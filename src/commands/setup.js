@@ -75,6 +75,10 @@ module.exports = {
             .setRequired(false)
         )
     )
+      .addSubcommands((sub) =>
+        sub.setName('details')
+        .setDescription('Show this server\'s setup values')
+      )
 ,
   async executeInteraction(interaction) {
     const safeReply = require('../utils/safeReply');
@@ -195,6 +199,32 @@ module.exports = {
       } catch (e) { try { require('../utils/logger').get('command:setup').warn('Failed to request spawn reschedule', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging requestReschedule error in setup', le && (le.stack || le)); } catch (ignored) {} } }
       await safeReply(interaction, { content: `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Egg limit set to ${num}.`, ephemeral: true }, { loggerName: 'command:setup' });
     } else {
+      if (sub === 'details') {
+        try {
+          const safeReply = require('../utils/safeReply');
+          const { EmbedBuilder } = require('discord.js');
+          const guildId = interaction.guildId;
+          const cfg = await guildModel.getGuildConfig(guildId) || {};
+          let nextSpawn = null;
+          try { const row = await require('../db').knex('guild_settings').where({ guild_id: guildId }).first('next_spawn_at'); nextSpawn = row && row.next_spawn_at ? Number(row.next_spawn_at) : null; } catch (e) {}
+          const embed = new EmbedBuilder()
+            .setTitle(`Setup for ${interaction.guild?.name || guildId}`)
+            .setColor(0x66ccff)
+            .addFields(
+              { name: 'Spawn Channel', value: cfg.channel_id ? `<#${cfg.channel_id}>` : 'Not set', inline: true },
+              { name: 'Egg Limit', value: String(cfg.egg_limit ?? '1'), inline: true },
+              { name: 'Spawn Min / Max (s)', value: `${cfg.spawn_min_seconds ?? '60'} / ${cfg.spawn_max_seconds ?? '3600'}`, inline: true }
+            )
+            .setTimestamp();
+          if (nextSpawn) embed.addFields({ name: 'Next scheduled spawn', value: new Date(nextSpawn).toLocaleString(), inline: true });
+          if (cfg && cfg.data && cfg.data.botAvatar) embed.setThumbnail(cfg.data.botAvatar);
+          await safeReply(interaction, { embeds: [embed] });
+        } catch (e) {
+          const safeReply = require('../utils/safeReply');
+          await safeReply(interaction, { content: `Failed to fetch setup details: ${e && (e.message || e)}`, ephemeral: true }, { loggerName: 'command:setup' });
+        }
+        return;
+      }
       // New: avatar subcommand handling
       if (sub === 'avatar') {
         const attachment = interaction.options.getAttachment('image');

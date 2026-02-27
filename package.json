@@ -6,6 +6,7 @@
   "scripts": {
     "start": "NODE_ENV=production node src/index.js",
     "start:dev": "NODE_ENV=development node src/index.js",
+    "predev": "BOT_PROFILE=dev node deploy-commands.js",
     "dev": "nodemon --watch src --exec node src/index.js",
     "deploy-commands": "node deploy-commands.js",
     "test": "jest --runInBand",

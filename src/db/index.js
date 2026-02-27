@@ -133,8 +133,9 @@ async function migrate() {
 
         if (!hasMin) {
           try {
+            // Add column without SQL-level default so existing rows are not overwritten
             await knex.schema.alterTable('guild_settings', (table) => {
-              table.integer('spawn_min_seconds').defaultTo(60);
+              table.integer('spawn_min_seconds');
             });
             logger.info('Added spawn_min_seconds to guild_settings');
           } catch (e) {
@@ -145,8 +146,9 @@ async function migrate() {
 
         if (!hasMax) {
           try {
+            // Add column without SQL-level default so existing rows are not overwritten
             await knex.schema.alterTable('guild_settings', (table) => {
-              table.integer('spawn_max_seconds').defaultTo(3600);
+              table.integer('spawn_max_seconds');
             });
             logger.info('Added spawn_max_seconds to guild_settings');
           } catch (e) {

@@ -16,10 +16,15 @@ module.exports = {
       const rows = await db.knex('guild_settings').select('*');
       for (const row of rows) {
         const parsed = row.data ? JSON.parse(row.data) : null;
+        // Normalize spawn timing fields into cache so consumers don't see missing fields
+        const spawnMin = row.spawn_min_seconds != null ? row.spawn_min_seconds : (row.spawn_rate_minutes != null ? Number(row.spawn_rate_minutes) * 60 : null);
+        const spawnMax = row.spawn_max_seconds != null ? row.spawn_max_seconds : (row.spawn_rate_minutes != null ? Number(row.spawn_rate_minutes) * 60 : null);
         const entry = {
           id: row.id,
           guild_id: row.guild_id,
           channel_id: row.channel_id,
+          spawn_min_seconds: spawnMin,
+          spawn_max_seconds: spawnMax,
           spawn_rate_minutes: row.spawn_rate_minutes,
           egg_limit: row.egg_limit,
           data: parsed,
