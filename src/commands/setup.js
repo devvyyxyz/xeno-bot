@@ -77,10 +77,10 @@ module.exports = {
     )
 ,
   async executeInteraction(interaction) {
+    const safeReply = require('../utils/safeReply');
     // permission: only server administrators or guild owner can change settings
     const memberPerms = interaction.memberPermissions;
       if (memberPerms && !memberPerms.has(PermissionsBitField.Flags.ManageGuild) && interaction.user.id !== interaction.guild.ownerId) {
-          const safeReply = require('../utils/safeReply');
           await safeReply(interaction, { content: 'You need Manage Server permission to run this.', ephemeral: true }, { loggerName: 'command:setup' });
           return;
         }

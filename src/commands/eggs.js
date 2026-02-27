@@ -18,7 +18,7 @@ module.exports = {
         name: 'sell',
         description: 'Sell an egg for royal jelly',
         options: [
-          { type: 3, name: 'egg', description: 'Egg type id', required: true },
+          { type: 3, name: 'egg', description: 'Egg type id', required: true, autocomplete: true },
           { type: 4, name: 'amount', description: 'Amount to sell', required: false }
         ]
       },
@@ -27,7 +27,7 @@ module.exports = {
         name: 'hatch',
         description: 'Start hatching an egg',
         options: [
-          { type: 3, name: 'egg', description: 'Egg type id', required: true },
+          { type: 3, name: 'egg', description: 'Egg type id', required: true, autocomplete: true },
           { type: 4, name: 'time', description: 'Hatch time in seconds', required: false }
         ]
       }
