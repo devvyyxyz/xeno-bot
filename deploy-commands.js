@@ -73,14 +73,20 @@ const rest = new REST({ version: '10' }).setToken(token);
 (async () => {
   try {
     console.log('Refreshing application (/) commands...');
-    if (process.env.GUILD_ID) {
-      logger.info('Registering guild commands', { clientId, guildId: process.env.GUILD_ID });
-      await rest.put(Routes.applicationGuildCommands(clientId, process.env.GUILD_ID), { body: commands });
+    // Priority: if GUILD_ID is set, register to that guild first for fast testing.
+    // Always attempt global registration afterwards (best-effort); failures are logged but do not abort.
+    const targetGuild = process.env.GUILD_ID;
+    if (targetGuild) {
+      logger.info('Registering guild commands', { clientId, guildId: targetGuild });
+      await rest.put(Routes.applicationGuildCommands(clientId, targetGuild), { body: commands });
       console.log('Successfully registered guild commands.');
-    } else {
-      logger.info('Registering global commands', { clientId });
+    }
+    try {
+      logger.info('Registering global commands (best-effort)', { clientId });
       await rest.put(Routes.applicationCommands(clientId), { body: commands });
       console.log('Successfully registered global commands.');
+    } catch (globalErr) {
+      logger.warn('Global command registration failed (best-effort)', { error: globalErr && (globalErr.stack || globalErr) });
     }
   } catch (error) {
     console.error(error);
