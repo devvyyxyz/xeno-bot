@@ -102,3 +102,18 @@ async function listHatches(discordId, guildId) {
 }
 
 module.exports = { init, startHatch, skipHatch, collectHatch, listHatches };
+
+// Shutdown helper: clear any pending timers
+async function shutdown() {
+  try {
+    for (const [id, t] of timers.entries()) {
+      try { clearTimeout(t); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing hatch timer during shutdown', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging timer clear error during hatchManager shutdown', le && (le.stack || le)); } catch (ignored) {} } }
+    }
+    timers.clear();
+    logger.info('hatchManager shutdown: cleared timers');
+  } catch (e) {
+    logger.warn('hatchManager shutdown error', { error: e && (e.stack || e) });
+  }
+}
+
+module.exports.shutdown = shutdown;

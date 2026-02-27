@@ -1,4 +1,5 @@
 const logger = require('../utils/logger').get('interactionCreate');
+const safeReply = require('../utils/safeReply');
 const { PermissionsBitField } = require('discord.js');
 
 module.exports = {
@@ -6,7 +7,7 @@ module.exports = {
   async execute(interaction, client) {
     try {
       // Handle autocomplete interactions separately
-      if (interaction.isAutocomplete && interaction.isAutocomplete()) {
+      if (typeof interaction.isAutocomplete === 'function' && interaction.isAutocomplete()) {
         const command = client.commands.get(interaction.commandName);
         if (!command) return;
         try {
@@ -18,7 +19,7 @@ module.exports = {
         }
         return;
       }
-      if (interaction.isChatInputCommand && interaction.isChatInputCommand()) {
+      if (typeof interaction.isChatInputCommand === 'function' && interaction.isChatInputCommand()) {
         const command = client.commands.get(interaction.commandName);
         if (!command) return;
         logger.info('Interaction command received', { command: interaction.commandName, user: interaction.user?.id });
@@ -31,8 +32,10 @@ module.exports = {
             const missing = perms.some(p => !(interaction.memberPermissions && interaction.memberPermissions.has(PermissionsBitField.Flags[p])));
             if (missing) {
               try {
-                await interaction.reply({ content: 'You do not have permission to run this command.', ephemeral: true });
-              } catch {}
+                await safeReply(interaction, { content: 'You do not have permission to run this command.', ephemeral: true }, { loggerName: 'interactionCreate' });
+              } catch (e) {
+                logger.warn('Failed sending permission denied message', { error: e && (e.stack || e) });
+              }
               return;
             }
           }
@@ -50,13 +53,20 @@ module.exports = {
                 data: { command: interaction.commandName, user: interaction.user?.id, guild: interaction.guildId, options: interaction.options?.data }
               });
               if (baseLogger.sentry.setTag) baseLogger.sentry.setTag('command', interaction.commandName);
-            } catch {}
+            } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (command.execute.start)', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging breadcrumb failure (command.execute.start)', le && (le.stack || le)); } }
           }
-          if (command.executeInteraction) await command.executeInteraction(interaction);
+          if (command.executeInteraction) {
+            try {
+              await command.executeInteraction(interaction);
+            } catch (cmdErr) {
+              // Let outer error handler catch it by rethrowing
+              throw cmdErr;
+            }
+          }
           if (baseLogger && baseLogger.sentry) {
             try {
               baseLogger.sentry.addBreadcrumb({ message: 'command.execute.finish', category: 'command', data: { command: interaction.commandName } });
-            } catch {}
+            } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (command.execute.finish)', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging breadcrumb failure (command.execute.finish)', le && (le.stack || le)); } }
           }
         } finally {
           // noop; outer catch will handle errors and capture
@@ -74,7 +84,7 @@ module.exports = {
         deferred: Boolean(interaction?.deferred),
         type: interaction?.type
       };
-      logger.error('Error handling interaction:', { error: err.stack || err, ...meta });
+      logger.error('Error handling interaction', { error: err && (err.stack || err), ...meta });
       try {
         const baseLogger = require('../utils/logger');
         if (baseLogger && baseLogger.sentry) baseLogger.sentry.captureException(err);
@@ -88,8 +98,7 @@ module.exports = {
           logger.warn('Interaction too old to reply to, skipping error reply', { ageMs, ...meta });
           return;
         }
-        if (interaction.replied || interaction.deferred) await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
-        else await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+        await safeReply(interaction, { content: 'There was an error while executing this command!', ephemeral: true }, { loggerName: 'interactionCreate' });
       } catch (replyErr) {
         logger.error('Failed to send error reply for interaction', { error: replyErr.stack || replyErr, ageMs: Date.now() - (interaction?.createdTimestamp || Date.now()), ...meta });
       }

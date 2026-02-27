@@ -1,0 +1,7 @@
+{
+  "profile": "dev",
+  "clientId": "1476813854938894510",
+  "owner": "664171400193638401",
+  "notes": "Development bot metadata. Do NOT commit secrets here — provide a development token via environment variables.",
+  "tokenEnvVar": "TOKEN_DEV"
+}

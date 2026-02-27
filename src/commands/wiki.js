@@ -11,6 +11,7 @@ module.exports = {
   description: cmd.description,
   data: { name: cmd.name, description: cmd.description },
   async executeInteraction(interaction) {
-    await interaction.reply({ content: `Wiki: ${links.wiki}`, ephemeral: false });
+    const safeReply = require('../utils/safeReply');
+    await safeReply(interaction, { content: `Wiki: ${links.wiki}`, ephemeral: false }, { loggerName: 'command:wiki' });
   }
 };

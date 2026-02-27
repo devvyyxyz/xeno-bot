@@ -220,6 +220,7 @@ module.exports = {
   getUserByDiscordId,
   createUser,
   updateUserData,
+  updateUserDataRawById,
   findOrCreate,
   addEggsForGuild,
   addItemForGuild,
@@ -231,5 +232,6 @@ module.exports = {
   removeItemForGuild,
   getAllUsers
 };
+
 
 

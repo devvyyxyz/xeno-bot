@@ -26,8 +26,16 @@ npm run deploy-commands
 
 4. Run the bot:
 
+Production (public bot):
+
 ```bash
-npm run start
+npm start
+```
+
+Development (private/dev bot):
+
+```bash
+npm run start:dev
 ```
 
 Development
@@ -55,3 +63,5 @@ Files of interest
 - `src/index.js` — bot entrypoint and loader
 - `deploy-commands.js` — small script to register commands
 - `config/config.json` — simple config (prefix, owner)
+ - `config/bot.public.json` — non-secret metadata for the public bot (token read from env `TOKEN`)
+ - `config/bot.dev.json` — non-secret metadata for the development bot (token read from env `TOKEN_DEV` by default)

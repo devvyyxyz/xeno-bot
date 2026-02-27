@@ -11,6 +11,8 @@ const cmd = getCommandConfig('info') || {
   description: 'Show system, tech, and global stats.'
 };
 
+const logger = require('../utils/logger').get('command:info');
+
 // Track soft uptime and loop count
 global._softUptimeStart = global._softUptimeStart || Date.now();
 global._loopCount = global._loopCount || 0;
@@ -25,7 +27,7 @@ module.exports = {
     let pythonVersion = 'N/A';
     try {
       pythonVersion = execSync('python3 --version').toString().trim().replace('Python ', '');
-    } catch {}
+    } catch (e) { try { logger.warn('Failed detecting python version for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging python detection error for info command', le && (le.stack || le)); } }
     const discordjsVersion = pkg.dependencies['discord.js'] || 'unknown';
     const cpuUsage = (os.loadavg()[0] / os.cpus().length * 100).toFixed(1) + '%';
     const ramUsage = ((process.memoryUsage().rss / os.totalmem()) * 100).toFixed(1) + '%';
@@ -45,7 +47,7 @@ module.exports = {
       const git = execSync('git log -1 --format=%ct').toString().trim();
       const last = Number(git) * 1000;
       lastUpdate = fmt(Date.now() - last);
-    } catch {}
+    } catch (e) { try { logger.warn('Failed getting last git update for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging git update error for info command', le && (le.stack || le)); } }
     const loops = ++global._loopCount;
     // Sharding (simulate)
     const shards = 192;
@@ -56,19 +58,19 @@ module.exports = {
     try {
       const g = await knex('guild_settings').count('* as c').first();
       guilds = g && (g.c ?? g['count(*)']) ? g.c || g['count(*)'] : '0';
-    } catch {}
+    } catch (e) { try { logger.warn('Failed querying guild count for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging guild count query error for info command', le && (le.stack || le)); } }
     try {
       const p = await knex('profiles').count('* as c').first();
       dbProfiles = p && (p.c ?? p['count(*)']) ? p.c || p['count(*)'] : '0';
-    } catch {}
+    } catch (e) { try { logger.warn('Failed querying profiles count for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging profiles count query error for info command', le && (le.stack || le)); } }
     try {
       const u = await knex('users').count('* as c').first();
       dbUsers = u && (u.c ?? u['count(*)']) ? u.c || u['count(*)'] : '0';
-    } catch {}
+    } catch (e) { try { logger.warn('Failed querying users count for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging users count query error for info command', le && (le.stack || le)); } }
     try {
       const c = await knex('channels').count('* as c').first();
       dbChannels = c && (c.c ?? c['count(*)']) ? c.c || c['count(*)'] : '0';
-    } catch {}
+    } catch (e) { try { logger.warn('Failed querying channels count for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging channels count query error for info command', le && (le.stack || le)); } }
 
     const embed = {
       title: '📊 Bot Info',
@@ -98,6 +100,7 @@ module.exports = {
         + `DB Channels:  ${dbChannels}`
         + '\n```',
     };
-    await interaction.reply({ embeds: [embed], ephemeral: cmd.ephemeral === true });
+    const safeReply = require('../utils/safeReply');
+    await safeReply(interaction, { embeds: [embed], ephemeral: cmd.ephemeral === true }, { loggerName: 'command:info' });
   }
 };

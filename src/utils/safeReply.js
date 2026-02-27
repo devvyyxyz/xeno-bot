@@ -34,7 +34,7 @@ async function safeReply(interaction, payload = {}, opts = {}) {
       }
     }
   } catch (finalErr) {
-    try { logger && logger.error && logger.error('safeReply: unexpected error', { error: finalErr && (finalErr.stack || finalErr) }); } catch (e) {}
+    try { logger && logger.error && logger.error('safeReply: unexpected error', { error: finalErr && (finalErr.stack || finalErr) }); } catch (e) { try { console.warn('safeReply: failed logging unexpected error', e && (e.stack || e)); } catch (ignored) {} }
   }
 }
 

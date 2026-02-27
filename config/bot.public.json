@@ -1,0 +1,7 @@
+{
+  "profile": "public",
+  "clientId": "1476427270326583306",
+  "owner": "664171400193638401",
+  "notes": "This file stores non-secret metadata for the public/production bot. Secrets (TOKEN) must be provided via environment variables or secret manager.",
+  "tokenEnvVar": "TOKEN"
+}

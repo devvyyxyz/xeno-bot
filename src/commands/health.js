@@ -13,7 +13,8 @@ module.exports = {
     const cfg = require('../../config/config.json');
     const ownerId = (cfg && cfg.owner) ? String(cfg.owner) : null;
     if (ownerId && interaction.user.id !== ownerId) {
-      await interaction.reply({ content: 'Only the bot developer/owner can run this command.', flags: 64 });
+      const safeReply = require('../utils/safeReply');
+      await safeReply(interaction, { content: 'Only the bot developer/owner can run this command.', ephemeral: true }, { loggerName: 'command:health' });
       return;
     }
     const now = new Date();
@@ -35,7 +36,9 @@ module.exports = {
           const { URL } = require('url');
           const parsed = new URL(process.env.DATABASE_URL);
           dbInfo += ` | Host: ${parsed.hostname}` + (parsed.pathname ? ` | DB: ${parsed.pathname.replace('/', '')}` : '');
-        } catch (e) {}
+        } catch (e) {
+          try { logger && logger.warn && logger.warn('Failed parsing DATABASE_URL in health command', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging DATABASE_URL parse error in health command', le && (le.stack || le)); } catch (ignored) {} }
+        }
       }
       try {
         const u = await knex('users').count('* as c').first();
@@ -65,7 +68,8 @@ module.exports = {
     if (dbError) {
       embed.addFields({ name: 'DB Error', value: String(dbError.message || dbError), inline: false });
     }
-    await interaction.reply({ embeds: [embed], flags: 64 });
+    const safeReply = require('../utils/safeReply');
+    await safeReply(interaction, { embeds: [embed], ephemeral: true }, { loggerName: 'command:health' });
   },
   // text-mode handler removed; use slash command
 };

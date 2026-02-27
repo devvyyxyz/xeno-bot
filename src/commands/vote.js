@@ -18,6 +18,7 @@ module.exports = {
         .setLabel('Vote on Top.gg')
         .setURL(links.vote)
     );
-    await interaction.reply({ content: 'Support the bot by voting!', components: [row], ephemeral: false });
+    const safeReply = require('../utils/safeReply');
+    await safeReply(interaction, { content: 'Support the bot by voting!', components: [row], ephemeral: false }, { loggerName: 'command:vote' });
   }
 };

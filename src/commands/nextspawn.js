@@ -24,7 +24,7 @@ module.exports = {
         await interaction.deferReply({ ephemeral: false });
       }
     } catch (deferErr) {
-      try { require('../utils/logger').get('command:nextspawn').warn('Failed to defer reply', { error: deferErr && (deferErr.stack || deferErr) }); } catch {}
+      try { require('../utils/logger').get('command:nextspawn').warn('Failed to defer reply', { error: deferErr && (deferErr.stack || deferErr) }); } catch (e) { try { require('../utils/logger').get('command:nextspawn').warn('Failed logging defer reply failure in nextspawn', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging defer reply failure in nextspawn fallback', le && (le.stack || le)); } }
       const ageMs = Date.now() - (interaction.createdTimestamp || Date.now());
       if (ageMs > 10000) {
         // Interaction likely expired; bail quietly
@@ -53,7 +53,7 @@ module.exports = {
         const safeReply = require('../utils/safeReply');
         await safeReply(interaction, { content: `Failed to get next spawn info: ${err && (err.message || err)}` }, { loggerName: 'command:nextspawn' });
       } catch (finalErr) {
-        try { logger.error('Failed replying after nextspawn error (final)', { error: finalErr && (finalErr.stack || finalErr) }); } catch {}
+        try { logger.error('Failed replying after nextspawn error (final)', { error: finalErr && (finalErr.stack || finalErr) }); } catch (e) { try { logger.warn('Failed logging final reply error in nextspawn', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging final reply error in nextspawn fallback', le && (le.stack || le)); } }
       }
     }
   }

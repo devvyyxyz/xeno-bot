@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+// EmbedBuilder not used in this command
 const { getCommandConfig } = require('../utils/commandsConfig');
 const userModel = require('../models/user');
 const hatchManager = require('../hatchManager');
@@ -53,7 +53,9 @@ module.exports = {
       });
       return autocomplete(interaction, items, { map: it => ({ name: it.name, value: it.id }), max: 25 });
     } catch (e) {
-      try { await interaction.respond([]); } catch {}
+      const logger = require('../utils/logger').get('command:eggs');
+      logger.warn('Autocomplete failed', { error: e && (e.stack || e) });
+      try { await interaction.respond([]); } catch (respErr) { logger.warn('Failed to respond empty autocomplete', { error: respErr && (respErr.stack || respErr) }); }
     }
   },
 
@@ -68,7 +70,8 @@ module.exports = {
         const amount = interaction.options.getInteger('amount') || 1;
         const eggConfig = eggTypes.find(e => e.id === eggId);
         if (!eggConfig) {
-          await interaction.editReply({ content: 'Unknown egg type.' });
+          const safeReply = require('../utils/safeReply');
+          await safeReply(interaction, { content: 'Unknown egg type.', ephemeral: true }, { loggerName: 'command:eggs' });
           return;
         }
         try {
@@ -77,9 +80,11 @@ module.exports = {
           const sellPrice = Math.max(0, Math.floor((Number(eggConfig.price || 0) / 2)));
           const total = sellPrice * Number(amount);
           const newBal = await userModel.modifyCurrencyForGuild(discordId, guildId, 'royal_jelly', total);
-          await interaction.editReply({ content: `Sold ${amount} x ${eggConfig.name} for ${total} royal jelly. New balance: ${newBal}.` });
+          const safeReply = require('../utils/safeReply');
+          await safeReply(interaction, { content: `Sold ${amount} x ${eggConfig.name} for ${total} royal jelly. New balance: ${newBal}.`, ephemeral: true }, { loggerName: 'command:eggs' });
         } catch (e) {
-          await interaction.editReply({ content: `Failed to sell eggs: ${e.message}` });
+          const safeReply = require('../utils/safeReply');
+          await safeReply(interaction, { content: `Failed to sell eggs: ${e.message}`, ephemeral: true }, { loggerName: 'command:eggs' });
         }
         return;
       }
@@ -89,19 +94,24 @@ module.exports = {
         const timeSec = interaction.options.getInteger('time') || 60;
         const eggConfig = eggTypes.find(e => e.id === eggId);
         if (!eggConfig) {
-          await interaction.editReply({ content: 'Unknown egg type.' });
+          const safeReply = require('../utils/safeReply');
+          await safeReply(interaction, { content: 'Unknown egg type.', ephemeral: true }, { loggerName: 'command:eggs' });
           return;
         }
         try {
           const h = await hatchManager.startHatch(discordId, guildId, eggId, Number(timeSec) * 1000);
-          await interaction.editReply({ content: `Started hatching ${eggConfig.name}. Hatch id: ${h.id}. It will finish in ${timeSec}s.` });
+          const safeReply = require('../utils/safeReply');
+          await safeReply(interaction, { content: `Started hatching ${eggConfig.name}. Hatch id: ${h.id}. It will finish in ${timeSec}s.`, ephemeral: true }, { loggerName: 'command:eggs' });
         } catch (e) {
-          await interaction.editReply({ content: `Failed to start hatch: ${e.message}` });
+          const safeReply = require('../utils/safeReply');
+          await safeReply(interaction, { content: `Failed to start hatch: ${e.message}`, ephemeral: true }, { loggerName: 'command:eggs' });
         }
         return;
       }
     } catch (err) {
-      try { await interaction.reply({ content: `Error: ${err.message}`, ephemeral: true }); } catch {}
+      const logger = require('../utils/logger').get('command:eggs');
+      logger.error('Unhandled error in eggs command', { error: err && (err.stack || err) });
+      try { const safeReply = require('../utils/safeReply'); await safeReply(interaction, { content: `Error: ${err.message}`, ephemeral: true }, { loggerName: 'command:eggs' }); } catch (replyErr) { logger.warn('Failed to send error reply in eggs command', { error: replyErr && (replyErr.stack || replyErr) }); }
     }
   }
 };

@@ -6,7 +6,8 @@ module.exports = {
   description: cmd.description,
   data: { name: cmd.name, description: cmd.description },
   async executeInteraction(interaction) {
-    await interaction.reply({ content: 'Pong!', flags: 64 });
+    const safeReply = require('../utils/safeReply');
+    await safeReply(interaction, { content: 'Pong!', ephemeral: true }, { loggerName: 'command:ping' });
   },
   // text-mode handler removed; use slash command
 };

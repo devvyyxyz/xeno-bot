@@ -52,7 +52,9 @@ module.exports = {
     // Only handle /give egg
     if (interaction.options.getSubcommand() === 'egg') {
       if (!interaction.memberPermissions || !interaction.memberPermissions.has('Administrator')) {
-        return interaction.reply({ content: 'You must be an admin to use this command.', ephemeral: true });
+        const safeReply = require('../utils/safeReply');
+        await safeReply(interaction, { content: 'You must be an admin to use this command.', ephemeral: true }, { loggerName: 'command:give' });
+        return;
       }
       await interaction.deferReply({ ephemeral: false });
       const target = interaction.options.getUser('user');
@@ -61,14 +63,16 @@ module.exports = {
       const guildId = interaction.guildId;
       const eggType = eggTypes.find(e => e.id === eggTypeId);
       if (!eggType) {
-        await interaction.editReply({ content: 'Invalid egg type.' });
+        const safeReply = require('../utils/safeReply');
+        await safeReply(interaction, { content: 'Invalid egg type.', ephemeral: true }, { loggerName: 'command:give' });
         return;
       }
       const baseLogger = require('../utils/logger');
-      if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.addEggs.start', category: 'db', data: { target: target.id, guildId, eggTypeId, amount } }); } catch {} }
+      if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.addEggs.start', category: 'db', data: { target: target.id, guildId, eggTypeId, amount } }); } catch (e) { try { require('../utils/logger').get('command:give').warn('Failed to add sentry breadcrumb (db.addEggs.start)', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging give breadcrumb error (db.addEggs.start)', le && (le.stack || le)); } catch (ignored) {} } } }
       await userModel.addEggsForGuild(target.id, guildId, amount, eggTypeId);
-      if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.addEggs.finish', category: 'db', data: { target: target.id, guildId } }); } catch {} }
-      await interaction.editReply({ content: `Gave ${eggType.emoji} ${eggType.name} x${amount} to ${target}.` });
+      if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.addEggs.finish', category: 'db', data: { target: target.id, guildId } }); } catch (e) { try { require('../utils/logger').get('command:give').warn('Failed to add sentry breadcrumb (db.addEggs.finish)', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging give breadcrumb error (db.addEggs.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
+      const safeReply = require('../utils/safeReply');
+      await safeReply(interaction, { content: `Gave ${eggType.emoji} ${eggType.name} x${amount} to ${target}.`, ephemeral: true }, { loggerName: 'command:give' });
     }
   }
 };

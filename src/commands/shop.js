@@ -5,6 +5,8 @@ const { EmbedBuilder, ActionRowBuilder } = require('discord.js');
 const { StringSelectMenuBuilder, SecondaryButtonBuilder, SuccessButtonBuilder } = require('@discordjs/builders');
 const userModel = require('../models/user');
 
+const logger = require('../utils/logger').get('command:shop');
+
 const cmd = getCommandConfig('shop') || { name: 'shop', description: 'Open the shop to buy items.' };
 
 const PAGE_SIZE = 6;
@@ -153,14 +155,14 @@ module.exports = {
             selCollector.stop();
           });
           selCollector.on('end', async () => {
-            try { await i.followUp({ content: 'Purchase session ended.', ephemeral: true }); } catch {}
+            try { await i.followUp({ content: 'Purchase session ended.', ephemeral: true }); } catch (e) { try { logger.warn('Failed to followUp after selCollector end in shop', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging followUp failure in shop selCollector end', le && (le.stack || le)); } catch (ignored) {} } }
           });
           return;
         }
       } catch (err) {
-        try { await i.reply({ content: 'Error handling shop interaction.', ephemeral: true }); } catch {}
+        try { await i.reply({ content: 'Error handling shop interaction.', ephemeral: true }); } catch (e) { try { logger.warn('Failed sending error reply in shop interaction handler', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging shop interaction error reply failure', le && (le.stack || le)); } catch (ignored) {} } }
       }
     });
-    collector.on('end', async () => { try { await interaction.editReply({ components: [] }); } catch {} });
+    collector.on('end', async () => { try { await interaction.editReply({ components: [] }); } catch (e) { try { logger.warn('Failed clearing shop components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging clearing shop components error', le && (le.stack || le)); } catch (ignored) {} } } });
   }
 };
