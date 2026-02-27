@@ -1,2 +1,20 @@
 node_modules/
 .env
+ # runtime logs
+logs/
+*.log
+
+# local sqlite DB used for development fallback
+data/*.sqlite
+data/*.sqlite3
+
+# editor / OS files
+.DS_Store
+.vscode/
+.idea/
+
+# build / test
+coverage/
+
+# lockfiles (optional)
+# package-lock.json
