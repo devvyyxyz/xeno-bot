@@ -32,7 +32,7 @@ async function getGuildConfig(guildId) {
 }
 
 async function upsertGuildConfig(guildId, changes = {}) {
-  const existing = await knex('guild_settings').where({ guild_id: guildId }).first();
+  const existing = await db.knex('guild_settings').where({ guild_id: guildId }).first();
   const payload = {};
   if ('channel_id' in changes) payload.channel_id = changes.channel_id;
   // accept spawn seconds as either spawn_min_seconds/spawn_max_seconds or spawn_rate_minutes (legacy)
