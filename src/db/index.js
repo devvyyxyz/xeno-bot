@@ -19,9 +19,35 @@ function createKnex() {
   return knexLib({ client: 'sqlite3', connection: { filename }, useNullAsDefault: true });
 }
 
-const knex = createKnex();
+let knex = createKnex();
+
+function createSqliteKnex() {
+  const dataDir = path.join(__dirname, '..', '..', 'data');
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  const filename = path.join(dataDir, 'dev.sqlite');
+  logger.info('Falling back to local SQLite DB', { filename });
+  return knexLib({ client: 'sqlite3', connection: { filename }, useNullAsDefault: true });
+}
 
 async function migrate() {
+  // If a DATABASE_URL is set, test the connection and fall back to SQLite on ECONNREFUSED.
+  if (process.env.DATABASE_URL) {
+    try {
+      await knex.raw('select 1');
+    } catch (e) {
+      const str = (e && (e.stack || e.message || '')).toString();
+      if (str.includes('ECONNREFUSED') || str.includes('connect ECONNREFUSED')) {
+        logger.error('DB connection refused for DATABASE_URL; falling back to local SQLite', { error: str });
+        try {
+          await knex.destroy();
+        } catch (_) {}
+        knex = createSqliteKnex();
+      } else {
+        // non-connection error - rethrow so migrate() fails loudly
+        throw e;
+      }
+    }
+  }
   try {
     const exists = await knex.schema.hasTable('users');
     if (!exists) {
@@ -60,12 +86,47 @@ async function migrate() {
       const hasOld = await knex.schema.hasColumn('guild_settings', 'spawn_rate_minutes');
       const hasNextSpawnAt = await knex.schema.hasColumn('guild_settings', 'next_spawn_at');
       if (!hasMin || !hasMax || !hasNextSpawnAt) {
-        await knex.schema.alterTable('guild_settings', (table) => {
-          if (!hasMin) table.integer('spawn_min_seconds').defaultTo(60);
-          if (!hasMax) table.integer('spawn_max_seconds').defaultTo(3600);
-          if (!hasNextSpawnAt) table.bigInteger('next_spawn_at');
-        });
-        logger.info('Added spawn_min_seconds/spawn_max_seconds/next_spawn_at columns to guild_settings');
+        // Add columns one-by-one and tolerate "duplicate column" errors
+        const isDuplicateColumnError = (e) => {
+          const msg = (e && (e.stack || e.message || '')).toString();
+          return msg.includes('duplicate column name') || msg.includes('already exists');
+        };
+
+        if (!hasMin) {
+          try {
+            await knex.schema.alterTable('guild_settings', (table) => {
+              table.integer('spawn_min_seconds').defaultTo(60);
+            });
+            logger.info('Added spawn_min_seconds to guild_settings');
+          } catch (e) {
+            if (isDuplicateColumnError(e)) logger.warn('spawn_min_seconds column already exists, ignoring');
+            else throw e;
+          }
+        }
+
+        if (!hasMax) {
+          try {
+            await knex.schema.alterTable('guild_settings', (table) => {
+              table.integer('spawn_max_seconds').defaultTo(3600);
+            });
+            logger.info('Added spawn_max_seconds to guild_settings');
+          } catch (e) {
+            if (isDuplicateColumnError(e)) logger.warn('spawn_max_seconds column already exists, ignoring');
+            else throw e;
+          }
+        }
+
+        if (!hasNextSpawnAt) {
+          try {
+            await knex.schema.alterTable('guild_settings', (table) => {
+              table.bigInteger('next_spawn_at');
+            });
+            logger.info('Added next_spawn_at to guild_settings');
+          } catch (e) {
+            if (isDuplicateColumnError(e)) logger.warn('next_spawn_at column already exists, ignoring');
+            else throw e;
+          }
+        }
       }
       if (hasOld) {
         try {
@@ -138,4 +199,7 @@ async function migrate() {
   }
 }
 
-module.exports = { knex, migrate };
+module.exports = {
+  get knex() { return knex; },
+  migrate
+};

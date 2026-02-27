@@ -1,5 +1,8 @@
+const db = require('../db');
+const logger = require('../utils/logger').get('models:egg');
+
 // Ensure all eggs from config are present in the database for all guilds
-async function ensureAllEggsInAllGuilds(eggTypes, knexInstance = knex) {
+async function ensureAllEggsInAllGuilds(eggTypes, knexInstance = db.knex) {
   await ensureEggStatsTable();
   // Get all guild IDs from guild_settings table
   const guildRows = await knexInstance('guild_settings').select('guild_id');
@@ -14,14 +17,12 @@ async function ensureAllEggsInAllGuilds(eggTypes, knexInstance = knex) {
     }
   }
 }
-const { knex } = require('../db');
-const logger = require('../utils/logger').get('models:egg');
 
 // Ensure the egg_stats table exists
 async function ensureEggStatsTable() {
-  const exists = await knex.schema.hasTable('egg_stats');
+  const exists = await db.knex.schema.hasTable('egg_stats');
   if (!exists) {
-    await knex.schema.createTable('egg_stats', (table) => {
+    await db.knex.schema.createTable('egg_stats', (table) => {
       table.increments('id').primary();
       table.string('egg_id').notNullable();
       table.string('guild_id').notNullable();
@@ -36,9 +37,9 @@ async function ensureEggStatsTable() {
 async function ensureEggTypesForGuild(guildId, eggTypes) {
   await ensureEggStatsTable();
   for (const egg of eggTypes) {
-    const exists = await knex('egg_stats').where({ egg_id: egg.id, guild_id: guildId }).first();
+    const exists = await db.knex('egg_stats').where({ egg_id: egg.id, guild_id: guildId }).first();
     if (!exists) {
-      await knex('egg_stats').insert({ egg_id: egg.id, guild_id: guildId, caught: 0 });
+      await db.knex('egg_stats').insert({ egg_id: egg.id, guild_id: guildId, caught: 0 });
       logger.info('Inserted egg stat row', { egg_id: egg.id, guild_id: guildId });
     }
   }
@@ -47,7 +48,7 @@ async function ensureEggTypesForGuild(guildId, eggTypes) {
 // Increment caught count for an egg type in a guild
 async function incrementEggCaught(guildId, eggId, amount = 1) {
   await ensureEggStatsTable();
-  await knex('egg_stats')
+  await db.knex('egg_stats')
     .where({ egg_id: eggId, guild_id: guildId })
     .increment('caught', amount);
 }
@@ -55,7 +56,7 @@ async function incrementEggCaught(guildId, eggId, amount = 1) {
 // Get all egg stats for a guild
 async function getEggStatsForGuild(guildId) {
   await ensureEggStatsTable();
-  const rows = await knex('egg_stats').where({ guild_id: guildId });
+  const rows = await db.knex('egg_stats').where({ guild_id: guildId });
   const stats = {};
   for (const row of rows) {
     stats[row.egg_id] = row.caught;

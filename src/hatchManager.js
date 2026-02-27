@@ -1,4 +1,4 @@
-const { knex } = require('./db');
+const db = require('./db');
 const logger = require('./utils/logger').get('hatch');
 const userModel = require('./models/user');
 const eggTypes = require('../config/eggTypes.json');
@@ -7,7 +7,7 @@ let timers = new Map(); // hatchId -> timeout
 
 async function init() {
   try {
-    const rows = await knex('hatches').where({ collected: false }).select('*');
+    const rows = await db.knex('hatches').where({ collected: false }).select('*');
     for (const r of rows) {
       const now = Date.now();
       const finishes = Number(r.finishes_at) || now;
@@ -53,7 +53,7 @@ async function startHatch(discordId, guildId, eggTypeId, durationMs) {
 
   const startedAt = Date.now();
   const finishesAt = startedAt + Number(durationMs || 60 * 1000);
-  const insert = await knex('hatches').insert({ discord_id: discordId, guild_id: guildId, egg_type: eggTypeId, started_at: startedAt, finishes_at: finishesAt });
+  const insert = await db.knex('hatches').insert({ discord_id: discordId, guild_id: guildId, egg_type: eggTypeId, started_at: startedAt, finishes_at: finishesAt });
   const id = Array.isArray(insert) ? insert[0] : insert;
   logger.info('Created hatch', { id, discordId, guildId, eggTypeId, finishesAt });
   scheduleTimer(id, finishesAt - Date.now());
@@ -62,7 +62,7 @@ async function startHatch(discordId, guildId, eggTypeId, durationMs) {
 
 // Skip hatch: pay royal jelly to complete instantly. costRoyalJelly can be number or function of egg type.
 async function skipHatch(discordId, guildId, hatchId, costRoyalJelly = 5) {
-  const row = await knex('hatches').where({ id: hatchId, discord_id: discordId, guild_id: guildId, collected: false }).first();
+  const row = await db.knex('hatches').where({ id: hatchId, discord_id: discordId, guild_id: guildId, collected: false }).first();
   if (!row) throw new Error('Hatch not found');
   const now = Date.now();
   if (Number(row.finishes_at) <= now) return true; // already finished
@@ -74,7 +74,7 @@ async function skipHatch(discordId, guildId, hatchId, costRoyalJelly = 5) {
     throw new Error('Insufficient royal jelly');
   }
   // mark skipped and set finishes_at to now
-  await knex('hatches').where({ id: hatchId }).update({ skipped: true, finishes_at: now });
+  await db.knex('hatches').where({ id: hatchId }).update({ skipped: true, finishes_at: now });
   if (timers.has(hatchId)) {
     clearTimeout(timers.get(hatchId));
     timers.delete(hatchId);
@@ -85,19 +85,19 @@ async function skipHatch(discordId, guildId, hatchId, costRoyalJelly = 5) {
 
 // Collect a finished hatch, granting a facehugger to the user (item id: 'facehugger')
 async function collectHatch(discordId, guildId, hatchId) {
-  const row = await knex('hatches').where({ id: hatchId, discord_id: discordId, guild_id: guildId, collected: false }).first();
+  const row = await db.knex('hatches').where({ id: hatchId, discord_id: discordId, guild_id: guildId, collected: false }).first();
   if (!row) throw new Error('Hatch not found');
   const now = Date.now();
   if (Number(row.finishes_at) > now) throw new Error('Hatch is not ready yet');
   // grant facehugger item
   await userModel.addItemForGuild(discordId, guildId, 'facehugger', 1);
-  await knex('hatches').where({ id: hatchId }).update({ collected: true });
+  await db.knex('hatches').where({ id: hatchId }).update({ collected: true });
   logger.info('Hatch collected', { hatchId, discordId, guildId });
   return true;
 }
 
 async function listHatches(discordId, guildId) {
-  const rows = await knex('hatches').where({ discord_id: discordId, guild_id: guildId }).orderBy('id', 'desc').limit(50);
+  const rows = await db.knex('hatches').where({ discord_id: discordId, guild_id: guildId }).orderBy('id', 'desc').limit(50);
   return rows.map(r => ({ id: r.id, egg_type: r.egg_type, started_at: Number(r.started_at), finishes_at: Number(r.finishes_at), collected: !!r.collected, skipped: !!r.skipped }));
 }
 

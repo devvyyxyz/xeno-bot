@@ -1,9 +1,9 @@
-const { knex } = require('../db');
+const db = require('../db');
 const logger = require('../utils/logger').get('models:user');
 const userDefaults = require('../../config/userDefaults.json');
 
 async function getUserByDiscordId(discordId) {
-  const row = await knex('users').where({ discord_id: discordId }).first();
+  const row = await db.knex('users').where({ discord_id: discordId }).first();
   if (!row) return null;
   try {
     const data = row.data ? JSON.parse(row.data) : null;
@@ -19,14 +19,14 @@ async function createUser(discordId, initialData = {}) {
   const gd = (userDefaults && userDefaults.guildDefaults) ? userDefaults.guildDefaults : { eggs: { classic: 1 }, items: {}, currency: { royal_jelly: 0 } };
   const dataToStore = Object.assign({}, defaults, initialData || {});
   dataToStore.guilds = dataToStore.guilds || {};
-  const inserted = await knex('users').insert({ discord_id: discordId, data: JSON.stringify(dataToStore) });
+  const inserted = await db.knex('users').insert({ discord_id: discordId, data: JSON.stringify(dataToStore) });
   const id = Array.isArray(inserted) ? inserted[0] : inserted;
   logger.info('Created user', { discordId, id });
   return getUserByDiscordId(discordId);
 }
 
 async function updateUserData(discordId, newData) {
-  const updated = await knex('users').where({ discord_id: discordId }).update({ data: JSON.stringify(newData), updated_at: knex.fn.now() });
+  const updated = await db.knex('users').where({ discord_id: discordId }).update({ data: JSON.stringify(newData), updated_at: db.knex.fn.now() });
   if (!updated) return null;
   return getUserByDiscordId(discordId);
 }
@@ -39,7 +39,7 @@ async function findOrCreate(discordId, defaults = {}) {
 
 async function updateUserDataRawById(userId, newData) {
   try {
-    await knex('users').where({ id: userId }).update({ data: JSON.stringify(newData), updated_at: knex.fn.now() });
+    await db.knex('users').where({ id: userId }).update({ data: JSON.stringify(newData), updated_at: db.knex.fn.now() });
   } catch (err) {
     logger.error('Failed to update user data (raw)', { userId, error: err.stack || err });
     throw err;
@@ -120,7 +120,7 @@ async function getGuildStats(discordId, guildId) {
 
 // Get all users (for leaderboard)
 async function getAllUsers() {
-  const rows = await knex('users').select('discord_id', 'data');
+  const rows = await db.knex('users').select('discord_id', 'data');
   return rows.map(row => ({ discord_id: row.discord_id, data: row.data ? JSON.parse(row.data) : {} }));
 }
 

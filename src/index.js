@@ -44,7 +44,7 @@ const logger = baseLogger.get('index');
 const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
 const config = require('../config/config.json');
 // Database adapter (knex). Exposes `migrate()` to prepare local DB during startup.
-const { knex, migrate } = require('./db');
+const db = require('./db');
 // Optional telemetry (Sentry) — validate DSN and initialize once
 let Sentry;
 if (process.env.SENTRY_DSN) {
@@ -63,13 +63,13 @@ if (process.env.SENTRY_DSN) {
 // Database (knex) — initialize and run migrations in dev
 
 if (process.env.NODE_ENV !== 'production') {
-  migrate().catch(err => baseLogger.error('DB migrate failed', { error: err.stack || err }));
+  db.migrate().catch(err => baseLogger.error('DB migrate failed', { error: err.stack || err }));
 }
 
 // Ensure all eggs from config are present in the database for all guilds
 const eggTypes = require('../config/eggTypes.json');
 const eggModel = require('./models/egg');
-eggModel.ensureAllEggsInAllGuilds(eggTypes, knex).catch(err => baseLogger.error('Failed to ensure all eggs in DB', { error: err.stack || err }));
+eggModel.ensureAllEggsInAllGuilds(eggTypes, db.knex).catch(err => baseLogger.error('Failed to ensure all eggs in DB', { error: err.stack || err }));
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
@@ -149,7 +149,7 @@ async function gracefulShutdown(reason) {
       const hatchManager = require('./hatchManager');
       if (typeof hatchManager.shutdown === 'function') await hatchManager.shutdown();
     } catch (e) { logger.warn('hatchManager.shutdown not available', { error: e && (e.stack || e) }); }
-    try { await knex.destroy(); } catch (e) { logger.warn('Failed to destroy knex', { error: e && (e.stack || e) }); }
+    try { await db.knex.destroy(); } catch (e) { logger.warn('Failed to destroy knex', { error: e && (e.stack || e) }); }
     logger.info('Graceful shutdown complete, exiting');
     process.exit(0);
   } catch (err) {

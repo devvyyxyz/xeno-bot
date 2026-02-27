@@ -1,7 +1,7 @@
 const { getCommandConfig } = require('../utils/commandsConfig');
 const cmd = getCommandConfig('health') || { name: 'health', description: 'Show bot health (DB and telemetry)' };
 const logger = require('../utils/logger').get('command:health');
-const { knex } = require('../db');
+const db = require('../db');
 const baseLogger = require('../utils/logger');
 
 module.exports = {
@@ -24,12 +24,12 @@ module.exports = {
     let guildsCount = 'n/a';
     let dbError = null;
     try {
-      await knex.raw('select 1 as result');
-      const clientName = knex.client.config.client || 'unknown';
+      await db.knex.raw('select 1 as result');
+      const clientName = db.knex.client.config.client || 'unknown';
       dbStatus = '✅ OK';
       dbInfo = `Client: ${clientName}`;
       if (clientName === 'sqlite3') {
-        const filename = knex.client.config.connection && knex.client.config.connection.filename;
+        const filename = db.knex.client.config.connection && db.knex.client.config.connection.filename;
         if (filename) dbInfo += ` | File: ${filename}`;
       } else if (process.env.DATABASE_URL) {
         try {
@@ -40,14 +40,14 @@ module.exports = {
           try { logger && logger.warn && logger.warn('Failed parsing DATABASE_URL in health command', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging DATABASE_URL parse error in health command', le && (le.stack || le)); } catch (ignored) {} }
         }
       }
-      try {
-        const u = await knex('users').count('* as c').first();
-        usersCount = u && (u.c ?? u['count(*)']) ? String(u.c || u['count(*)']) : '0';
-      } catch (e) { usersCount = 'err'; }
-      try {
-        const g = await knex('guild_settings').count('* as c').first();
-        guildsCount = g && (g.c ?? g['count(*)']) ? String(g.c || g['count(*)']) : '0';
-      } catch (e) { guildsCount = 'err'; }
+        try {
+          const u = await db.knex('users').count('* as c').first();
+          usersCount = u && (u.c ?? u['count(*)']) ? String(u.c || u['count(*)']) : '0';
+        } catch (e) { usersCount = 'err'; }
+        try {
+          const g = await db.knex('guild_settings').count('* as c').first();
+          guildsCount = g && (g.c ?? g['count(*)']) ? String(g.c || g['count(*)']) : '0';
+        } catch (e) { guildsCount = 'err'; }
     } catch (err) {
       dbError = err;
       logger.error('DB health check failed', { error: err.stack || err });

@@ -1,4 +1,4 @@
-const { knex } = require('../db');
+const db = require('../db');
 const logger = require('../utils/logger').get('models:guild');
 const cache = require('../utils/cache');
 
@@ -8,7 +8,7 @@ async function getGuildConfig(guildId) {
   const cached = cache.get(`guild:${guildId}`);
   if (cached) return cached;
 
-  const row = await knex('guild_settings').where({ guild_id: guildId }).first();
+  const row = await db.knex('guild_settings').where({ guild_id: guildId }).first();
   if (!row) return null;
   try {
     const data = row.data ? JSON.parse(row.data) : null;
@@ -47,10 +47,10 @@ async function upsertGuildConfig(guildId, changes = {}) {
   if ('data' in changes) payload.data = JSON.stringify(changes.data);
 
   if (existing) {
-    await knex('guild_settings').where({ guild_id: guildId }).update({ ...payload, updated_at: knex.fn.now() });
+    await db.knex('guild_settings').where({ guild_id: guildId }).update({ ...payload, updated_at: db.knex.fn.now() });
     logger.info('Updated guild config', { guildId, changes });
   } else {
-    await knex('guild_settings').insert({ guild_id: guildId, ...payload });
+    await db.knex('guild_settings').insert({ guild_id: guildId, ...payload });
     logger.info('Inserted guild config', { guildId, changes });
   }
   // invalidate cache and return fresh

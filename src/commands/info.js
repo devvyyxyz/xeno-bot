@@ -1,7 +1,7 @@
 const os = require('os');
 const process = require('process');
 const { getCommandConfig } = require('../utils/commandsConfig');
-const { knex } = require('../db');
+const db = require('../db');
 const { version: nodeVersion } = process;
 const { execSync } = require('child_process');
 const pkg = require('../../package.json');
@@ -56,19 +56,19 @@ module.exports = {
     // Global Stats
     let guilds = 'unknown', dbProfiles = 'unknown', dbUsers = 'unknown', dbChannels = 'unknown';
     try {
-      const g = await knex('guild_settings').count('* as c').first();
+      const g = await db.knex('guild_settings').count('* as c').first();
       guilds = g && (g.c ?? g['count(*)']) ? g.c || g['count(*)'] : '0';
     } catch (e) { try { logger.warn('Failed querying guild count for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging guild count query error for info command', le && (le.stack || le)); } }
     try {
-      const p = await knex('profiles').count('* as c').first();
+      const p = await db.knex('profiles').count('* as c').first();
       dbProfiles = p && (p.c ?? p['count(*)']) ? p.c || p['count(*)'] : '0';
     } catch (e) { try { logger.warn('Failed querying profiles count for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging profiles count query error for info command', le && (le.stack || le)); } }
     try {
-      const u = await knex('users').count('* as c').first();
+      const u = await db.knex('users').count('* as c').first();
       dbUsers = u && (u.c ?? u['count(*)']) ? u.c || u['count(*)'] : '0';
     } catch (e) { try { logger.warn('Failed querying users count for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging users count query error for info command', le && (le.stack || le)); } }
     try {
-      const c = await knex('channels').count('* as c').first();
+      const c = await db.knex('channels').count('* as c').first();
       dbChannels = c && (c.c ?? c['count(*)']) ? c.c || c['count(*)'] : '0';
     } catch (e) { try { logger.warn('Failed querying channels count for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging channels count query error for info command', le && (le.stack || le)); } }
 

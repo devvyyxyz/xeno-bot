@@ -1,5 +1,5 @@
 const logger = require('../utils/logger').get('ready');
-const { knex } = require('../db');
+const db = require('../db');
 const cache = require('../utils/cache');
 
 module.exports = {
@@ -10,7 +10,7 @@ module.exports = {
 
     // Warm-up guild settings cache: load all guild_settings into cache for quick access
     try {
-      const rows = await knex('guild_settings').select('*');
+      const rows = await db.knex('guild_settings').select('*');
       for (const row of rows) {
         const parsed = row.data ? JSON.parse(row.data) : null;
         const entry = {
