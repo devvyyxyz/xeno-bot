@@ -10613,3 +10613,745 @@
 2026-02-27T06:39:58.564Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772174541755,"in_ms":143191}
 2026-02-27T06:39:58.565Z [info] [spawn] Spawn manager initialized {"guilds":1}
 2026-02-27T06:39:58.565Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:42:21.760Z [info] [spawn] doSpawn entered {"guildId":"1170182175283494952","timersHas":true,"nextSpawnPersisted":1772174541755}
+2026-02-27T06:42:21.769Z [info] [spawn] No spawn channel configured; skipping {"guildId":"1170182175283494952"}
+2026-02-27T06:42:21.771Z [info] [spawn] About to schedule next spawn {"guildId":"1170182175283494952","min":60,"max":60,"delay":60000,"scheduledAt":1772174601770,"pendingReschedule":false,"existingTimer":false,"persistedNext":null}
+2026-02-27T06:42:21.773Z [info] [spawn] Scheduled next spawn {"guildId":"1170182175283494952","in_ms":60000,"scheduled_at":1772174601770}
+2026-02-27T06:42:25.520Z [info] [index] Graceful shutdown starting {"reason":"SIGINT"}
+2026-02-27T06:42:25.521Z [info] [spawn] spawnManager shutdown: cleared timers and pending state
+2026-02-27T06:42:25.521Z [info] [hatch] hatchManager shutdown: cleared timers
+2026-02-27T06:42:25.522Z [info] [index] Graceful shutdown complete, exiting
+2026-02-27T06:42:31.066Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:42:31.096Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:42:31.097Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:42:31.098Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:42:31.100Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:42:31.100Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:42:31.101Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:42:31.101Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:42:31.102Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:42:31.103Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:42:31.104Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:42:31.104Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:42:31.104Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:42:31.105Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:42:31.105Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:42:31.106Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:42:31.106Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:42:31.107Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:42:31.107Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:42:31.107Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:42:31.107Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:42:31.108Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:42:31.108Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:42:31.108Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:42:31.126Z [error] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:42:31.127Z [error] Failed to ensure all eggs in DB {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:42:31.127Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:42:31.139Z [info] [db] `users` table already exists
+2026-02-27T06:42:31.139Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:42:31.141Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:42:31.141Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:42:31.142Z [info] [db] `hatches` table already exists
+2026-02-27T06:42:31.915Z [info] [index] Login initiated
+2026-02-27T06:42:31.935Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:42:31.937Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:42:31.939Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772174601770,"in_ms":49831}
+2026-02-27T06:42:31.939Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:42:31.940Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:42:48.608Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:42:48.633Z [warn] [deploy-commands] commands.json entry missing module: Gameplay/collect {"category":"Gameplay","key":"collect"}
+2026-02-27T06:42:48.633Z [warn] [deploy-commands] commands.json entry missing module: Social/trade {"category":"Social","key":"trade"}
+2026-02-27T06:42:48.633Z [warn] [deploy-commands] commands.json entry missing module: Social/trade-log {"category":"Social","key":"trade-log"}
+2026-02-27T06:42:48.634Z [warn] [deploy-commands] commands.json entry missing module: Social/showcase {"category":"Social","key":"showcase"}
+2026-02-27T06:42:48.634Z [warn] [deploy-commands] commands.json entry missing module: Social/gift {"category":"Social","key":"gift"}
+2026-02-27T06:42:49.372Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:42:49.394Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:42:49.395Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:42:49.395Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:42:49.396Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:42:49.397Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:42:49.397Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:42:49.397Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:42:49.398Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:42:49.398Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:42:49.398Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:42:49.399Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:42:49.399Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:42:49.399Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:42:49.400Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:42:49.400Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:42:49.400Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:42:49.400Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:42:49.401Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:42:49.401Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:42:49.401Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:42:49.401Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:42:49.402Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:42:49.402Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:42:49.424Z [error] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:42:49.425Z [error] Failed to ensure all eggs in DB {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:42:49.425Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:42:49.435Z [info] [db] `users` table already exists
+2026-02-27T06:42:49.436Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:42:49.438Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:42:49.438Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:42:49.439Z [info] [db] `hatches` table already exists
+2026-02-27T06:42:50.158Z [info] [index] Login initiated
+2026-02-27T06:42:50.163Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:42:50.164Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:42:50.165Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772174601770,"in_ms":31605}
+2026-02-27T06:42:50.165Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:42:50.166Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:43:21.773Z [info] [spawn] doSpawn entered {"guildId":"1170182175283494952","timersHas":true,"nextSpawnPersisted":1772174601770}
+2026-02-27T06:43:21.775Z [info] [spawn] doSpawn entered {"guildId":"1170182175283494952","timersHas":true,"nextSpawnPersisted":1772174601770}
+2026-02-27T06:43:21.786Z [info] [spawn] No spawn channel configured; skipping {"guildId":"1170182175283494952"}
+2026-02-27T06:43:21.788Z [info] [spawn] About to schedule next spawn {"guildId":"1170182175283494952","min":60,"max":60,"delay":60000,"scheduledAt":1772174661787,"pendingReschedule":false,"existingTimer":false,"persistedNext":null}
+2026-02-27T06:43:21.788Z [info] [spawn] No spawn channel configured; skipping {"guildId":"1170182175283494952"}
+2026-02-27T06:43:21.789Z [info] [spawn] Scheduled next spawn {"guildId":"1170182175283494952","in_ms":60000,"scheduled_at":1772174661787}
+2026-02-27T06:43:21.791Z [info] [spawn] About to schedule next spawn {"guildId":"1170182175283494952","min":60,"max":60,"delay":60000,"scheduledAt":1772174661790,"pendingReschedule":false,"existingTimer":false,"persistedNext":1772174661787}
+2026-02-27T06:43:21.792Z [info] [spawn] Scheduled next spawn {"guildId":"1170182175283494952","in_ms":60000,"scheduled_at":1772174661790}
+2026-02-27T06:43:26.832Z [info] [index] Graceful shutdown starting {"reason":"SIGINT"}
+2026-02-27T06:43:26.834Z [info] [spawn] spawnManager shutdown: cleared timers and pending state
+2026-02-27T06:43:26.835Z [info] [hatch] hatchManager shutdown: cleared timers
+2026-02-27T06:43:29.108Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:43:29.132Z [warn] [deploy-commands] commands.json entry missing module: Gameplay/collect {"category":"Gameplay","key":"collect"}
+2026-02-27T06:43:29.132Z [warn] [deploy-commands] commands.json entry missing module: Social/trade {"category":"Social","key":"trade"}
+2026-02-27T06:43:29.132Z [warn] [deploy-commands] commands.json entry missing module: Social/trade-log {"category":"Social","key":"trade-log"}
+2026-02-27T06:43:29.133Z [warn] [deploy-commands] commands.json entry missing module: Social/showcase {"category":"Social","key":"showcase"}
+2026-02-27T06:43:29.133Z [warn] [deploy-commands] commands.json entry missing module: Social/gift {"category":"Social","key":"gift"}
+2026-02-27T06:43:29.846Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:43:29.869Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:43:29.870Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:43:29.871Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:43:29.872Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:43:29.873Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:43:29.873Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:43:29.873Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:43:29.874Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:43:29.874Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:43:29.875Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:43:29.875Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:43:29.875Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:43:29.875Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:43:29.876Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:43:29.876Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:43:29.876Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:43:29.877Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:43:29.877Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:43:29.877Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:43:29.877Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:43:29.878Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:43:29.878Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:43:29.878Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:43:29.895Z [error] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:43:29.895Z [error] Failed to ensure all eggs in DB {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:43:29.895Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:43:29.907Z [info] [db] `users` table already exists
+2026-02-27T06:43:29.907Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:43:29.909Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:43:29.909Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:43:29.909Z [info] [db] `hatches` table already exists
+2026-02-27T06:43:30.798Z [info] [index] Login initiated
+2026-02-27T06:43:30.822Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:43:30.822Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:43:30.823Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772174661790,"in_ms":50967}
+2026-02-27T06:43:30.823Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:43:30.824Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:44:21.793Z [info] [spawn] doSpawn entered {"guildId":"1170182175283494952","timersHas":true,"nextSpawnPersisted":1772174661790}
+2026-02-27T06:44:21.801Z [info] [spawn] No spawn channel configured; skipping {"guildId":"1170182175283494952"}
+2026-02-27T06:44:21.804Z [info] [spawn] About to schedule next spawn {"guildId":"1170182175283494952","min":60,"max":60,"delay":60000,"scheduledAt":1772174721803,"pendingReschedule":false,"existingTimer":false,"persistedNext":null}
+2026-02-27T06:44:21.806Z [info] [spawn] Scheduled next spawn {"guildId":"1170182175283494952","in_ms":60000,"scheduled_at":1772174721803}
+2026-02-27T06:44:42.708Z [info] [index] Graceful shutdown starting {"reason":"SIGINT"}
+2026-02-27T06:44:42.710Z [info] [spawn] spawnManager shutdown: cleared timers and pending state
+2026-02-27T06:44:42.710Z [info] [hatch] hatchManager shutdown: cleared timers
+2026-02-27T06:44:45.394Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:44:45.418Z [warn] [deploy-commands] commands.json entry missing module: Gameplay/collect {"category":"Gameplay","key":"collect"}
+2026-02-27T06:44:45.419Z [warn] [deploy-commands] commands.json entry missing module: Social/trade {"category":"Social","key":"trade"}
+2026-02-27T06:44:45.419Z [warn] [deploy-commands] commands.json entry missing module: Social/trade-log {"category":"Social","key":"trade-log"}
+2026-02-27T06:44:45.419Z [warn] [deploy-commands] commands.json entry missing module: Social/showcase {"category":"Social","key":"showcase"}
+2026-02-27T06:44:45.419Z [warn] [deploy-commands] commands.json entry missing module: Social/gift {"category":"Social","key":"gift"}
+2026-02-27T06:44:46.178Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:44:46.197Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:44:46.198Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:44:46.198Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:44:46.199Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:44:46.199Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:44:46.200Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:44:46.200Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:44:46.200Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:44:46.201Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:44:46.201Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:44:46.202Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:44:46.202Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:44:46.202Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:44:46.202Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:44:46.203Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:44:46.203Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:44:46.203Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:44:46.203Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:44:46.203Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:44:46.204Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:44:46.204Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:44:46.204Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:44:46.204Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:44:46.220Z [error] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:44:46.221Z [error] Failed to ensure all eggs in DB {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:44:46.221Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:44:46.233Z [info] [db] `users` table already exists
+2026-02-27T06:44:46.233Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:44:46.235Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:44:46.235Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:44:46.235Z [info] [db] `hatches` table already exists
+2026-02-27T06:44:47.071Z [info] [index] Login initiated
+2026-02-27T06:44:47.099Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:44:47.100Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:44:47.100Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772174721803,"in_ms":34703}
+2026-02-27T06:44:47.100Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:44:47.101Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:45:13.617Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:45:13.643Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:45:13.645Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:45:13.646Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:45:13.648Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:45:13.648Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:45:13.649Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:45:13.649Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:45:13.650Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:45:13.651Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:45:13.651Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:45:13.651Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:45:13.652Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:45:13.652Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:45:13.653Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:45:13.654Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:45:13.654Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:45:13.655Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:45:13.655Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:45:13.655Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:45:13.655Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:45:13.656Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:45:13.656Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:45:13.656Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:45:13.664Z [error] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:45:13.665Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:45:13.675Z [info] [db] `users` table already exists
+2026-02-27T06:45:13.675Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:45:13.677Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:45:13.677Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:45:13.678Z [info] [db] `hatches` table already exists
+2026-02-27T06:45:13.678Z [info] DB migrate complete
+2026-02-27T06:45:13.680Z [info] Egg stats ensured in DB
+2026-02-27T06:45:14.555Z [info] [index] Login initiated
+2026-02-27T06:45:14.564Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:45:14.565Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:45:14.566Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772174721803,"in_ms":7237}
+2026-02-27T06:45:14.566Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:45:14.567Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:45:19.590Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:45:19.611Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:45:19.612Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:45:19.613Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:45:19.614Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:45:19.614Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:45:19.614Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:45:19.615Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:45:19.615Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:45:19.615Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:45:19.616Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:45:19.617Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:45:19.617Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:45:19.617Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:45:19.619Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:45:19.620Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:45:19.620Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:45:19.621Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:45:19.621Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:45:19.621Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:45:19.621Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:45:19.622Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:45:19.622Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:45:19.622Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:45:19.634Z [error] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:45:19.635Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:45:19.644Z [info] [db] `users` table already exists
+2026-02-27T06:45:19.644Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:45:19.646Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:45:19.646Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:45:19.647Z [info] [db] `hatches` table already exists
+2026-02-27T06:45:19.647Z [info] DB migrate complete
+2026-02-27T06:45:19.650Z [info] Egg stats ensured in DB
+2026-02-27T06:45:20.640Z [info] [index] Login initiated
+2026-02-27T06:45:20.692Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:45:20.693Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:45:20.694Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772174721803,"in_ms":1109}
+2026-02-27T06:45:20.694Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:45:20.695Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:45:21.806Z [info] [spawn] doSpawn entered {"guildId":"1170182175283494952","timersHas":true,"nextSpawnPersisted":1772174721803}
+2026-02-27T06:45:21.811Z [info] [spawn] No spawn channel configured; skipping {"guildId":"1170182175283494952"}
+2026-02-27T06:45:21.814Z [info] [spawn] About to schedule next spawn {"guildId":"1170182175283494952","min":60,"max":3600,"delay":1074000,"scheduledAt":1772175795812,"pendingReschedule":false,"existingTimer":false,"persistedNext":null}
+2026-02-27T06:45:21.816Z [info] [spawn] Scheduled next spawn {"guildId":"1170182175283494952","in_ms":1074000,"scheduled_at":1772175795812}
+2026-02-27T06:45:27.101Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:45:27.117Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:45:27.118Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:45:27.118Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:45:27.120Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:45:27.121Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:45:27.121Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:45:27.122Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:45:27.122Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:45:27.123Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:45:27.123Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:45:27.123Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:45:27.123Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:45:27.124Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:45:27.124Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:45:27.124Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:45:27.125Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:45:27.125Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:45:27.125Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:45:27.125Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:45:27.125Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:45:27.125Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:45:27.126Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:45:27.126Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:45:27.133Z [error] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:45:27.134Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:45:27.142Z [info] [db] `users` table already exists
+2026-02-27T06:45:27.142Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:45:27.144Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:45:27.144Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:45:27.145Z [info] [db] `hatches` table already exists
+2026-02-27T06:45:27.145Z [info] DB migrate complete
+2026-02-27T06:45:27.148Z [info] Egg stats ensured in DB
+2026-02-27T06:45:27.860Z [info] [index] Login initiated
+2026-02-27T06:45:27.980Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:45:27.981Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:45:27.982Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772175795812,"in_ms":1067830}
+2026-02-27T06:45:27.983Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:45:27.984Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:45:34.878Z [info] [index] Graceful shutdown starting {"reason":"SIGINT"}
+2026-02-27T06:45:34.879Z [info] [spawn] spawnManager shutdown: cleared timers and pending state
+2026-02-27T06:45:34.880Z [info] [hatch] hatchManager shutdown: cleared timers
+2026-02-27T06:45:37.553Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:45:37.581Z [warn] [deploy-commands] commands.json entry missing module: Gameplay/collect {"category":"Gameplay","key":"collect"}
+2026-02-27T06:45:37.582Z [warn] [deploy-commands] commands.json entry missing module: Social/trade {"category":"Social","key":"trade"}
+2026-02-27T06:45:37.582Z [warn] [deploy-commands] commands.json entry missing module: Social/trade-log {"category":"Social","key":"trade-log"}
+2026-02-27T06:45:37.582Z [warn] [deploy-commands] commands.json entry missing module: Social/showcase {"category":"Social","key":"showcase"}
+2026-02-27T06:45:37.582Z [warn] [deploy-commands] commands.json entry missing module: Social/gift {"category":"Social","key":"gift"}
+2026-02-27T06:45:38.293Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:45:38.312Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:45:38.313Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:45:38.314Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:45:38.315Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:45:38.315Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:45:38.315Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:45:38.315Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:45:38.316Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:45:38.316Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:45:38.316Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:45:38.317Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:45:38.317Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:45:38.317Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:45:38.318Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:45:38.318Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:45:38.318Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:45:38.319Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:45:38.319Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:45:38.319Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:45:38.319Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:45:38.320Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:45:38.320Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:45:38.320Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:45:38.328Z [error] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:45:38.328Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:45:38.338Z [info] [db] `users` table already exists
+2026-02-27T06:45:38.338Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:45:38.340Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:45:38.340Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:45:38.340Z [info] [db] `hatches` table already exists
+2026-02-27T06:45:38.340Z [info] DB migrate complete
+2026-02-27T06:45:38.343Z [info] Egg stats ensured in DB
+2026-02-27T06:45:39.188Z [info] [index] Login initiated
+2026-02-27T06:45:39.235Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:45:39.236Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:45:39.237Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772175795812,"in_ms":1056575}
+2026-02-27T06:45:39.237Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:45:39.239Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:46:03.272Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:46:03.303Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:46:03.305Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:46:03.306Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:46:03.308Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:46:03.308Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:46:03.308Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:46:03.309Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:46:03.309Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:46:03.310Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:46:03.310Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:46:03.311Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:46:03.311Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:46:03.311Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:46:03.312Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:46:03.312Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:46:03.313Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:46:03.313Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:46:03.313Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:46:03.313Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:46:03.314Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:46:03.314Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:46:03.314Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:46:03.315Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:46:03.323Z [warn] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:46:03.323Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:46:03.333Z [info] [db] `users` table already exists
+2026-02-27T06:46:03.334Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:46:03.336Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:46:03.336Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:46:03.337Z [info] [db] `hatches` table already exists
+2026-02-27T06:46:03.337Z [info] DB migrate complete
+2026-02-27T06:46:03.339Z [info] Egg stats ensured in DB
+2026-02-27T06:46:03.982Z [info] [index] Login initiated
+2026-02-27T06:46:03.991Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:46:03.992Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:46:03.992Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772175795812,"in_ms":1031820}
+2026-02-27T06:46:03.992Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:46:03.993Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:46:05.308Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:46:05.324Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:46:05.325Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:46:05.325Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:46:05.326Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:46:05.326Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:46:05.327Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:46:05.327Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:46:05.327Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:46:05.328Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:46:05.328Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:46:05.328Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:46:05.328Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:46:05.328Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:46:05.329Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:46:05.329Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:46:05.330Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:46:05.330Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:46:05.330Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:46:05.330Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:46:05.330Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:46:05.331Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:46:05.331Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:46:05.331Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:46:05.339Z [warn] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:46:05.339Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:46:05.346Z [info] [db] `users` table already exists
+2026-02-27T06:46:05.346Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:46:05.348Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:46:05.348Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:46:05.349Z [info] [db] `hatches` table already exists
+2026-02-27T06:46:05.349Z [info] DB migrate complete
+2026-02-27T06:46:05.352Z [info] Egg stats ensured in DB
+2026-02-27T06:46:06.288Z [info] [index] Login initiated
+2026-02-27T06:46:06.319Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:46:06.320Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:46:06.321Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772175795812,"in_ms":1029491}
+2026-02-27T06:46:06.321Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:46:06.322Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:46:27.873Z [info] [index] Graceful shutdown starting {"reason":"SIGINT"}
+2026-02-27T06:46:30.717Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:46:30.741Z [warn] [deploy-commands] commands.json entry missing module: Gameplay/collect {"category":"Gameplay","key":"collect"}
+2026-02-27T06:46:30.742Z [warn] [deploy-commands] commands.json entry missing module: Social/trade {"category":"Social","key":"trade"}
+2026-02-27T06:46:30.742Z [warn] [deploy-commands] commands.json entry missing module: Social/trade-log {"category":"Social","key":"trade-log"}
+2026-02-27T06:46:30.742Z [warn] [deploy-commands] commands.json entry missing module: Social/showcase {"category":"Social","key":"showcase"}
+2026-02-27T06:46:30.742Z [warn] [deploy-commands] commands.json entry missing module: Social/gift {"category":"Social","key":"gift"}
+2026-02-27T06:46:31.920Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB"}
+2026-02-27T06:46:31.948Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:46:31.949Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:46:31.950Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:46:31.951Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:46:31.951Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:46:31.952Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:46:31.952Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:46:31.952Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:46:31.953Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:46:31.953Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:46:31.954Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:46:31.954Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:46:31.954Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:46:31.955Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:46:31.956Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:46:31.956Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:46:31.956Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:46:31.956Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:46:31.956Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:46:31.957Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:46:31.958Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:46:31.958Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:46:31.958Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:46:31.966Z [warn] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:46:31.966Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:46:31.977Z [info] [db] `users` table already exists
+2026-02-27T06:46:31.978Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:46:31.980Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:46:31.980Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:46:31.980Z [info] [db] `hatches` table already exists
+2026-02-27T06:46:31.980Z [info] DB migrate complete
+2026-02-27T06:46:31.983Z [info] Egg stats ensured in DB
+2026-02-27T06:46:32.743Z [info] [index] Login initiated
+2026-02-27T06:46:32.772Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:46:32.772Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:46:32.773Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772175795812,"in_ms":1003039}
+2026-02-27T06:46:32.773Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:46:32.774Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:47:46.525Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB","client":"pg"}
+2026-02-27T06:47:46.559Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:47:46.560Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:47:46.561Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:47:46.563Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:47:46.564Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:47:46.565Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:47:46.565Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:47:46.566Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:47:46.567Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:47:46.570Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:47:46.570Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:47:46.571Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:47:46.572Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:47:46.573Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:47:46.574Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:47:46.574Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:47:46.575Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:47:46.575Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:47:46.575Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:47:46.576Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:47:46.576Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:47:46.576Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:47:46.577Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:47:46.587Z [warn] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:47:46.587Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:47:46.614Z [info] [db] `users` table already exists
+2026-02-27T06:47:46.615Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:47:46.625Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:47:46.626Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:47:46.626Z [info] [db] `hatches` table already exists
+2026-02-27T06:47:46.626Z [info] DB migrate complete
+2026-02-27T06:47:46.640Z [info] Egg stats ensured in DB
+2026-02-27T06:47:47.425Z [info] [index] Login initiated
+2026-02-27T06:47:47.463Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:47:47.464Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:47:47.465Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772175795812,"in_ms":928347}
+2026-02-27T06:47:47.465Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:47:47.466Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:47:52.810Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB","client":"pg"}
+2026-02-27T06:47:52.836Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:47:52.837Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:47:52.838Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:47:52.840Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:47:52.840Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:47:52.841Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:47:52.841Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:47:52.842Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:47:52.843Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:47:52.843Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:47:52.844Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:47:52.844Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:47:52.844Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:47:52.845Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:47:52.846Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:47:52.846Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:47:52.847Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:47:52.848Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:47:52.848Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:47:52.848Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:47:52.848Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:47:52.849Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:47:52.849Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:47:52.857Z [warn] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:47:52.857Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:47:52.867Z [info] [db] `users` table already exists
+2026-02-27T06:47:52.868Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:47:52.870Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:47:52.870Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:47:52.871Z [info] [db] `hatches` table already exists
+2026-02-27T06:47:52.871Z [info] DB migrate complete
+2026-02-27T06:47:52.874Z [info] Egg stats ensured in DB
+2026-02-27T06:47:53.711Z [info] [index] Login initiated
+2026-02-27T06:47:53.716Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:47:53.716Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:47:53.718Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772175795812,"in_ms":922094}
+2026-02-27T06:47:53.718Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:47:53.718Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:48:00.262Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB","client":"pg"}
+2026-02-27T06:48:00.289Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:48:00.291Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:48:00.291Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:48:00.293Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:48:00.294Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:48:00.294Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:48:00.295Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:48:00.295Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:48:00.296Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:48:00.297Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:48:00.297Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:48:00.297Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:48:00.298Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:48:00.298Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:48:00.299Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:48:00.299Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:48:00.300Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:48:00.300Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:48:00.300Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:48:00.301Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:48:00.302Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:48:00.302Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:48:00.302Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:48:00.262Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB","client":"pg"}
+2026-02-27T06:48:00.289Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:48:00.291Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:48:00.291Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:48:00.293Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:48:00.294Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:48:00.294Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:48:00.295Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:48:00.295Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:48:00.296Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:48:00.297Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:48:00.297Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:48:00.297Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:48:00.298Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:48:00.298Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:48:00.299Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:48:00.299Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:48:00.300Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:48:00.300Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:48:00.300Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:48:00.301Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:48:00.302Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:48:00.302Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:48:00.302Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:48:00.311Z [warn] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:48:00.311Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:48:00.311Z [warn] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:48:00.311Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:48:00.324Z [info] [db] `users` table already exists
+2026-02-27T06:48:00.324Z [info] [db] `users` table already exists
+2026-02-27T06:48:00.325Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:48:00.325Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:48:00.328Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:48:00.329Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:48:00.329Z [info] [db] `hatches` table already exists
+2026-02-27T06:48:00.329Z [info] DB migrate complete
+2026-02-27T06:48:00.330Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:48:00.331Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:48:00.331Z [info] [db] `hatches` table already exists
+2026-02-27T06:48:00.331Z [info] DB migrate complete
+2026-02-27T06:48:00.332Z [info] Egg stats ensured in DB
+2026-02-27T06:48:00.334Z [info] Egg stats ensured in DB
+2026-02-27T06:48:01.055Z [info] [index] Login initiated
+2026-02-27T06:48:01.055Z [info] [index] Login initiated
+2026-02-27T06:48:01.058Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:48:01.059Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:48:01.059Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772175795812,"in_ms":914753}
+2026-02-27T06:48:01.059Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:48:01.060Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:48:01.149Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:48:01.150Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:48:01.151Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772175795812,"in_ms":914661}
+2026-02-27T06:48:01.151Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:48:01.152Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:48:11.109Z [info] [index] Graceful shutdown starting {"reason":"SIGINT"}
+2026-02-27T06:51:37.351Z [warn] [db] DATABASE_URL appears to target MySQL (port 3306); switching client to mysql2 {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB","previousClient":"pg"}
+2026-02-27T06:51:37.352Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB","client":"mysql2"}
+2026-02-27T06:51:37.410Z [warn] [deploy-commands] commands.json entry missing module: Gameplay/collect {"category":"Gameplay","key":"collect"}
+2026-02-27T06:51:37.410Z [warn] [deploy-commands] commands.json entry missing module: Social/trade {"category":"Social","key":"trade"}
+2026-02-27T06:51:37.410Z [warn] [deploy-commands] commands.json entry missing module: Social/trade-log {"category":"Social","key":"trade-log"}
+2026-02-27T06:51:37.411Z [warn] [deploy-commands] commands.json entry missing module: Social/showcase {"category":"Social","key":"showcase"}
+2026-02-27T06:51:37.411Z [warn] [deploy-commands] commands.json entry missing module: Social/gift {"category":"Social","key":"gift"}
+2026-02-27T06:51:38.266Z [warn] [db] DATABASE_URL appears to target MySQL (port 3306); switching client to mysql2 {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB","previousClient":"pg"}
+2026-02-27T06:51:38.267Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB","client":"mysql2"}
+2026-02-27T06:51:38.299Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:51:38.299Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:51:38.300Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:51:38.301Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:51:38.302Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:51:38.302Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:51:38.302Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:51:38.303Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:51:38.303Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:51:38.303Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:51:38.304Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:51:38.304Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:51:38.304Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:51:38.305Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:51:38.306Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:51:38.306Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:51:38.306Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:51:38.306Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:51:38.306Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:51:38.307Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:51:38.307Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:51:38.307Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:51:38.308Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:51:38.315Z [warn] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:51:38.316Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:51:38.334Z [info] [db] `users` table already exists
+2026-02-27T06:51:38.335Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:51:38.337Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:51:38.337Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:51:38.337Z [info] [db] `hatches` table already exists
+2026-02-27T06:51:38.337Z [info] DB migrate complete
+2026-02-27T06:51:38.340Z [info] Egg stats ensured in DB
+2026-02-27T06:51:39.179Z [info] [index] Login initiated
+2026-02-27T06:51:39.196Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:51:39.197Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:51:39.198Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772175795812,"in_ms":696615}
+2026-02-27T06:51:39.198Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:51:39.198Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:52:14.348Z [info] [index] Graceful shutdown starting {"reason":"SIGINT"}
+2026-02-27T06:52:21.376Z [warn] [db] DATABASE_URL appears to target MySQL (port 3306); switching client to mysql2 {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB","previousClient":"pg"}
+2026-02-27T06:52:21.377Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB","client":"mysql2"}
+2026-02-27T06:52:21.423Z [warn] [deploy-commands] commands.json entry missing module: Gameplay/collect {"category":"Gameplay","key":"collect"}
+2026-02-27T06:52:21.423Z [warn] [deploy-commands] commands.json entry missing module: Social/trade {"category":"Social","key":"trade"}
+2026-02-27T06:52:21.423Z [warn] [deploy-commands] commands.json entry missing module: Social/trade-log {"category":"Social","key":"trade-log"}
+2026-02-27T06:52:21.423Z [warn] [deploy-commands] commands.json entry missing module: Social/showcase {"category":"Social","key":"showcase"}
+2026-02-27T06:52:21.424Z [warn] [deploy-commands] commands.json entry missing module: Social/gift {"category":"Social","key":"gift"}
+2026-02-27T06:52:22.193Z [warn] [db] DATABASE_URL appears to target MySQL (port 3306); switching client to mysql2 {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB","previousClient":"pg"}
+2026-02-27T06:52:22.195Z [info] [db] Using DATABASE_URL {"url":"sql.pebblehost.com:3306/customer_1330886_Xeno-Bot-DB","client":"mysql2"}
+2026-02-27T06:52:22.225Z [info] [index] Loaded command {"command":"credits"}
+2026-02-27T06:52:22.225Z [info] [index] Loaded command {"command":"eggs"}
+2026-02-27T06:52:22.226Z [info] [index] Loaded command {"command":"encyclopedia"}
+2026-02-27T06:52:22.227Z [info] [index] Loaded command {"command":"forcespawn"}
+2026-02-27T06:52:22.227Z [info] [index] Loaded command {"command":"give"}
+2026-02-27T06:52:22.227Z [info] [index] Loaded command {"command":"health"}
+2026-02-27T06:52:22.228Z [info] [index] Loaded command {"command":"help"}
+2026-02-27T06:52:22.228Z [info] [index] Loaded command {"command":"info"}
+2026-02-27T06:52:22.228Z [info] [index] Loaded command {"command":"inventory"}
+2026-02-27T06:52:22.229Z [info] [index] Loaded command {"command":"leaderboard"}
+2026-02-27T06:52:22.229Z [info] [index] Loaded command {"command":"nextspawn"}
+2026-02-27T06:52:22.229Z [info] [index] Loaded command {"command":"ping"}
+2026-02-27T06:52:22.229Z [info] [index] Loaded command {"command":"sell"}
+2026-02-27T06:52:22.230Z [info] [index] Loaded command {"command":"setup"}
+2026-02-27T06:52:22.230Z [info] [index] Loaded command {"command":"shop"}
+2026-02-27T06:52:22.230Z [info] [index] Loaded command {"command":"stats"}
+2026-02-27T06:52:22.231Z [info] [index] Loaded command {"command":"vote"}
+2026-02-27T06:52:22.231Z [info] [index] Loaded command {"command":"wiki"}
+2026-02-27T06:52:22.231Z [info] [index] Commands loaded {"count":18}
+2026-02-27T06:52:22.231Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-27T06:52:22.232Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-27T06:52:22.232Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-27T06:52:22.232Z [info] [index] Events loaded {"count":3}
+2026-02-27T06:52:22.240Z [warn] [db] DB connection refused for DATABASE_URL; falling back to local SQLite {"error":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1134:18)\n    at afterConnectMultiple (node:net:1715:7)"}
+2026-02-27T06:52:22.240Z [info] [db] Falling back to local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-27T06:52:22.254Z [info] [db] `users` table already exists
+2026-02-27T06:52:22.254Z [info] [db] `guild_settings` table already exists
+2026-02-27T06:52:22.256Z [info] [db] Migrated spawn_rate_minutes to spawn_min_seconds/spawn_max_seconds
+2026-02-27T06:52:22.257Z [info] [db] `active_spawns` table already exists
+2026-02-27T06:52:22.257Z [info] [db] `hatches` table already exists
+2026-02-27T06:52:22.257Z [info] DB migrate complete
+2026-02-27T06:52:22.259Z [info] Egg stats ensured in DB
+2026-02-27T06:52:22.929Z [info] [index] Login initiated
+2026-02-27T06:52:22.945Z [info] [ready] Logged in {"user":"Xeno Bot (testing)#1581","id":"1476813854938894510"}
+2026-02-27T06:52:22.946Z [info] [ready] Guild settings cache warm-up complete {"count":1}
+2026-02-27T06:52:22.946Z [info] [spawn] Restored scheduled spawn from DB {"guildId":"1170182175283494952","scheduled_at":1772175795812,"in_ms":652866}
+2026-02-27T06:52:22.947Z [info] [spawn] Spawn manager initialized {"guilds":1}
+2026-02-27T06:52:22.947Z [info] [ready] Presence cycling started {"count":3,"intervalSeconds":60}
+2026-02-27T06:53:49.836Z [info] [index] Graceful shutdown starting {"reason":"SIGINT"}

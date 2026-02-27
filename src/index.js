@@ -60,16 +60,40 @@ if (process.env.SENTRY_DSN) {
   }
 }
 
-// Database (knex) — initialize and run migrations in dev
-
-if (process.env.NODE_ENV !== 'production') {
-  db.migrate().catch(err => baseLogger.error('DB migrate failed', { error: err.stack || err }));
-}
-
-// Ensure all eggs from config are present in the database for all guilds
+// Perform DB migrations and ensure egg stats before starting the bot.
 const eggTypes = require('../config/eggTypes.json');
 const eggModel = require('./models/egg');
-eggModel.ensureAllEggsInAllGuilds(eggTypes, db.knex).catch(err => baseLogger.error('Failed to ensure all eggs in DB', { error: err.stack || err }));
+
+async function startup() {
+  try {
+    if (process.env.NODE_ENV !== 'production') {
+      await db.migrate();
+      baseLogger.info('DB migrate complete');
+    }
+  } catch (err) {
+    baseLogger.error('DB migrate failed', { error: err.stack || err });
+    // Continue — migrate() already falls back to SQLite on connection refusal
+  }
+
+  try {
+    await eggModel.ensureAllEggsInAllGuilds(eggTypes, db.knex);
+    baseLogger.info('Egg stats ensured in DB');
+  } catch (err) {
+    baseLogger.error('Failed to ensure all eggs in DB', { error: err.stack || err });
+  }
+
+  // Now login the Discord client
+  try {
+    await client.login(process.env.TOKEN);
+    logger.info('Login initiated');
+  } catch (err) {
+    logger.error('Failed to login', { error: err.stack || err });
+    process.exit(1);
+  }
+}
+
+// Start async startup tasks
+startup();
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
@@ -129,12 +153,6 @@ process.on('unhandledRejection', (reason) => {
   if (baseLogger.sentry) baseLogger.sentry.captureException(reason instanceof Error ? reason : new Error(String(reason)));
 });
  
-client.login(process.env.TOKEN).then(() => {
-  logger.info('Login initiated');
-}).catch(err => {
-  logger.error('Failed to login', { error: err.stack || err });
-  process.exit(1);
-});
 
 // Graceful shutdown: try to clean up managers and DB before exit
 async function gracefulShutdown(reason) {

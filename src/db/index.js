@@ -6,9 +6,48 @@ const logger = require('../utils/logger').get('db');
 function createKnex() {
   const dbUrl = process.env.DATABASE_URL;
   if (dbUrl) {
-    // If DATABASE_URL is provided, try to use Postgres (common for remote DBs)
-    logger.info('Using DATABASE_URL', { url: dbUrl.split('?')[0] });
-    return knexLib({ client: 'pg', connection: dbUrl, pool: { min: 0, max: 7 } });
+    // If DATABASE_URL is provided, attempt to detect the DB client (pg or mysql2).
+    let client = 'pg';
+    let connection = dbUrl;
+    try {
+      let parsed;
+      try {
+        parsed = new URL(dbUrl);
+      } catch (parseErr) {
+        // If scheme missing (e.g. host:port/db), try guessing based on common ports
+        if (dbUrl.includes(':3306')) parsed = new URL(`mysql://${dbUrl}`);
+        else if (dbUrl.includes(':5432')) parsed = new URL(`postgres://${dbUrl}`);
+        else {
+          // default to postgres parsing attempt
+          parsed = new URL(`postgres://${dbUrl}`);
+        }
+        connection = parsed.toString();
+      }
+
+      const proto = (parsed.protocol || '').replace(':', '').toLowerCase();
+      if (proto === 'mysql' || proto === 'mariadb') client = 'mysql2';
+      else if (proto === 'postgres' || proto === 'postgresql') client = 'pg';
+      else if (proto === 'sqlite' || proto === 'sqlite3') client = 'sqlite3';
+      // Heuristic: if the original URL contains common MySQL port, prefer mysql2
+      if (dbUrl.includes(':3306') && client !== 'mysql2') {
+        logger.warn('DATABASE_URL appears to target MySQL (port 3306); switching client to mysql2', { url: dbUrl.split('?')[0], previousClient: client });
+        client = 'mysql2';
+      }
+      logger.info('Using DATABASE_URL', { url: connection.split('?')[0], client });
+    } catch (e) {
+      // Fallback: assume Postgres but log that detection failed
+      logger.warn('Could not fully parse DATABASE_URL; defaulting to pg client', { url: dbUrl });
+      client = 'pg';
+      connection = dbUrl;
+    }
+
+    try {
+      return knexLib({ client, connection, pool: { min: 0, max: 7 } });
+    } catch (err) {
+      // Likely missing DB driver (e.g., mysql2). Provide actionable log then fallback later.
+      logger.error('Failed creating knex for DATABASE_URL — missing or incompatible DB driver', { client, error: err && (err.stack || err) });
+      throw err;
+    }
   }
 
   // Default: local SQLite file for quick development
@@ -37,7 +76,7 @@ async function migrate() {
     } catch (e) {
       const str = (e && (e.stack || e.message || '')).toString();
       if (str.includes('ECONNREFUSED') || str.includes('connect ECONNREFUSED')) {
-        logger.error('DB connection refused for DATABASE_URL; falling back to local SQLite', { error: str });
+        logger.warn('DB connection refused for DATABASE_URL; falling back to local SQLite', { error: str });
         try {
           await knex.destroy();
         } catch (_) {}

@@ -7,6 +7,9 @@ module.exports = {
   once: true,
   async execute(client) {
     logger.info('Logged in', { user: client.user.tag, id: client.user.id });
+    // Also print to console so it's visible in plain stdout
+    // eslint-disable-next-line no-console
+    console.log(`Logged in as ${client.user.tag} (${client.user.id})`);
 
     // Warm-up guild settings cache: load all guild_settings into cache for quick access
     try {
