@@ -78,8 +78,8 @@ module.exports = {
         }
         try {
           await userModel.removeEggsForGuild(discordId, guildId, eggId, amount);
-          // compute sell price (default: half of configured price)
-          const sellPrice = Math.max(0, Math.floor((Number(eggConfig.price || 0) / 2)));
+          // compute sell price: prefer explicit `sell` field, otherwise default to half of configured price
+          const sellPrice = Math.max(0, eggConfig.sell != null ? Number(eggConfig.sell) : Math.floor(Number(eggConfig.price || 0) / 2));
           const total = sellPrice * Number(amount);
           const newBal = await userModel.modifyCurrencyForGuild(discordId, guildId, 'royal_jelly', total);
           const safeReply = require('../utils/safeReply');
