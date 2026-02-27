@@ -43,16 +43,43 @@ if (fs.existsSync(commandsPath)) {
   }
 }
 
-const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+// Determine bot profile and token/client selection
+const profile = process.env.BOT_PROFILE || (process.env.NODE_ENV === 'development' ? 'dev' : 'public');
+let clientId = process.env.CLIENT_ID;
+let token = process.env.TOKEN;
+try {
+  const profilePath = path.join(__dirname, 'config', `bot.${profile}.json`);
+  if (fs.existsSync(profilePath)) {
+  const profileCfg = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+  // prefer the profile's configured clientId when present
+  clientId = profileCfg.clientId || clientId;
+  const tokenEnvVar = profileCfg.tokenEnvVar || 'TOKEN';
+  token = process.env[tokenEnvVar] || token;
+  logger.info('Using bot profile', { profile, clientId, tokenEnvVar });
+  } else {
+    logger.info('Bot profile file not found, falling back to env vars', { profile });
+  }
+} catch (e) {
+  logger.warn('Failed to load bot profile config; using env vars', { profile, error: e && (e.stack || e) });
+}
+
+if (!token) {
+  console.error('No bot token found in environment. Set TOKEN or the profile-specific token env var.');
+  process.exit(1);
+}
+
+const rest = new REST({ version: '10' }).setToken(token);
 
 (async () => {
   try {
     console.log('Refreshing application (/) commands...');
     if (process.env.GUILD_ID) {
-      await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands });
+      logger.info('Registering guild commands', { clientId, guildId: process.env.GUILD_ID });
+      await rest.put(Routes.applicationGuildCommands(clientId, process.env.GUILD_ID), { body: commands });
       console.log('Successfully registered guild commands.');
     } else {
-      await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
+      logger.info('Registering global commands', { clientId });
+      await rest.put(Routes.applicationCommands(clientId), { body: commands });
       console.log('Successfully registered global commands.');
     }
   } catch (error) {
