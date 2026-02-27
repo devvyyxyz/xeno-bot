@@ -257,11 +257,12 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       try {
         const stats = fs.statSync(imgPath);
         const maxSize = 8 * 1024 * 1024; // 8MB conservative limit for many guilds
-        if (stats.size <= maxSize) {
-          // Read into buffer and attach from memory — this avoids issues with path-based AttachmentBuilder on some runtimes
+          if (stats.size <= maxSize) {
+          // Read into buffer and attach from memory — send buffer form directly to avoid AttachmentBuilder/path issues
           try {
             const buf = fs.readFileSync(imgPath);
-            attachment = new AttachmentBuilder(buf, { name: 'egg_spawn.png' });
+            // Use raw buffer attachment format which is more consistent across environments
+            attachment = { attachment: buf, name: 'egg_spawn.png' };
           } catch (readErr) {
             logger.warn('Failed reading spawn image into buffer; skipping attach', { guildId, error: readErr && (readErr.stack || readErr) });
             attachment = null;
