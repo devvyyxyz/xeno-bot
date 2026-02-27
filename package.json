@@ -1,0 +1,32 @@
+{
+  "name": "xeno-bot",
+  "version": "0.1.0",
+  "description": "Scalable discord.js v14 bot scaffold",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon --watch src --exec node src/index.js",
+    "deploy-commands": "node deploy-commands.js",
+    "test": "jest --runInBand"
+  },
+  "dependencies": {
+    "@discordjs/builders": "^2.0.0-dev.1771286636-ccce987fa",
+    "@discordjs/rest": "^1.4.0",
+    "@sentry/node": "^7.16.0",
+    "discord-api-types": "^0.37.58",
+    "discord.js": "^15.0.0-pr-10758.1765463096-d081e1706",
+    "dotenv": "^16.0.0",
+    "knex": "^2.5.1",
+    "pg": "^8.11.0",
+    "sqlite3": "^5.1.6",
+    "winston": "^3.8.2",
+    "winston-daily-rotate-file": "^4.7.1"
+  },
+  "devDependencies": {
+    "jest": "^29.6.1",
+    "nodemon": "^2.0.22"
+  },
+  "engines": {
+    "node": ">=16.9.0"
+  }
+}

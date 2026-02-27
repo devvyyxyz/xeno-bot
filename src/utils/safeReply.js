@@ -1,0 +1,41 @@
+const baseLogger = require('./logger');
+
+async function safeReply(interaction, payload = {}, opts = {}) {
+  const logger = (baseLogger && baseLogger.get) ? baseLogger.get(opts.loggerName || 'utils:safeReply') : console;
+  try {
+    // If interaction already replied or deferred, prefer editReply
+    if (interaction.replied || interaction.deferred) {
+      try {
+        return await interaction.editReply(payload);
+      } catch (e) {
+        // fallthrough to followUp
+        try {
+          if (typeof interaction.followUp === 'function') return await interaction.followUp(payload);
+        } catch (e2) {
+          logger && logger.warn && logger.warn('safeReply: editReply/followUp failed', { error: e2 && (e2.stack || e2) });
+        }
+      }
+    }
+
+    // Not replied yet — try reply
+    try {
+      return await interaction.reply(payload);
+    } catch (e) {
+      logger && logger.warn && logger.warn('safeReply: reply failed, attempting defer+edit', { error: e && (e.stack || e) });
+      try {
+        if (!interaction.deferred) await interaction.deferReply({ ephemeral: payload.ephemeral || false });
+        return await interaction.editReply(payload);
+      } catch (e2) {
+        try {
+          if (typeof interaction.followUp === 'function') return await interaction.followUp(payload);
+        } catch (e3) {
+          logger && logger.error && logger.error('safeReply: all reply strategies failed', { error: e3 && (e3.stack || e3) });
+        }
+      }
+    }
+  } catch (finalErr) {
+    try { logger && logger.error && logger.error('safeReply: unexpected error', { error: finalErr && (finalErr.stack || finalErr) }); } catch (e) {}
+  }
+}
+
+module.exports = safeReply;

@@ -1,0 +1,39 @@
+2026-02-26T09:19:16.581Z [info] Loaded command: ping
+2026-02-26T09:19:16.583Z [info] Loaded event: interactionCreate
+2026-02-26T09:19:16.584Z [info] Loaded event: messageCreate
+2026-02-26T09:19:16.584Z [info] Registered compatibility listener for clientReady
+2026-02-26T09:19:16.584Z [info] Loaded event: ready
+2026-02-26T09:19:17.467Z [info] Logged in as Xeno Bot#9227
+2026-02-26T09:19:17.467Z [info] Logged in as Xeno Bot#9227
+2026-02-26T09:20:41.183Z [info] Loaded command: ping
+2026-02-26T09:20:41.185Z [info] Loaded event: interactionCreate (registered as interactionCreate)
+2026-02-26T09:20:41.185Z [info] Loaded event: messageCreate (registered as messageCreate)
+2026-02-26T09:20:41.185Z [info] Loaded event: clientReady (registered as clientReady)
+2026-02-26T09:20:42.016Z [info] Logged in as Xeno Bot#9227
+2026-02-26T09:22:34.101Z [info] [index] Loaded command {"command":"ping"}
+2026-02-26T09:22:34.103Z [info] [index] Commands loaded {"count":1}
+2026-02-26T09:22:34.103Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-26T09:22:34.104Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-26T09:22:34.104Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-26T09:22:34.104Z [info] [index] Events loaded {"count":3}
+2026-02-26T09:22:34.779Z [info] [index] Login initiated
+2026-02-26T09:22:34.795Z [info] [ready] Logged in {"user":"Xeno Bot#9227","id":"1476427270326583306"}
+2026-02-26T09:24:22.309Z [info] [index] Loaded command {"command":"ping"}
+2026-02-26T09:24:22.311Z [info] [index] Commands loaded {"count":1}
+2026-02-26T09:24:22.311Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-26T09:24:22.311Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-26T09:24:22.312Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-26T09:24:22.312Z [info] [index] Events loaded {"count":3}
+2026-02-26T09:24:23.582Z [info] [index] Login initiated
+2026-02-26T09:24:23.599Z [info] [ready] Logged in {"user":"Xeno Bot#9227","id":"1476427270326583306"}
+2026-02-26T09:27:41.422Z [info] [db] Using local SQLite DB {"filename":"/Users/kaispife/Documents/VSC/xeno-bot/data/dev.sqlite"}
+2026-02-26T09:27:41.450Z [info] [index] Loaded command {"command":"ping"}
+2026-02-26T09:27:41.450Z [info] [index] Commands loaded {"count":1}
+2026-02-26T09:27:41.451Z [info] [index] Loaded event {"event":"interactionCreate","registeredAs":"interactionCreate"}
+2026-02-26T09:27:41.451Z [info] [index] Loaded event {"event":"messageCreate","registeredAs":"messageCreate"}
+2026-02-26T09:27:41.452Z [info] [index] Loaded event {"event":"clientReady","registeredAs":"clientReady"}
+2026-02-26T09:27:41.452Z [info] [index] Events loaded {"count":3}
+2026-02-26T09:27:41.474Z [info] [db] Created `users` table
+2026-02-26T09:27:42.641Z [info] [index] Login initiated
+2026-02-26T09:27:42.653Z [info] [ready] Logged in {"user":"Xeno Bot#9227","id":"1476427270326583306"}
+2026-02-26T09:27:47.968Z [info] [messageCreate] Executing message command {"command":"ping","user":"664171400193638401"}

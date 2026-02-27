@@ -1,0 +1,6 @@
+{
+  "channel_id": null,
+  "spawn_min_seconds": 60,
+  "spawn_max_seconds": 300,
+  "egg_limit": 3
+}

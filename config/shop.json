@@ -1,0 +1,13 @@
+{
+  "categories": [
+    { "id": "eggs", "name": "Eggs", "description": "Buy collectible eggs." },
+    { "id": "boosts", "name": "Boosts", "description": "Temporary boosts for your hive." },
+    { "id": "cosmetics", "name": "Cosmetics", "description": "Profile and bot cosmetics." }
+  ],
+  "items": [
+    { "id": "classic_egg", "name": "Classic Egg", "description": "A standard xeno egg.", "category": "eggs", "price": 100, "sellPrice": 50, "sellable": true },
+    { "id": "royal_egg", "name": "Royal Egg", "description": "A rare royal egg.", "category": "eggs", "price": 500, "sellPrice": 250, "sellable": true },
+    { "id": "speed_boost", "name": "Speed Boost", "description": "Shortens egg spawn time.", "category": "boosts", "price": 250, "sellPrice": 125, "sellable": true },
+    { "id": "profile_bg", "name": "Profile Background", "description": "Customizes your profile.", "category": "cosmetics", "price": 300, "sellPrice": 0, "sellable": false }
+  ]
+}

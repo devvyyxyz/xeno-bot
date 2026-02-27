@@ -1,0 +1,10 @@
+{
+  "madeBy": "Devvyyxyz",
+  "contributors": [
+    "devvyyxyz (Lead Developer and Designer)"
+  ],
+  "apis": ["discord.js", "top.gg"],
+  "openSource": ["discord.js","knex","winston"],
+  "artAndMore": "Many thanks to the artists who contributed to the bot's visuals, and to the supportive community that has helped shape its development!",
+  "testers": ["None yet :("]
+}

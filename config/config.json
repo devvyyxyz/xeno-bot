@@ -1,0 +1,13 @@
+{
+  "prefix": "!",
+  "owner": "",
+  "presence": {
+    "activities": [
+      "Playing with the hive",
+      "Watching over the nest",
+      "Listening to the voices"
+    ],
+    "intervalSeconds": 60,
+    "status": "online"
+  }
+}

@@ -1,0 +1,20 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/kaispife/Documents/VSC/xeno-bot/logs/.afd7ccfba1645d99496b37c8cd080a7f8f8e5c9f-audit.json",
+    "files": [
+        {
+            "date": 1772098327365,
+            "name": "/Users/kaispife/Documents/VSC/xeno-bot/logs/application-2026-02-26.log",
+            "hash": "8bca135cab820cde31ab1061a07c2d9f85554f5af61dbde6f25802ec2a57dcfd"
+        },
+        {
+            "date": 1772150453101,
+            "name": "/Users/kaispife/Documents/VSC/xeno-bot/logs/application-2026-02-27.log",
+            "hash": "cf0162bb5944e83de45e1abdb174c69f0b469b3969b0d4a42e97415a2c378e1d"
+        }
+    ],
+    "hashType": "sha256"
+}

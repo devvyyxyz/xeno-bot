@@ -1,0 +1,7 @@
+{
+  "guildDefaults": {
+    "eggs": { "classic": 1 },
+    "items": {},
+    "currency": { "royal_jelly": 0 }
+  }
+}

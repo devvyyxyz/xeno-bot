@@ -1,0 +1,35 @@
+{
+  "Gameplay": {
+    "shop": { "name": "shop", "description": "Open the shop to buy items.", "usage": "/shop", "embedColor": 46031, "ephemeral": true },
+    "inventory": { "name": "inventory", "description": "Show your egg inventory or another user's.", "usage": "/inventory [@user]", "embedColor": 46031, "ephemeral": false },
+    "leaderboard": { "name": "leaderboard", "description": "Check the top collectors and strongest hives.", "usage": "/leaderboard [sort]" },
+    "stats": { "name": "stats", "description": "View stats about a user.", "usage": "/stats [@user]" },
+    "encyclopedia": { "name": "encyclopedia", "description": "Show all eggs and their stats.", "usage": "", "embedColor": 46031, "ephemeral": false },
+    "collect": { "name": "collect", "description": "Collect a spawned egg from the channel.", "usage": "" },
+    "eggs": { "name": "eggs", "description": "Manage your egg collection (list, info, destroy).", "usage": "/eggs list | /eggs info <egg_id> | /eggs destroy <egg_id>" },
+    "nextspawn": { "name": "nextspawn", "description": "Show time until the next egg spawn for this server.", "usage": "" }
+  },
+
+  "General": {
+    "ping": { "name": "ping", "description": "Replies with Pong!", "usage": "" },
+    "help": { "name": "help", "description": "Show help for available commands", "usage": "/help [category]", "embedColor": 46031, "ephemeral": false },
+    "credits": { "name": "credits", "description": "Show bot credits and contributors.", "usage": "", "embedColor": 46031, "ephemeral": false },
+    "info": { "name": "info", "description": "Show system, tech, and global stats.", "usage": "", "embedColor": 46031, "ephemeral": false },
+    "wiki": { "name": "wiki", "description": "Get the bot wiki link.", "usage": "" },
+    "vote": { "name": "vote", "description": "Vote for the bot on top.gg.", "usage": "" }
+  },
+
+  "Administration": {
+    "health": { "name": "health", "description": "Show bot health (DB and telemetry)", "usage": "" },
+    "setup": { "name": "setup", "description": "Manage bot settings for this server", "usage": "[#channel] | spawn-rate [min max] (units: seconds|minutes) | egg-limit [number] | avatar [attachment|url]" },
+    "forcespawn": { "name": "forcespawn", "description": "Force spawn eggs in the configured channel (admin only)", "usage": "/forcespawn [egg_type]" },
+    "give": { "name": "give", "description": "Give items to users (admin only)", "usage": "/give egg @user <egg_type> [amount]" }
+  },
+
+  "Social": {
+    "trade": { "name": "trade", "description": "Trade eggs or xenomorphs with another player.", "usage": "/trade @user <item_id>" },
+    "trade-log": { "name": "trade-log", "description": "View your past trades." },
+    "showcase": { "name": "showcase", "description": "Show off your hive or collection to others.", "usage": "/showcase @user" },
+    "gift": { "name": "gift", "description": "Gift an egg or xenomorph to another player.", "usage": "/gift @user <item_id>" }
+  }
+}
