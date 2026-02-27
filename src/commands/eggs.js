@@ -38,6 +38,7 @@ module.exports = {
       const autocomplete = require('../utils/autocomplete');
       const discordId = interaction.user.id;
       const guildId = interaction.guildId;
+      const logger = require('../utils/logger').get('command:eggs');
       const u = await userModel.getUserByDiscordId(discordId);
       let inventoryEggs = [];
       if (u && u.data && u.data.guilds && u.data.guilds[guildId] && u.data.guilds[guildId].eggs) {
@@ -51,6 +52,7 @@ module.exports = {
         const meta = eggTypes.find(t => t.id === e.id);
         return { id: e.id, name: meta ? `${meta.name} (${e.qty})` : `${e.id} (${e.qty})` };
       });
+      logger.info('Autocomplete invocation', { discordId, guildId, inventoryCount: inventoryEggs.length, itemsCount: items.length, focused: interaction.options.getFocused?.() || '' });
       return autocomplete(interaction, items, { map: it => ({ name: it.name, value: it.id }), max: 25 });
     } catch (e) {
       const logger = require('../utils/logger').get('command:eggs');

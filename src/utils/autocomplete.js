@@ -12,7 +12,14 @@
  * opts.max: max results (default 25)
  */
 module.exports = async function autocomplete(interaction, items = [], opts = {}) {
-  const focused = String(interaction.options.getFocused?.() || '');
+  // Normalize focused value: discord.js may return a plain string or an object { value, type, name }
+  let focusedRaw = interaction.options.getFocused?.();
+  let focused = '';
+  if (focusedRaw && typeof focusedRaw === 'object') {
+    focused = String(focusedRaw.value || '');
+  } else {
+    focused = String(focusedRaw || '');
+  }
   const mapFn = typeof opts.map === 'function' ? opts.map : (it) => ({ name: String(it.name || it.id || it.label || it.value || it), value: String(it.id || it.value || it) });
   const filterFields = Array.isArray(opts.filterFields) ? opts.filterFields : null;
   const max = Number(opts.max || 25);
@@ -35,8 +42,12 @@ module.exports = async function autocomplete(interaction, items = [], opts = {})
       });
     }
     choices = choices.slice(0, max);
-    // Discord expects array of { name, value }
-    await interaction.respond(choices);
+      // Discord expects array of { name, value }
+      try {
+        const logger = require('./logger').get('utils:autocomplete');
+        logger.info('Responding autocomplete choices', { count: choices.length, sample: choices.slice(0, 5) });
+      } catch (e) {}
+      await interaction.respond(choices);
   } catch (e) {
     try { await interaction.respond([]); } catch (e2) {}
   }
