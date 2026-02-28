@@ -124,7 +124,7 @@ module.exports = {
         .setColor(0x00b2ff)
         .setThumbnail(typeof target.displayAvatarURL === 'function' ? target.displayAvatarURL({ size: 512, extension: 'png' }) : null)
         .addFields(
-          { name: 'Performance', value: `Catches: ${stats.catches || 0}\nPurrfect: ${stats.purrfect || 0} (${((stats.purrfect || 0) && stats.catches ? Math.round(100 * (stats.purrfect || 0) / stats.catches) : 0)}%)\nAvg: ${msToHuman(stats.avg || null)}\nFastest: ${msToHuman(stats.fastest || null)}\nSlowest: ${msToHuman(stats.slowest || null)}\nLeaderboard: ${rankInfo}`, inline: false },
+          { name: 'Performance', value: `Catches: ${stats.catches || 0}\nAvg: ${msToHuman(stats.avg || null)}\nFastest: ${msToHuman(stats.fastest || null)}\nSlowest: ${msToHuman(stats.slowest || null)}\nLeaderboard: ${rankInfo}`, inline: false },
           { name: 'Inventory', value: `(this server) Eggs: ${totalEggs} | Items: ${totalItems}\n(global) Eggs: ${globalEggs} | Items: ${globalItems}`, inline: false },
           { name: 'Top Eggs', value: `(this server) ${topEggsGuild.length ? topEggsGuild.map(e => `${e.k}: ${e.v} (${fmtRate(e.v)})`).join('\n') : 'none'}\n(global) ${topEggs.length ? topEggs.map(e => `${e.k}: ${e.v} (${fmtRate(e.v)})`).join('\n') : 'none'}`, inline: false },
           { name: 'Currency', value: `(this server) ${guildCurrencyLines.length ? guildCurrencyLines.map(c => `${c.k}: ${c.v}`).join(', ') : `royal_jelly: ${royal || 0}`}\n(global) ${globalCurrencyLines.length ? globalCurrencyLines.map(c => `${c.k}: ${c.v}`).join(', ') : 'none'}`, inline: false },
