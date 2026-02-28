@@ -73,6 +73,28 @@ const rest = new REST({ version: '10' }).setToken(token);
 
 (async () => {
   try {
+    // If requested, clear global (application) commands for the selected client and exit.
+    // This is useful to remove previously-registered global commands that should no longer exist.
+    if (process.env.CLEAR_GLOBAL_COMMANDS === 'true') {
+      logger.info('CLEAR_GLOBAL_COMMANDS requested — clearing global commands for client', { clientId });
+      await rest.put(Routes.applicationCommands(clientId), { body: [] });
+      console.log('Cleared global commands for client', clientId);
+      return;
+    }
+
+    // Likewise, allow clearing a specific guild's commands via CLEAR_GUILD_COMMANDS=true and GUILD_ID
+    if (process.env.CLEAR_GUILD_COMMANDS === 'true') {
+      const guildToClear = process.env.GUILD_ID || (profileCfg && profileCfg.guildId);
+      if (!guildToClear) {
+        logger.warn('CLEAR_GUILD_COMMANDS requested but no GUILD_ID or profile guildId found');
+      } else {
+        logger.info('Clearing guild commands', { clientId, guildId: guildToClear });
+        await rest.put(Routes.applicationGuildCommands(clientId, guildToClear), { body: [] });
+        console.log('Cleared guild commands for', guildToClear);
+      }
+      return;
+    }
+
     console.log('Refreshing application (/) commands...');
     // Priority: if GUILD_ID is set, register to that guild first for fast testing.
     // Also allow the profile file to specify a default guildId (useful for dev profile).
