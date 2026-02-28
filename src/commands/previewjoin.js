@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../utils/logger').get('command:previewjoin');
 const { EmbedBuilder } = require('discord.js');
+const links = require('../../config/links.json');
+const guildCreateHandler = require('../events/guildCreate');
 
 module.exports = {
   name: 'previewjoin',
@@ -23,6 +25,27 @@ module.exports = {
 
       if (!ownerId || message.author.id !== String(ownerId)) {
         try { await message.reply('You are not authorized to run this preview command.'); } catch (_) {}
+        return;
+      }
+
+      // Allow optional guild id argument: `previewjoin <guildId>` will cause the join embed
+      // to be sent to that guild (if the bot is present). Useful for forcing the join message.
+      const parts = (message.content || '').trim().split(/\s+/);
+      const targetGuildId = parts[1] || null;
+      if (targetGuildId) {
+        try {
+          const guild = await message.client.guilds.fetch(targetGuildId);
+          if (!guild) {
+            await message.reply(`Guild ${targetGuildId} not found or bot is not in that guild.`);
+            return;
+          }
+          // Reuse the existing guildCreate handler to send the embed into that guild
+          await guildCreateHandler.execute(guild, message.client);
+          await message.reply(`Preview join embed sent to guild ${targetGuildId}.`);
+        } catch (e) {
+          logger.warn('Failed sending preview join to target guild', { targetGuildId, error: e && (e.stack || e) });
+          try { await message.reply(`Failed to send preview to guild ${targetGuildId}: ${e && e.message ? e.message : 'error'}`); } catch (_) {}
+        }
         return;
       }
 
@@ -60,7 +83,44 @@ module.exports = {
         .setTimestamp()
         .setFooter({ text: 'Xeno Bot', iconURL: avatarUrl });
 
-      await message.reply({ embeds: [embed] });
+      // Build buttons with compatibility fallback
+      const components = [];
+      try {
+        const buttons = [];
+        const makeButton = (label, url) => {
+          try {
+            // prefer constructors when available
+            const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
+            if (typeof ButtonBuilder === 'function') return new ButtonBuilder().setLabel(label).setStyle(ButtonStyle.Link).setURL(url);
+          } catch (_) {}
+          return { type: 2, style: 5, label, url };
+        };
+
+        if (links && typeof links.wiki === 'string') {
+          const v = links.wiki.trim();
+          if (/^https?:\/\//i.test(v)) buttons.push(makeButton('Documentation', v));
+          else logger.warn('Invalid wiki URL in links.json, skipping Documentation button', { url: links.wiki });
+        }
+        if (links && typeof links.vote === 'string') {
+          const v2 = links.vote.trim();
+          if (/^https?:\/\//i.test(v2)) buttons.push(makeButton('Vote', v2));
+          else logger.warn('Invalid vote URL in links.json, skipping Vote button', { url: links.vote });
+        }
+
+        if (buttons.length > 0) {
+          try {
+            const { ActionRowBuilder } = require('discord.js');
+            if (typeof ActionRowBuilder === 'function') components.push(new ActionRowBuilder().addComponents(...buttons));
+            else components.push({ type: 1, components: buttons });
+          } catch (_) {
+            components.push({ type: 1, components: buttons });
+          }
+        }
+      } catch (e) {
+        logger.warn('Unexpected error while building link buttons for preview embed', { error: e && (e.stack || e), links });
+      }
+
+      await message.reply({ embeds: [embed], components });
       logger.info('Preview join embed posted', { channelId: message.channel.id, author: message.author.id });
     } catch (err) {
       logger.error('Error in previewjoin command', { error: err && (err.stack || err) });

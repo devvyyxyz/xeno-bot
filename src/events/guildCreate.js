@@ -44,19 +44,42 @@ module.exports = {
         .setTimestamp()
         .setFooter({ text: 'Xeno Bot', iconURL: avatarUrl });
 
-      // Build optional link buttons from config/links.json
-      let components = [];
+      // Build optional link buttons from config/links.json (defensive)
+      const components = [];
+      // Build buttons defensively: validate each URL using a simple scheme check and only add valid ones.
       try {
-        const row = new ActionRowBuilder();
-        if (links && links.wiki) {
-          row.addComponents(new ButtonBuilder().setLabel('Documentation').setStyle(ButtonStyle.Link).setURL(links.wiki));
+        const buttons = [];
+        const makeButton = (label, url) => {
+          try {
+            if (typeof ButtonBuilder === 'function') return new ButtonBuilder().setLabel(label).setStyle(ButtonStyle.Link).setURL(url);
+          } catch (_) {}
+          return { type: 2, style: 5, label, url };
+        };
+
+        if (links && typeof links.wiki === 'string') {
+          const v = links.wiki.trim();
+          if (/^https?:\/\//i.test(v)) buttons.push(makeButton('Documentation', v));
+          else logger.warn('Invalid wiki URL in links.json, skipping Documentation button', { url: links.wiki });
         }
-        if (links && links.vote) {
-          row.addComponents(new ButtonBuilder().setLabel('Vote').setStyle(ButtonStyle.Link).setURL(links.vote));
+        if (links && typeof links.vote === 'string') {
+          const v2 = links.vote.trim();
+          if (/^https?:\/\//i.test(v2)) buttons.push(makeButton('Vote', v2));
+          else logger.warn('Invalid vote URL in links.json, skipping Vote button', { url: links.vote });
         }
-        if (row.components && row.components.length > 0) components.push(row);
+
+        if (buttons.length > 0) {
+          try {
+            if (typeof ActionRowBuilder === 'function') components.push(new ActionRowBuilder().addComponents(...buttons));
+            else components.push({ type: 1, components: buttons });
+          } catch (_) {
+            components.push({ type: 1, components: buttons });
+          }
+        }
       } catch (e) {
-        logger.warn('Failed building link buttons for embed', { error: e && (e.stack || e) });
+        const errStr = e ? (e.stack || String(e)) : 'no-error-object';
+        let linksDump = null;
+        try { linksDump = JSON.stringify(links); } catch (je) { linksDump = String(links); }
+        logger.warn('Unexpected error while building link buttons for embed', { error: errStr, links: linksDump });
       }
 
       // helper to attempt sending to a channel and log failures
