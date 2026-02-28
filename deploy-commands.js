@@ -47,15 +47,16 @@ if (fs.existsSync(commandsPath)) {
 const profile = process.env.BOT_PROFILE || (process.env.NODE_ENV === 'development' ? 'dev' : 'public');
 let clientId = process.env.CLIENT_ID;
 let token = process.env.TOKEN;
+let profileCfg = null;
 try {
   const profilePath = path.join(__dirname, 'config', `bot.${profile}.json`);
   if (fs.existsSync(profilePath)) {
-  const profileCfg = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
-  // prefer the profile's configured clientId when present
-  clientId = profileCfg.clientId || clientId;
-  const tokenEnvVar = profileCfg.tokenEnvVar || 'TOKEN';
-  token = process.env[tokenEnvVar] || token;
-  logger.info('Using bot profile', { profile, clientId, tokenEnvVar });
+    profileCfg = JSON.parse(fs.readFileSync(profilePath, 'utf8'));
+    // prefer the profile's configured clientId when present
+    clientId = profileCfg.clientId || clientId;
+    const tokenEnvVar = profileCfg.tokenEnvVar || 'TOKEN';
+    token = process.env[tokenEnvVar] || token;
+    logger.info('Using bot profile', { profile, clientId, tokenEnvVar });
   } else {
     logger.info('Bot profile file not found, falling back to env vars', { profile });
   }
@@ -74,8 +75,9 @@ const rest = new REST({ version: '10' }).setToken(token);
   try {
     console.log('Refreshing application (/) commands...');
     // Priority: if GUILD_ID is set, register to that guild first for fast testing.
+    // Also allow the profile file to specify a default guildId (useful for dev profile).
     // Always attempt global registration afterwards (best-effort); failures are logged but do not abort.
-    const targetGuild = process.env.GUILD_ID;
+    const targetGuild = process.env.GUILD_ID || (profileCfg && profileCfg.guildId);
     if (targetGuild) {
       logger.info('Registering guild commands', { clientId, guildId: targetGuild });
       await rest.put(Routes.applicationGuildCommands(clientId, targetGuild), { body: commands });
