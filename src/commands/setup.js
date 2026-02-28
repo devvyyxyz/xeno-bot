@@ -89,6 +89,11 @@ module.exports = {
         sub.setName('details')
         .setDescription('Show this server\'s setup values')
       )
+    .addSubcommands((sub) =>
+      sub.setName('message-delete')
+        .setDescription('Toggle deleting the spawn message after it is caught')
+        .addBooleanOptions(opt => opt.setName('enabled').setDescription('Enable deleting spawn messages after catch').setRequired(true))
+    )
 ,
   async executeInteraction(interaction) {
     const safeReply = require('../utils/safeReply');
@@ -139,6 +144,22 @@ module.exports = {
         await safeReply(interaction, { content: `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Server settings reset to default values.`, ephemeral: true }, { loggerName: 'command:setup' });
         return;
       }
+    }
+
+    if (sub === 'message-delete') {
+      const enabled = interaction.options.getBoolean('enabled');
+      try {
+        const existing = await guildModel.getGuildConfig(interaction.guildId) || {};
+        const data = existing.data || {};
+        data.delete_spawn_message = enabled === true;
+        await guildModel.upsertGuildConfig(interaction.guildId, { data });
+        const safeReply = require('../utils/safeReply');
+        await safeReply(interaction, { content: `Spawn message deletion after catch is now ${enabled ? 'enabled' : 'disabled'}.`, ephemeral: true }, { loggerName: 'command:setup' });
+      } catch (e) {
+        const safeReply = require('../utils/safeReply');
+        await safeReply(interaction, { content: `Failed to update setting: ${e && (e.message || e)}`, ephemeral: true }, { loggerName: 'command:setup' });
+      }
+      return;
     }
 
     if (sub === 'channel') {

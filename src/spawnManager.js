@@ -405,6 +405,40 @@ async function handleMessage(message) {
     try { logger.warn('Failed removing active_spawns row after catch', { guildId: gid, messageId: eggEvent && eggEvent.messageId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging removal of active_spawns row after catch', le && (le.stack || le)); } catch (ignored) {} }
   }
 
+  // Optionally delete the original spawn message if configured for this guild
+  try {
+    const cfg = await guildModel.getGuildConfig(gid);
+    const shouldDelete = cfg && cfg.data && cfg.data.delete_spawn_message === true;
+    if (shouldDelete && eggEvent && eggEvent.messageId) {
+      try {
+        // Fetch the channel where the spawn was posted to be safe
+        const spawnChannelId = eggEvent.channelId || message.channel.id;
+        const spawnChannel = await client.channels.fetch(spawnChannelId).catch(() => null);
+        if (spawnChannel) {
+          const perms = spawnChannel.permissionsFor && client && client.user ? spawnChannel.permissionsFor(client.user) : null;
+          const canManage = perms ? perms.has(PermissionsBitField.Flags.ManageMessages) : false;
+          if (!canManage) {
+            logger.warn('Bot lacks permission to delete spawn message', { guildId: gid, channelId: spawnChannelId, messageId: eggEvent.messageId });
+          } else {
+            const spawnMsg = await spawnChannel.messages.fetch(eggEvent.messageId).catch(() => null);
+            if (spawnMsg) {
+              await spawnMsg.delete().catch(() => null);
+              logger.info('Deleted spawn message after catch', { guildId: gid, messageId: eggEvent.messageId });
+            } else {
+              logger.warn('Spawn message not found when attempting delete', { guildId: gid, messageId: eggEvent.messageId });
+            }
+          }
+        } else {
+          logger.warn('Spawn channel not found when attempting delete', { guildId: gid, channelId: eggEvent.channelId });
+        }
+      } catch (delErr) {
+        logger.warn('Failed to delete spawn message after catch', { guildId: gid, messageId: eggEvent && eggEvent.messageId, error: delErr && (delErr.stack || delErr) });
+      }
+    }
+  } catch (e) {
+    try { logger.warn('Failed checking spawn deletion setting after catch', { guildId: gid, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging spawn deletion check error', le && (le.stack || le)); } catch (ignored) {} }
+  }
+
   // If no more active eggs, schedule the next spawn (apply pending reschedule if present)
   if (!activeEggs.has(gid)) {
     if (pendingReschedule.has(gid)) {
