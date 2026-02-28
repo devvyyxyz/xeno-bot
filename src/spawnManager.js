@@ -370,7 +370,7 @@ async function handleMessage(message) {
     // Track per egg type and stats
     const result = await userModel.addEggsForGuild(String(message.author.id), gid, eggEvent.numEggs, eggEvent.eggType.id, catchTimeMs);
     const catchTimeSec = (catchTimeMs / 1000).toFixed(2);
-    await message.channel.send(`${message.author} caught ${eggEvent.numEggs} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${eggEvent.numEggs > 1 ? 's' : ''}! (${catchTimeSec}s)\nYou now have ${result} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${result > 1 ? 's' : ''}.`);
+    await message.channel.send(`${message.author} caught ${eggEvent.numEggs} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${eggEvent.numEggs > 1 ? 's' : ''}! (${catchTimeSec}s)\n\-\#You now have ${result} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${result > 1 ? 's' : ''}.`);
     logger.info('Egg(s) caught', { guildId: gid, user: message.author.id, numEggs: eggEvent.numEggs, eggType: eggEvent.eggType.id, catchTimeMs });
   } catch (err) {
     logger.error('Failed awarding egg', { guildId: gid, user: message.author.id, error: err.stack || err });
