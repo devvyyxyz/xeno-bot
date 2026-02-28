@@ -7,6 +7,7 @@ const userModel = require('../models/user');
 
 const logger = require('../utils/logger').get('command:shop');
 const fallbackLogger = require('../utils/fallbackLogger');
+const createInteractionCollector = require('../utils/collectorHelper');
 
 const cmd = getCommandConfig('shop') || { name: 'shop', description: 'Open the shop to buy items.' };
 
@@ -76,8 +77,11 @@ module.exports = {
 
     await interaction.editReply({ embeds: [embed], components, ephemeral: cmd.ephemeral === true });
 
-    const msg = await interaction.fetchReply();
-    const collector = msg.createMessageComponentCollector({ time: 120_000 });
+    const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [embed], components, time: 120_000, ephemeral: cmd.ephemeral === true, edit: true });
+    if (!collector) {
+      logger.warn('Failed to attach main shop collector');
+      return;
+    }
 
     collector.on('collect', async i => {
       if (i.user.id !== interaction.user.id) return i.reply({ content: 'Only the command user can interact with this shop view.', ephemeral: true });
@@ -119,9 +123,12 @@ module.exports = {
             .setCustomId('shop-buy-select')
             .setPlaceholder('Select item to buy')
             .addOptions(pageItems.slice(0, 25).map(it => ({ label: `${it.name} — ${it.price ?? '—'}`, value: `${it.type || 'item'}:${it.id}` })));
-          await i.reply({ content: 'Select an item to buy:', components: [new ActionRowBuilder().addComponents(itemSelect)], ephemeral: true });
-          const replyMsg = await i.fetchReply();
-          const selCollector = replyMsg.createMessageComponentCollector({ time: 60_000 });
+          // Use helper to create the ephemeral select and its collector
+          const { collector: selCollector, message: replyMsg } = await createInteractionCollector(i, { components: [new ActionRowBuilder().addComponents(itemSelect)], time: 60_000, ephemeral: true, edit: false });
+          if (!selCollector) {
+            try { await i.reply({ content: 'Failed to open purchase selector.', ephemeral: true }); } catch (e) { logger.warn('Failed to notify user about selector failure', { error: e && (e.stack || e) }); }
+            return;
+          }
           selCollector.on('collect', async sel => {
             if (sel.user.id !== i.user.id) return sel.reply({ content: 'This selection is for the original buyer only.', ephemeral: true });
             const raw = sel.values && sel.values[0];

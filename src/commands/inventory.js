@@ -6,6 +6,7 @@ const {
 } = require('@discordjs/builders');
 const { EmbedBuilder } = require('discord.js');
 const fallbackLogger = require('../utils/fallbackLogger');
+const createInteractionCollector = require('../utils/collectorHelper');
 
 const { getCommandConfig, commands: commandsConfig } = require('../utils/commandsConfig');
 const { DiscordAPIError } = require('discord.js');
@@ -153,8 +154,11 @@ module.exports = {
     }
 
     // Collector to handle select + navigation
-    const msg = await interaction.fetchReply();
-    const collector = msg.createMessageComponentCollector({ time: 120_000 });
+    const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [embed], components, time: 120_000, ephemeral: cmd.ephemeral === true, edit: true });
+    if (!collector) {
+      try { require('../utils/logger').get('command:inventory').warn('Failed to attach inventory collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach inventory collector'); } catch (ignored) {} }
+      return;
+    }
     collector.on('collect', async i => {
       if (i.user.id !== interaction.user.id) return i.reply({ content: 'Only the command user can interact with this view.', ephemeral: true });
       try {
