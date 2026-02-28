@@ -90,9 +90,10 @@ module.exports = {
         let supportBuilders = false;
         try { const { ButtonBuilder } = require('discord.js'); supportBuilders = typeof ButtonBuilder === 'function'; } catch (_) { supportBuilders = false; }
 
+        const pageLinks = links.general || links;
         const buttons = [];
-        if (links && typeof links.wiki === 'string') {
-          const v = links.wiki.trim();
+        if (pageLinks && typeof pageLinks.wiki === 'string') {
+          const v = pageLinks.wiki.trim();
           if (/^https?:\/\//i.test(v)) {
             if (supportBuilders) {
               const { ButtonBuilder, ButtonStyle } = require('discord.js');
@@ -103,8 +104,8 @@ module.exports = {
           } else logger.warn('Invalid wiki URL in links.json, skipping Documentation button', { url: links.wiki });
         }
 
-        if (links && typeof links.vote === 'string') {
-          const v2 = links.vote.trim();
+        if (pageLinks && typeof pageLinks.vote === 'string') {
+          const v2 = pageLinks.vote.trim();
           if (/^https?:\/\//i.test(v2)) {
             if (supportBuilders) {
               const { ButtonBuilder, ButtonStyle } = require('discord.js');

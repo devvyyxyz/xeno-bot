@@ -2,6 +2,7 @@ const { ActionRowBuilder } = require('discord.js');
 const { LinkButtonBuilder } = require('@discordjs/builders');
 const { getCommandConfig } = require('../utils/commandsConfig');
 const links = require('../../config/links.json');
+const pageLinks = links.general || links;
 
 const cmd = getCommandConfig('vote') || {
   name: 'vote',
@@ -16,7 +17,7 @@ module.exports = {
     const row = new ActionRowBuilder().addComponents(
       new LinkButtonBuilder()
         .setLabel('Vote on Top.gg')
-        .setURL(links.vote)
+        .setURL(pageLinks.vote)
     );
     const safeReply = require('../utils/safeReply');
     await safeReply(interaction, { content: 'Support the bot by voting!', components: [row], ephemeral: false }, { loggerName: 'command:vote' });
