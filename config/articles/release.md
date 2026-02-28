@@ -77,6 +77,22 @@ Date: 2026-02-28
 - Continued refinements to the `news` UX, quick links handling, and collector integration (3c9ce90, 6afb398).
 - Created per-category article files in `config/articles/` and populated example content for `release`, `events`, `newsletter`, and `other` (3f2c915, 3ce5a60).
 
+## v1.1.0 — Improvements, telemetry, and stability
+
+Date: 2026-02-28
+
+- Bump package to `1.1.0` and publish-ready metadata.
+- Hardened logging and sanitization: added redaction for sensitive env values in health and log-tail outputs, file-backed `fallbackLogger`, and forced-ANSI support for consistent logs in non-TTY environments.
+- `/health` redesign: switched to subcommands (`show` and `lastlogs`), added developer `detail` levels, owner-only `lastlogs` with rate-limiting and audit entries, and masked secrets as `*****` in outputs.
+- Collector helper and command hardening: centralized `createInteractionCollector`, fixed many collector integrations across commands to avoid component attach errors.
+- `/info` styling and runtime values: `info` now reports real runtime values (Node, discord.js, gateway ping, shard info, cached counts) and includes thumbnail/footer/timestamp for clarity.
+- `/stats` overhaul: reorganized layout, combined server/global views, added SQL-backed leaderboard ranking via `egg_catches`, and per-egg historical rates computed from recorded events.
+- Egg recording and analytics: added `egg_catches` table and `recordEggCatch()` to persist timestamped catch events and keep aggregate `egg_stats` in sync.
+- Spawn loop fix: ensured the spawn manager always schedules the next spawn after events complete to avoid the loop stopping unexpectedly.
+- Various small fixes and compatibility updates across commands, configuration, and deploy flows.
+
+----
+
 ----
 
 Notes:
