@@ -228,7 +228,7 @@ if (fs.existsSync(commandsPath)) {
       client.commands.set(command.name, command);
       	  logger.info(`Loaded command ${command.name}`, { command: command.name, file });
     } catch (err) {
-      logger.error('Failed loading command file', { file, error: err.stack || err });
+      logger.error(`Failed loading command file: ${file}`, { file, error: err.stack || err });
     }
   }
   	logger.info('Commands loaded', { count: client.commands.size, commands: Array.from(client.commands.keys()).sort() });
@@ -249,7 +249,7 @@ if (fs.existsSync(eventsPath)) {
 
       logger.info('Loaded event', { event: event.name, registeredAs: registeredName });
     } catch (err) {
-      logger.error('Failed loading event file', { file, error: err.stack || err });
+      logger.error(`Failed loading event file: ${file}`, { file, error: err.stack || err });
     }
   }
   logger.info('Events loaded', { count: (fs.existsSync(eventsPath) && fs.readdirSync(eventsPath).filter(f => f.endsWith('.js')).length) || 0 });
