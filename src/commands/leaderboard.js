@@ -145,7 +145,7 @@ module.exports = {
     } else {
       await interaction.editReply({ embeds: [embed], components });
       // Collector for sort menu
-      const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [embed], components, time: 60_000, ephemeral: cmd.ephemeral === true, edit: true });
+      const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [embed], components, time: 60_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 3 } });
       if (!collector) {
         try { require('../utils/logger').get('command:leaderboard').warn('Failed to attach leaderboard collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach leaderboard collector', le && (le.stack || le)); } catch (ignored) {} }
         return;

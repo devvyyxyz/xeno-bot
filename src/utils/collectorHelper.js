@@ -14,6 +14,9 @@ module.exports = async function createInteractionCollector(interaction, opts = {
     filter = (i) => i.user.id === (interaction && interaction.user && interaction.user.id),
     edit = true
   } = opts;
+  // Optional collectorOptions will be merged into the options used when
+  // creating the MessageComponentCollector (allows passing componentType, etc.)
+  const collectorOptionsFromCaller = opts.collectorOptions || {};
 
   try {
     // Ensure reply exists
@@ -39,7 +42,8 @@ module.exports = async function createInteractionCollector(interaction, opts = {
       return { collector: null, message: null };
     }
 
-    const collector = message.createMessageComponentCollector({ filter, time });
+    const collectorOptions = Object.assign({ filter, time }, collectorOptionsFromCaller);
+    const collector = message.createMessageComponentCollector(collectorOptions);
     return { collector, message };
   } catch (err) {
     logger.error('createInteractionCollector failed', { error: err && (err.stack || err) });

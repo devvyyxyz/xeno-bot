@@ -86,7 +86,7 @@ module.exports = {
     );
     await interaction.editReply({ embeds: [getEmbed(page)], components: [row] });
     if (pages.length === 1) return;
-    const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [getEmbed(page)], components: [row], time: 120_000, ephemeral: cmd.ephemeral === true, edit: true });
+    const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [getEmbed(page)], components: [row], time: 120_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 2 } });
     if (!collector) {
       try { const l = require('../utils/logger').get('command:encyclopedia'); l && l.warn && l.warn('Failed to attach encyclopedia collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach encyclopedia collector', le && (le.stack || le)); } catch (ignored) {} }
       return;
