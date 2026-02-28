@@ -66,7 +66,7 @@ module.exports = {
     let page = 0;
     const getEmbed = (pageIdx) => new EmbedBuilder()
       .setTitle('📚 The Catalogue')
-      .setColor(cmd.embedColor || 0x00b2ff)
+      .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || '#bab25d')
       .setFooter({ text: `Page ${pageIdx + 1} of ${pages.length}` })
       .addFields(pages[pageIdx]);
     const row = new ActionRowBuilder().addComponents(

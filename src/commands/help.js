@@ -98,7 +98,7 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setTitle('📖 Bot Commands')
-        .setColor(cmd.embedColor || 0x00b2ff)
+        .setColor(getCommandsObject().colour || '#bab25d')
         .setFooter({ text: `Category: ${cat} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}` });
 
       for (const e of pageEntries) {
@@ -157,7 +157,7 @@ module.exports = {
           const pageEntries = pages[page] || [];
           const embed = new EmbedBuilder()
             .setTitle('📖 Bot Commands')
-            .setColor(cmd.embedColor || 0x00b2ff)
+            .setColor(getCommandsObject().colour || '#bab25d')
             .setDescription(currentCategory === 'All' ? 'All commands' : `Category: ${currentCategory}`)
             .setFooter({ text: `Page ${page + 1} of ${Math.max(1, pages.length)}` });
           for (const e of pageEntries) embed.addFields({ name: `${e.mention} — ${e.usage || `/${e.mention}`}`, value: e.description || '\u200B', inline: true });

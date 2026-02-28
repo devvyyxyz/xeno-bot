@@ -24,7 +24,7 @@ function chunkPages(fields) {
 }
 
 function makeEmbed(target, type, pageIdx, pages, balances = {}) {
-  const embed = new EmbedBuilder().setTitle(`${target.username}'s Inventory`).setColor(cmd.embedColor || 0x00b2ff);
+  const embed = new EmbedBuilder().setTitle(`${target.username}'s Inventory`).setColor(require('../../utils/commandsConfig').getCommandsObject().colour || '#bab25d');
   try {
     const avatarUrl = target && typeof target.displayAvatarURL === 'function' ? target.displayAvatarURL({ size: 512, extension: 'png' }) : null;
     if (avatarUrl) embed.setThumbnail(avatarUrl);

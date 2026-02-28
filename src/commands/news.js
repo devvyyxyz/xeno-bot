@@ -77,7 +77,7 @@ function renderArticleEmbed(article, index, total) {
     .setTitle(title)
     .setDescription(body || 'No content')
     .setFooter({ text: `Article ${index + 1} of ${total}` })
-    .setColor(0x5865F2)
+    .setColor(require('../utils/commandsConfig').getCommandsObject().colour || '#bab25d')
     .setTimestamp();
   return embed;
 }
@@ -149,7 +149,7 @@ module.exports = {
         const pageLinks = linksObj || {};
         const embed = new EmbedBuilder()
           .setTitle('📢 News')
-          .setColor(0x5865F2)
+          .setColor(require('../utils/commandsConfig').getCommandsObject().colour || '#bab25d')
           .setTimestamp();
         if (avatarUrl) embed.setThumbnail(avatarUrl);
 
@@ -272,7 +272,7 @@ module.exports = {
             idx = 0;
             total = catArticles.length;
             if (total === 0) {
-              const emptyEmbed = new EmbedBuilder().setTitle(`No articles in ${cat}`).setDescription('No articles found.').setColor(0x5865F2);
+              const emptyEmbed = new EmbedBuilder().setTitle(`No articles in ${cat}`).setDescription('No articles found.').setColor(require('../utils/commandsConfig').getCommandsObject().colour || '#bab25d');
               try { await message.edit({ embeds: [emptyEmbed], components: buildRow(supportBuilders, true, true) }); } catch (_) {}
               return;
             }

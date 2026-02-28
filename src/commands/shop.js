@@ -23,7 +23,7 @@ function makeEmbedForPage(categoryName, pageIdx, pages, royalJelly = 0) {
   const page = pages[pageIdx] || [];
   const embed = new EmbedBuilder()
     .setTitle(`${categoryName} Shop`)
-    .setColor(cmd.embedColor || 0x00b2ff)
+    .setColor(require('../utils/commandsConfig').getCommandsObject().colour || '#bab25d')
     .setFooter({ text: `Royal Jelly: ${royalJelly} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}` });
   if (page.length === 0) embed.setDescription('No items in this category.');
   for (const it of page) {

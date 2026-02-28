@@ -122,7 +122,7 @@ module.exports = {
     const embed = new EmbedBuilder()
       .setTitle('🏆 Leaderboard')
       .setDescription(desc || 'No data.')
-      .setColor(cmd.embedColor || 0x00b2ff)
+      .setColor(require('../utils/commandsConfig').getCommandsObject().colour || '#bab25d')
       .setFooter({ text: `Sorted by: ${sortChoices.concat(eggTypeChoices).find(c => c.value === sort)?.label || sort}` });
 
     const select = new StringSelectMenuBuilder()

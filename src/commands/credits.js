@@ -43,7 +43,7 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setTitle('Credits')
-      .setColor(cfg.embedColor || 0x00b2ff)
+      .setColor(require('../utils/commandsConfig').getCommandsObject().colour || '#bab25d')
       .setDescription(`Made by ${credits.madeBy || 'Unknown'}`)
       .setThumbnail(botAvatar || undefined);
 

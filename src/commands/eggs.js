@@ -89,7 +89,7 @@ module.exports = {
             }
             const { EmbedBuilder } = require('discord.js');
             const now = Date.now();
-            const embed = new EmbedBuilder().setTitle('Your Hatches').setColor(0x00AE86).setTimestamp();
+            const embed = new EmbedBuilder().setTitle('Your Hatches').setColor(require('../utils/commandsConfig').getCommandsObject().colour || '#bab25d').setTimestamp();
             // Build description lines with relative timestamps for pending hatches
             const lines = rows.map(r => {
               const finishes = Number(r.finishes_at) || 0;

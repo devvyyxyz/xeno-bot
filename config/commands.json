@@ -1,17 +1,18 @@
 {
+  "colour": "#bab25d",
   "Gameplay": {
     "shop": {
       "name": "shop",
       "description": "Open the shop to buy items.",
       "usage": "/shop",
-      "embedColor": 46031,
+      
       "ephemeral": true
     },
     "inventory": {
       "name": "inventory",
       "description": "Show your egg inventory or another user's.",
       "usage": "/inventory [@user]",
-      "embedColor": 46031,
+      
       "ephemeral": false
     },
     "leaderboard": {
@@ -28,7 +29,7 @@
       "name": "encyclopedia",
       "description": "Show all eggs and their stats.",
       "usage": "",
-      "embedColor": 46031,
+      
       "ephemeral": false
     },
     "collect": {
@@ -49,8 +50,7 @@
     "item": {
       "name": "item",
       "description": "Use or inspect items (use/info/combine)",
-      "usage": "/item <use|info|combine>",
-      "embedColor": 46031
+      "usage": "/item <use|info|combine>"
     }
   },
   "General": {
@@ -63,28 +63,26 @@
       "name": "help",
       "description": "Show help for available commands",
       "usage": "/help [category]",
-      "embedColor": 46031,
+      
       "ephemeral": false
     },
     "credits": {
       "name": "credits",
       "description": "Show bot credits and contributors.",
       "usage": "",
-      "embedColor": 46031,
       "ephemeral": false
     },
     "info": {
       "name": "info",
       "description": "Show system, tech, and global stats.",
       "usage": "",
-      "embedColor": 46031,
       "ephemeral": false
     },
     "news": {
       "name": "news",
       "description": "Read the latest news articles",
       "usage": "/news",
-      "embedColor": 5865,
+      
       "ephemeral": false
     },
     "wiki": {
