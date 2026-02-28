@@ -92,3 +92,52 @@ Date: 2026-02-28
 - Various small fixes and compatibility updates across commands, configuration, and deploy flows.
 
 ----
+
+## v1.2.0 — News, Shop, Inventory, and Currency Improvements
+
+Released: 2026-02-28
+
+This release introduces multiple user-facing features, bug fixes, and developer tools. Highlights:
+
+### Key Features
+
+- News/Home improvements
+  - The news home now automatically previews the most recent article (uses file modification timestamps to detect newest content).
+  - Added `src/utils/articles.js` to reliably detect latest article title/content with short caching.
+  - When a user opens `/news` the bot records the latest article timestamp as read for that user so reminders stop.
+  - Added a per-user unread-article reminder that shows on commands when a newer article is available; reminders are cleared when the user reads the article.
+
+- Inventory UI & Currencies
+  - Added a `Currencies` tab to `Inventory` showing `credits` (global) and `royal_jelly` (guild).
+  - Fixed an issue where the inventory view showed an "Avatar / View Avatar" placeholder when the user had no items — avatar only appears when items exist.
+  - `credits` is now a global currency stored under `data.currency.credits` (not per-guild). Default value is `0` via `config/userDefaults.json`.
+
+- Shop & Items
+  - Shop UI now displays configured emojis and uses a stable button implementation compatible with the repo's discord.js/builders versions.
+  - Removed purchasable eggs/cosmetics from the shop and added consumable items and boosts.
+  - Fixed buy flow robustness and purchase confirmation messaging; purchases correctly deduct currency and add items.
+
+- Developer & Ops
+  - Added several developer-only commands and hid them from normal help listings.
+  - Hardened `deveval` with blacklists and logging.
+  - Added owner bypasses for setup and text-mode `forcespawn` commands.
+
+- Data & Migrations
+  - Made `credits` a global currency: added `scripts/migrate-credits-global.js` to migrate guild-level credits to global credits (dry-run and apply modes).
+  - Added `scripts/migrate-mark-articles-read.js` to initialize `data.meta.lastReadArticleAt` for existing users so they won't immediately see unread reminders.
+
+### Bug Fixes
+
+- Fixed a TypeError related to `ButtonBuilder` incompatibilities by using the builders-provided `SecondaryButtonBuilder`/`SuccessButtonBuilder` fallback when appropriate.
+- Fixed interaction handling so the news-reminder check is performed asynchronously and does not block command handling (avoids "The application did not respond").
+- Adjusted inventory and shop collectors to be robust against rejected component payloads.
+
+### Notes for Server Operators
+
+- Run `node scripts/migrate-credits-global.js --apply` if you have legacy `credits` stored per-guild and want them consolidated into global balances.
+- A one-time migration to mark all users as read was included and run during development. If you prefer a different initial state, run `node scripts/migrate-mark-articles-read.js` (dry-run without `--apply`).
+
+### Internal
+
+- Version bumped to `1.2.0`.
+- Tests run locally and passed after changes.
