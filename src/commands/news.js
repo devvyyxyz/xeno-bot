@@ -82,57 +82,71 @@ module.exports = {
       })();
 
       // Build a home embed that shows introduction, quick links, and latest article
-      const buildHomeEmbed = (linksObj, latestArticle, totalCount) => {
+      function extractTitleAndBody(article) {
+        const lines = article.split(/\r?\n/).map(l => l.trim());
+        let title = null;
+        for (const l of lines) {
+          if (!l) continue;
+          const m = l.match(/^#{1,2}\s+(.+)$/);
+          if (m) { title = m[1]; break; }
+          title = l; break;
+        }
+        const body = article.replace(/^#{1,2}\s+.*$/m, '').trim();
+        const truncated = body.length > 900 ? body.slice(0, 900) + '\n\n*...truncated*' : body;
+        return { title: title || 'Latest Article', body: truncated };
+      }
+
+      function buildHomeEmbed(linksObj, latestArticle, totalCount, avatarUrl) {
         const pageLinks = linksObj || {};
         const embed = new EmbedBuilder()
           .setTitle('📢 News')
           .setColor(0x5865F2)
           .setTimestamp();
+        if (avatarUrl) embed.setThumbnail(avatarUrl);
 
         // Introduction
         embed.addFields({ name: 'Introduction', value: "Welcome to the Xeno Bot news hub — read the latest updates, find quick links, and browse recent articles.", inline: false });
 
-        // Quick Links: list categorized links from config/links.json
+        // Quick Links: create one field per category with a list of links
         try {
-          const categories = Object.keys(pageLinks);
-          if (categories.length === 0) {
+          const categories = Object.keys(pageLinks || {});
+          if (!categories || categories.length === 0) {
             embed.addFields({ name: 'Quick Links', value: 'No quick links configured.', inline: false });
           } else {
-            let linksText = '';
             for (const cat of categories) {
               const items = pageLinks[cat] || {};
               const displayCat = String(cat).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-              linksText += `**${displayCat}**\n`;
+              let value = '';
               for (const [key, url] of Object.entries(items)) {
                 try {
                   if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
                     const label = String(key).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                    linksText += `• [${label}](${url})\n`;
+                    value += `• [${label}](${url})\n`;
                   }
-                } catch (e) { /* ignore malformed entries */ }
+                } catch (e) { /* ignore malformed */ }
               }
-              linksText += '\n';
+              if (!value) value = 'No links configured for this category.';
+              embed.addFields({ name: `Quick Links — ${displayCat}`, value: value.trim(), inline: false });
             }
-            embed.addFields({ name: 'Quick Links', value: linksText.trim() || 'No quick links configured.', inline: false });
           }
         } catch (e) {
           embed.addFields({ name: 'Quick Links', value: 'Failed to load quick links.', inline: false });
         }
 
-        // Latest article preview
+        // Latest article preview (single field with title)
         if (latestArticle) {
-          const artEmbed = renderArticleEmbed(latestArticle, 0, totalCount);
-          const title = artEmbed.data && artEmbed.data.title ? artEmbed.data.title : 'Latest Article';
-          const desc = artEmbed.data && artEmbed.data.description ? artEmbed.data.description : 'No content';
-          embed.addFields({ name: `Latest: ${title}`, value: desc.length > 1000 ? desc.slice(0, 997) + '...' : desc, inline: false });
+          const { title, body } = extractTitleAndBody(latestArticle);
+          const safeBody = body && body.length > 1024 ? body.slice(0, 1021) + '...' : (body || 'No content');
+          embed.addFields({ name: `Latest Article — ${title}`, value: safeBody, inline: false });
         } else {
           embed.addFields({ name: 'Latest Article', value: 'No articles available.', inline: false });
         }
 
         return embed;
-      };
+      }
 
-      const embed = buildHomeEmbed(links.general || links, articles[0], total);
+      const botAvatar = interaction && interaction.client && interaction.client.user ? interaction.client.user.displayAvatarURL({ size: 512, extension: 'png' }) : null;
+      const embed = buildHomeEmbed(links.general || links, articles[0], total, botAvatar);
       const components = buildRow(supportBuilders, true, total === 0);
 
       const createCollector = require('../utils/collectorHelper');
