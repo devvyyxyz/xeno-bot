@@ -49,7 +49,7 @@ module.exports = {
       const chunk = fields.slice(i, i + CHUNK);
       const embed = new EmbedBuilder()
         .setTitle('Developer / Admin Commands')
-        .setColor(require('../utils/commandsConfig').getCommandsObject().colour || '0xbab25d')
+        .setColor(require('../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
         .setTimestamp()
         .setFooter({ text: `Requested by ${message.author.username}` });
       for (const f of chunk) embed.addFields({ name: f.name, value: f.value || '\u200B' });

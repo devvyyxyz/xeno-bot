@@ -121,7 +121,7 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setTitle(`${target.username}#${target.discriminator} — Game Stats`)
-        .setColor(require('../utils/commandsConfig').getCommandsObject().colour || '0xbab25d')
+        .setColor(require('../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
         .setThumbnail(typeof target.displayAvatarURL === 'function' ? target.displayAvatarURL({ size: 512, extension: 'png' }) : null)
         .addFields(
           { name: 'Performance', value: `Catches: ${stats.catches || 0}\nAvg: ${msToHuman(stats.avg || null)}\nFastest: ${msToHuman(stats.fastest || null)}\nSlowest: ${msToHuman(stats.slowest || null)}\nLeaderboard: ${rankInfo}`, inline: false },

@@ -40,12 +40,12 @@ module.exports = {
       }
       if (info.active) {
         const human = msToHuman(info.activeSinceMs);
-        const embed = new EmbedBuilder().setTitle('Spawn Active').setDescription(`An egg event is currently active (${info.numEggs} egg(s)), started ${human} ago.`).setColor(require('../utils/commandsConfig').getCommandsObject().colour || '0xbab25d');
+        const embed = new EmbedBuilder().setTitle('Spawn Active').setDescription(`An egg event is currently active (${info.numEggs} egg(s)), started ${human} ago.`).setColor(require('../utils/commandsConfig').getCommandsObject().colour || 0xbab25d);
         await interaction.editReply({ embeds: [embed] });
         return;
       }
       const human = msToHuman(info.remainingMs);
-      const embed = new EmbedBuilder().setTitle('Next Spawn').setDescription(`Next spawn in ${human}.`).setColor(require('../utils/commandsConfig').getCommandsObject().colour || '0xbab25d');
+      const embed = new EmbedBuilder().setTitle('Next Spawn').setDescription(`Next spawn in ${human}.`).setColor(require('../utils/commandsConfig').getCommandsObject().colour || 0xbab25d);
       if (info.pendingReschedule) embed.setFooter({ text: 'Reschedule pending: will apply after active eggs clear.' });
       await interaction.editReply({ embeds: [embed] });
     } catch (err) {

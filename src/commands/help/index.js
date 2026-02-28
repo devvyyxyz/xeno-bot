@@ -61,20 +61,6 @@ module.exports = {
         try { appCommands = await interaction.client.application.commands.fetch(); } catch (e) { try { logger && logger.warn && logger.warn('Failed fetching app commands for help view', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging app commands fetch failure', le && (le.stack || le)); } }
       }
 
-      const usageHints = {
-        eggs: '/eggs list | info [egg_id] | destroy [egg_id]',
-        hive: '/hive view | power | upgrade [id] | evolve [id] | release [id]',
-        setup: '/setup channel [#channel] | spawn-rate [min max] | egg-limit [number] | avatar [attachment|url]',
-        shop: '/shop',
-        collect: '/collect',
-        hatch: '/hatch [egg_id]',
-        trade: '/trade [@user] [item_id]',
-        battle: '/battle challenge [@player] | defend | rank',
-        fun: '/fun pet [id] | dance | quiz',
-        craft: '/craft [item_name]',
-        train: '/train [xenomorph_id]'
-      };
-
       const lines = await Promise.all(cmds.map(async c => {
         let id = null;
         try {
@@ -84,8 +70,7 @@ module.exports = {
           }
         } catch (e) { try { logger && logger.warn && logger.warn('Failed updating help view state', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging help view update failure', le && (le.stack || le)); } }
         const mention = id ? `</${c.name}:${id}>` : `/${c.name}`;
-        const usage = usageHints[c.name] || `/${c.name}`;
-        return { mention, description: c.description || '', usage };
+        return { mention, description: c.description || '' };
       }));
 
       // build pages of fields (inline) - show up to 12 entries per page
@@ -100,8 +85,14 @@ module.exports = {
         .setColor(getCommandsObject().colour || 0xbab25d)
         .setFooter({ text: `Category: ${cat} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}` });
 
+      // Intro: about and quick setup instructions
+      embed.addFields(
+        { name: 'About', value: 'Xeno Bot manages egg spawns, collections, and in-server economies. Use commands below to interact with bot features.', inline: false },
+        { name: 'Setup (Server Admins)', value: 'Configure the bot with `/setup` — subcommands: `/setup channel`, `/setup spawn-rate`, `/setup egg-limit`, `/setup avatar`, `/setup details`. Use `/setup reset` to reset a user or server (admin/owner only).', inline: false }
+      );
+
       for (const e of pageEntries) {
-        const title = `${e.mention} — ${e.usage}`;
+        const title = `${e.mention}`;
         const value = e.description ? `${e.description}` : '\u200B';
         embed.addFields({ name: title, value, inline: true });
       }

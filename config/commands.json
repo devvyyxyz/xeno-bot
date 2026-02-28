@@ -4,174 +4,147 @@
     "shop": {
       "name": "shop",
       "description": "Open the shop to buy items.",
-      "usage": "/shop",
-      
       "ephemeral": true
     },
     "inventory": {
       "name": "inventory",
       "description": "Show your egg inventory or another user's.",
-      "usage": "/inventory [@user]",
-      
       "ephemeral": false
     },
     "leaderboard": {
       "name": "leaderboard",
-      "description": "Check the top collectors and strongest hives.",
-      "usage": "/leaderboard [sort]"
+      "description": "Check the top collectors and strongest hives."
     },
     "stats": {
       "name": "stats",
-      "description": "View stats about a user.",
-      "usage": "/stats [@user]"
+      "description": "View stats about a user."
     },
     "encyclopedia": {
       "name": "encyclopedia",
       "description": "Show all eggs and their stats.",
-      "usage": "",
-      
       "ephemeral": false
     },
     "collect": {
       "name": "collect",
-      "description": "Collect a spawned egg from the channel.",
-      "usage": ""
+      "description": "Collect a spawned egg from the channel."
     },
     "eggs": {
       "name": "eggs",
-      "description": "Manage your egg collection (list, info, destroy).",
-      "usage": "/eggs list | /eggs info <egg_id> | /eggs destroy <egg_id>"
+      "description": "Manage your egg collection (list, info, destroy)."
     },
     "nextspawn": {
       "name": "nextspawn",
-      "description": "Show time until the next egg spawn for this server.",
-      "usage": ""
+      "description": "Show time until the next egg spawn for this server."
     },
     "item": {
       "name": "item",
-      "description": "Use or inspect items (use/info/combine)",
-      "usage": "/item <use|info|combine>"
+      "description": "Use or inspect items (use/info/combine)"
     }
   },
   "General": {
     "ping": {
       "name": "ping",
-      "description": "Replies with Pong!",
-      "usage": ""
+      "description": "Replies with Pong!"
     },
     "help": {
       "name": "help",
       "description": "Show help for available commands",
-      "usage": "/help [category]",
-      
       "ephemeral": false
     },
     "credits": {
       "name": "credits",
       "description": "Show bot credits and contributors.",
-      "usage": "",
       "ephemeral": false
     },
     "info": {
       "name": "info",
       "description": "Show system, tech, and global stats.",
-      "usage": "",
-      "ephemeral": false
+      "ephemeral": true
     },
     "news": {
       "name": "news",
       "description": "Read the latest news articles",
-      "usage": "/news",
-      
       "ephemeral": false
     },
     "wiki": {
       "name": "wiki",
       "description": "Get the bot wiki link.",
-      "usage": ""
+      "ephemeral": true
     },
     "vote": {
       "name": "vote",
       "description": "Vote for the bot on top.gg.",
-      "usage": ""
+      "ephemeral": true
     }
   },
   "Administration": {
     "health": {
       "name": "health",
       "description": "Show bot health (DB and telemetry)",
-      "usage": ""
+      
     },
     "setup": {
       "name": "setup",
       "description": "Manage bot settings for this server",
-      "usage": "[#channel] | spawn-rate [min max] (units: seconds|minutes) | egg-limit [number] | avatar [attachment|url]"
+      
     },
     "forcespawn": {
       "name": "forcespawn",
       "description": "Force spawn eggs in the configured channel (admin only)",
-      "usage": "/forcespawn [egg_type]"
+      
     },
     "give": {
       "name": "give",
       "description": "Give items to users (admin only)",
-      "usage": "/give egg @user <egg_type> [amount]"
+      
     }
   },
   "Developer": {
     "devcommands": {
       "name": "devcommands",
       "description": "List developer/admin commands (owner only)",
-      "usage": "!devcommands",
       "developerOnly": true,
       "hidden": true
     },
     "devreload": {
       "name": "devreload",
       "description": "Reload command modules (owner only)",
-      "usage": "!devreload",
       "developerOnly": true,
       "hidden": true
     },
     "devrestart": {
       "name": "devrestart",
       "description": "Restart the bot process (owner only)",
-      "usage": "!devrestart",
       "developerOnly": true,
       "hidden": true
     },
     "deveval": {
       "name": "deveval",
       "description": "Evaluate JavaScript (owner only)",
-      "usage": "!deveval <code>",
       "developerOnly": true,
       "hidden": true
     },
     "devget": {
       "name": "devget",
       "description": "Get runtime config or env value (owner only)",
-      "usage": "!devget <key>",
       "developerOnly": true,
       "hidden": true
     },
     "devset": {
       "name": "devset",
       "description": "Set config value and update runtime (owner only)",
-      "usage": "!devset <key> <value>",
       "developerOnly": true,
       "hidden": true
     },
     "previewjoin": {
       "name": "previewjoin",
       "description": "Preview the guild join embed in this channel (owner only)",
-      "usage": "!previewjoin [guildId]",
       "developerOnly": true,
       "hidden": true
     },
     "checkcommands": {
       "name": "checkcommands",
       "description": "Check whether slash commands are registered in this guild",
-      "usage": "!checkcommands",
       "developerOnly": true,
       "hidden": true
     }
@@ -179,7 +152,6 @@
     "devgive": {
       "name": "devgive",
       "description": "Give credits to a user (owner only)",
-      "usage": "!devgive @user <amount>",
       "developerOnly": true,
       "hidden": true
     }
@@ -188,7 +160,7 @@
     "trade": {
       "name": "trade",
       "description": "Trade eggs or xenomorphs with another player.",
-      "usage": "/trade @user <item_id>"
+      
     },
     "trade-log": {
       "name": "trade-log",
@@ -197,12 +169,12 @@
     "showcase": {
       "name": "showcase",
       "description": "Show off your hive or collection to others.",
-      "usage": "/showcase @user"
+      
     },
     "gift": {
       "name": "gift",
       "description": "Gift an egg or xenomorph to another player.",
-      "usage": "/gift @user <item_id>"
+      
     }
   }
 }
