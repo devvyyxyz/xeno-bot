@@ -81,21 +81,9 @@ module.exports = {
       const embed = renderArticleEmbed(articles[idx], idx, total);
       const components = buildRow(supportBuilders, idx === 0, idx === total - 1);
 
-      // Defer reply then edit — ensures we can `fetchReply()` reliably
-      try {
-        if (!interaction.deferred && !interaction.replied) await interaction.deferReply({ ephemeral: false });
-      } catch (e) {
-        // ignore: some runtimes may not allow deferring; we'll continue
-      }
-      await interaction.editReply({ embeds: [embed], components });
-      const reply = await (async () => {
-        try { return await interaction.fetchReply(); } catch (e) { logger.warn('Failed to fetch reply message for news collector', { error: e && (e.stack || e) }); return null; }
-      })();
-      if (!reply || typeof reply.createMessageComponentCollector !== 'function') {
-        logger.warn('Cannot attach message component collector for news command (no message available)');
-        return;
-      }
-      const collector = reply.createMessageComponentCollector({ filter: i => i.user.id === interaction.user.id, time: 1000 * 60 * 10 });
+      const createCollector = require('../utils/collectorHelper');
+      const { collector, message } = await createCollector(interaction, { embeds: [embed], components, time: 1000 * 60 * 10, ephemeral: false, filter: i => i.user.id === interaction.user.id });
+      if (!collector) return;
       collector.on('collect', async (btn) => {
         try {
           await btn.deferUpdate();
@@ -118,7 +106,7 @@ module.exports = {
         (async () => {
           try {
             const disabled = buildRow(supportBuilders, true, true);
-            await reply.edit({ components: disabled });
+            await message.edit({ components: disabled });
           } catch (_) {}
         })();
       });
