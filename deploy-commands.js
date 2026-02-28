@@ -82,9 +82,16 @@ const rest = new REST({ version: '10' }).setToken(token);
       console.log('Successfully registered guild commands.');
     }
     try {
-      logger.info('Registering global commands (best-effort)', { clientId });
-      await rest.put(Routes.applicationCommands(clientId), { body: commands });
-      console.log('Successfully registered global commands.');
+      // By default do not register global commands to avoid accidental duplication.
+      // To allow global registration set `ALLOW_GLOBAL_REGISTRATION=true` in env.
+      const allowGlobal = process.env.ALLOW_GLOBAL_REGISTRATION === 'true';
+      if (!allowGlobal) {
+        logger.info('Global registration disabled by default; set ALLOW_GLOBAL_REGISTRATION=true to enable', { profile });
+      } else {
+        logger.info('Registering global commands (best-effort)', { clientId });
+        await rest.put(Routes.applicationCommands(clientId), { body: commands });
+        console.log('Successfully registered global commands.');
+      }
     } catch (globalErr) {
       logger.warn('Global command registration failed (best-effort)', { error: globalErr && (globalErr.stack || globalErr) });
     }

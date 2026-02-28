@@ -30,7 +30,20 @@ module.exports = {
           { type: 3, name: 'egg', description: 'Egg type id', required: true, autocomplete: true },
           { type: 4, name: 'amount', description: 'Amount to hatch', required: false }
         ]
-      }
+      },
+        {
+          type: 1,
+          name: 'list',
+          description: 'List your hatches (in-progress and ready to collect)'
+        },
+        {
+          type: 1,
+          name: 'collect',
+          description: 'Collect a finished hatch',
+          options: [
+            { type: 4, name: 'id', description: 'Hatch id to collect', required: true }
+          ]
+        }
     ]
   },
   async autocomplete(interaction) {
@@ -66,6 +79,56 @@ module.exports = {
     const guildId = interaction.guildId;
     const discordId = interaction.user.id;
     try {
+        if (sub === 'list') {
+            await interaction.deferReply({ ephemeral: true });
+            const rows = await hatchManager.listHatches(discordId, guildId);
+            const safeReply = require('../utils/safeReply');
+            if (!rows || rows.length === 0) {
+              await safeReply(interaction, { content: 'You have no hatches.', ephemeral: true }, { loggerName: 'command:eggs' });
+              return;
+            }
+            const { EmbedBuilder } = require('discord.js');
+            const now = Date.now();
+            const embed = new EmbedBuilder().setTitle('Your Hatches').setColor(0x00AE86).setTimestamp();
+            // Build description lines with relative timestamps for pending hatches
+            const lines = rows.map(r => {
+              const finishes = Number(r.finishes_at) || 0;
+              const ready = finishes <= now;
+              const eggMeta = eggTypes.find(e => e.id === r.egg_type);
+              const name = eggMeta ? eggMeta.name : r.egg_type;
+              let status;
+              if (r.collected) {
+                status = 'Collected';
+              } else if (ready) {
+                status = 'Ready';
+              } else {
+                // Discord relative timestamp: <t:UNIX:R>
+                status = `<t:${Math.floor(finishes / 1000)}:R>`;
+              }
+              return `#${r.id} — **${name}** — ${status}`;
+            });
+            // Truncate if too long
+            let desc = lines.join('\n');
+            if (desc.length > 3500) desc = desc.slice(0, 3496) + '...';
+            embed.setDescription(desc);
+            await safeReply(interaction, { embeds: [embed], ephemeral: true }, { loggerName: 'command:eggs' });
+            return;
+          }
+
+        if (sub === 'collect') {
+          await interaction.deferReply({ ephemeral: true });
+          const id = interaction.options.getInteger('id');
+          try {
+            await hatchManager.collectHatch(discordId, guildId, id);
+            const safeReply = require('../utils/safeReply');
+            await safeReply(interaction, { content: `Collected hatch #${id}. You received a facehugger.`, ephemeral: true }, { loggerName: 'command:eggs' });
+          } catch (e) {
+            const safeReply = require('../utils/safeReply');
+            await safeReply(interaction, { content: `Failed to collect hatch: ${e.message}`, ephemeral: true }, { loggerName: 'command:eggs' });
+          }
+          return;
+        }
+
       if (sub === 'sell') {
         await interaction.deferReply({ ephemeral: true });
         const eggId = interaction.options.getString('egg');
