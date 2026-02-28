@@ -64,4 +64,38 @@ module.exports = {
       await safeReply(interaction, { content: `Failed to force spawn eggs: ${err && err.message ? err.message : 'Unknown error'}`, ephemeral: true }, { loggerName: 'command:forcespawn' });
     }
   }
+  ,
+  // Message-mode: allow developer/owner to force spawn via text
+  async executeMessage(message, args) {
+    const ownerId = (process.env.BOT_CONFIG_PATH ? (() => { try { const bc = require(process.env.BOT_CONFIG_PATH); return bc && bc.owner; } catch (e) { return null; } })() : null) || process.env.OWNER || process.env.BOT_OWNER;
+    const memberPerms = message.member && message.member.permissions;
+    const isOwnerBypass = ownerId && String(message.author.id) === String(ownerId);
+    if (!isOwnerBypass && memberPerms && !memberPerms.has(PermissionsBitField.Flags.ManageGuild) && message.author.id !== (message.guild && message.guild.ownerId)) {
+      try { await message.reply({ content: 'You need Manage Server permission to run this.', allowedMentions: { repliedUser: false } }); } catch (e) {}
+      return;
+    }
+
+    try {
+      const eggTypeId = (args && args.length > 0) ? args[0] : null;
+      const baseLogger = require('../utils/logger');
+      const logger = baseLogger && baseLogger.get ? baseLogger.get('command:forcespawn') : console;
+      if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.start', category: 'spawn', data: { guildId: message.guildId || (message.guild && message.guild.id), eggTypeId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.start)', le && (le.stack || le)); } catch (ignored) {} } } }
+      let spawned = false;
+      if (typeof spawnManager.forceSpawn === 'function') {
+        spawned = await spawnManager.forceSpawn(message.guild.id, eggTypeId);
+      } else {
+        spawned = await spawnManager.doSpawn(message.guild.id, eggTypeId);
+      }
+      if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.finish', category: 'spawn', data: { guildId: message.guild.id, eggTypeId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
+      if (spawned) {
+        try { await message.reply(`${emojis.egg || ''} Forced egg spawn triggered${eggTypeId ? `: ${eggTypeId}` : ''}!`); } catch (e) {}
+      } else {
+        try { await message.reply({ content: `No spawn occurred: a spawn recently happened. Try again in a few seconds.`, allowedMentions: { repliedUser: false } }); } catch (e) {}
+      }
+    } catch (err) {
+      const logger = require('../utils/logger').get('command:forcespawn');
+      logger.error('Failed to force spawn eggs (message)', { error: err && (err.stack || err) });
+      try { await message.reply({ content: `Failed to force spawn eggs: ${err && err.message ? err.message : 'Unknown error'}`, allowedMentions: { repliedUser: false } }); } catch (e) {}
+    }
+  }
 };

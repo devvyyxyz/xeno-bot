@@ -8,6 +8,15 @@ const cmd = getCommandConfig('setup') || { name: 'setup', description: 'Manage b
 const logger = require('../utils/logger').get('command:setup');
 const fallbackLogger = require('../utils/fallbackLogger');
 
+function resolveOwnerId() {
+  try {
+    if (process.env.BOT_CONFIG_PATH) {
+      try { const bc = require(process.env.BOT_CONFIG_PATH); if (bc && bc.owner) return String(bc.owner); } catch (e) {}
+    }
+  } catch (e) {}
+  return process.env.OWNER || process.env.BOT_OWNER || process.env.OWNER_ID || null;
+}
+
 module.exports = {
   name: cmd.name,
   description: cmd.description,
@@ -85,10 +94,12 @@ module.exports = {
     const safeReply = require('../utils/safeReply');
     // permission: only server administrators or guild owner can change settings
     const memberPerms = interaction.memberPermissions;
-      if (memberPerms && !memberPerms.has(PermissionsBitField.Flags.ManageGuild) && interaction.user.id !== interaction.guild.ownerId) {
-          await safeReply(interaction, { content: 'You need Manage Server permission to run this.', ephemeral: true }, { loggerName: 'command:setup' });
-          return;
-        }
+    const ownerId = resolveOwnerId();
+    const isOwnerBypass = ownerId && String(interaction.user.id) === String(ownerId);
+    if (!isOwnerBypass && memberPerms && !memberPerms.has(PermissionsBitField.Flags.ManageGuild) && interaction.user.id !== interaction.guild.ownerId) {
+      await safeReply(interaction, { content: 'You need Manage Server permission to run this.', ephemeral: true }, { loggerName: 'command:setup' });
+      return;
+    }
 
     try {
       await interaction.deferReply({ ephemeral: true });
