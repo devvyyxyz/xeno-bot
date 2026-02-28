@@ -18,18 +18,25 @@ module.exports = {
     name: cmd.name,
     description: cmd.description,
     options: [
-      // Keep a simple string option for quick detail level selection
+      // Subcommand to show health info; accepts a detail option
       {
-        name: 'detail',
-        description: 'Level of detail: summary, full, db, env, metrics',
-        type: 3, // STRING
-        required: false,
-        choices: [
-          { name: 'summary', value: 'summary' },
-          { name: 'full', value: 'full' },
-          { name: 'db', value: 'db' },
-          { name: 'env', value: 'env' },
-          { name: 'metrics', value: 'metrics' }
+        name: 'show',
+        description: 'Show health information',
+        type: 1, // SUB_COMMAND
+        options: [
+          {
+            name: 'detail',
+            description: 'Level of detail: summary, full, db, env, metrics',
+            type: 3, // STRING
+            required: false,
+            choices: [
+              { name: 'summary', value: 'summary' },
+              { name: 'full', value: 'full' },
+              { name: 'db', value: 'db' },
+              { name: 'env', value: 'env' },
+              { name: 'metrics', value: 'metrics' }
+            ]
+          }
         ]
       },
       // Subcommand to tail recent logs
@@ -53,18 +60,22 @@ module.exports = {
       return;
     }
     const now = new Date();
-    // Grab the detail option robustly. Support both direct string option and subcommands.
+    // Determine subcommand and detail option. We use subcommands only: 'show' and 'lastlogs'.
     let detail = 'summary';
+    let sub = null;
     try {
-      // If a subcommand like 'lastlogs' was used, handle that separately below
-      const sub = interaction.options && interaction.options.getSubcommand && (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
-      if (sub) detail = sub;
-    } catch (e) {
-      // ignore
+      sub = interaction.options && interaction.options.getSubcommand ? (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })() : null;
+    } catch (e) { sub = null; }
+    if (sub === 'lastlogs') {
+      detail = 'lastlogs';
+    } else if (sub === 'show') {
+      const optDetail = interaction.options && interaction.options.getString ? interaction.options.getString('detail') : null;
+      detail = optDetail || 'summary';
+    } else {
+      // backward-compat: accept a top-level detail string if present
+      const optDetail = interaction.options && interaction.options.getString ? interaction.options.getString('detail') : null;
+      if (optDetail) detail = optDetail;
     }
-    // If no subcommand, prefer explicit string option if present
-    const optDetail = interaction.options && interaction.options.getString ? interaction.options.getString('detail') : null;
-    if (optDetail) detail = optDetail;
     let dbStatus = '❌ FAILED';
     let dbInfo = '';
     let usersCount = 'n/a';
