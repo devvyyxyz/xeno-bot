@@ -19,7 +19,10 @@ function getCommandsByCategory(category) {
     for (const k of Object.keys(commandsConfig)) {
       const cat = commandsConfig[k] || {};
       for (const cmdKey of Object.keys(cat)) {
-        out.push(cat[cmdKey]);
+        const entry = cat[cmdKey];
+        // hide developer-only or explicitly hidden commands from help
+        if (entry && (entry.developerOnly === true || entry.hidden === true)) continue;
+        out.push(entry);
       }
     }
     // dedupe by name
@@ -32,7 +35,7 @@ function getCommandsByCategory(category) {
     });
   }
   const cat = (commandsConfig && commandsConfig[category]) || {};
-  return Object.values(cat);
+  return Object.values(cat).filter(c => !(c && (c.developerOnly === true || c.hidden === true)));
 }
 
 module.exports = {

@@ -26,6 +26,15 @@
     "give": { "name": "give", "description": "Give items to users (admin only)", "usage": "/give egg @user <egg_type> [amount]" }
   },
 
+  "Developer": {
+    "devcommands": { "name": "devcommands", "description": "List developer/admin commands (owner only)", "usage": "!devcommands", "developerOnly": true, "hidden": true },
+    "devreload": { "name": "devreload", "description": "Reload command modules (owner only)", "usage": "!devreload", "developerOnly": true, "hidden": true },
+    "devrestart": { "name": "devrestart", "description": "Restart the bot process (owner only)", "usage": "!devrestart", "developerOnly": true, "hidden": true },
+    "deveval": { "name": "deveval", "description": "Evaluate JavaScript (owner only)", "usage": "!deveval <code>", "developerOnly": true, "hidden": true },
+    "devget": { "name": "devget", "description": "Get runtime config or env value (owner only)", "usage": "!devget <key>", "developerOnly": true, "hidden": true },
+    "devset": { "name": "devset", "description": "Set config value and update runtime (owner only)", "usage": "!devset <key> <value>", "developerOnly": true, "hidden": true }
+  },
+
   "Social": {
     "trade": { "name": "trade", "description": "Trade eggs or xenomorphs with another player.", "usage": "/trade @user <item_id>" },
     "trade-log": { "name": "trade-log", "description": "View your past trades." },
