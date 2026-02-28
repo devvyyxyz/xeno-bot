@@ -8,15 +8,6 @@
   ],
   "items": [
     {
-      "id": "speed_boost",
-      "name": "Speed Boost",
-      "description": "Shortens egg spawn time.",
-      "category": "boosts",
-      "price": 250,
-      "sellPrice": 125,
-      "sellable": true
-    },
-    {
       "id": "pathogen_spores",
       "name": "Pathogen Spores (Motes)",
       "description": "Consumable used to infect a Human Host and trigger Neomorph evolution pathways.",
