@@ -1,3 +1,3 @@
-# secretive....
+# secretive
 
 hmmm
