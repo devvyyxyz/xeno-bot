@@ -85,12 +85,15 @@ module.exports = {
     const embed = new EmbedBuilder()
       .setTitle('📊 Bot Info')
       .setColor(cmd.embedColor || 0x00b2ff)
+      .setThumbnail(client && client.user && client.user.displayAvatarURL ? client.user.displayAvatarURL({ size: 512 }) : undefined)
       .addFields(
         { name: 'System', value: `OS: ${osVersion}\nNode: ${process.version}\ndiscord.js: ${discordjsVersion}\nPython: ${pythonVersion}\nCPU: ${cpuUsage}\nRAM: ${ramUsage}`, inline: false },
         { name: 'Tech', value: `Hard uptime: ${fmt(hardUptimeMs)}\nSoft uptime: ${fmt(softUptimeMs)}\nLast update: ${lastUpdate}\nLoops: ${loops}\nShards: ${shardCount}\nShard IDs: ${shardIds}\nGateway ping: ${gatewayPing}\nIntents: ${intents}`, inline: false },
         { name: 'Global Stats', value: `Guilds (cache): ${guilds}\nDB Profiles: ${dbProfiles}\nUsers (cache): ${dbUsers}\nChannels (cache): ${dbChannels}`, inline: false },
         { name: 'Client', value: `User: ${botUser}`, inline: false }
-      );
+      )
+      .setFooter({ text: client && client.user ? `${client.user.tag}` : 'xeno-bot' })
+      .setTimestamp(new Date());
     const safeReply = require('../utils/safeReply');
     await safeReply(interaction, { embeds: [embed], ephemeral: cmd.ephemeral === true }, { loggerName: 'command:info' });
   }

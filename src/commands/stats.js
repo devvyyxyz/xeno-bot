@@ -55,23 +55,49 @@ module.exports = {
       const stats = userModel.getUserStats(user || {});
       const guildId = interaction.guildId;
       const guildData = (user && user.data && user.data.guilds && user.data.guilds[guildId]) || { eggs: {}, items: {}, currency: {} };
+      // totals for this guild
       const totalEggs = Object.values(guildData.eggs || {}).reduce((a, b) => a + (Number(b) || 0), 0);
       const totalItems = Object.values(guildData.items || {}).reduce((a, b) => a + (Number(b) || 0), 0);
+      // global totals across all guilds
+      const allGuilds = (user && user.data && user.data.guilds) || {};
+      let globalEggs = 0, globalItems = 0;
+      const eggTotalsByType = {};
+      const currencyTotals = {};
+      for (const [gId, gData] of Object.entries(allGuilds)) {
+        const eggs = gData.eggs || {};
+        for (const [etype, qty] of Object.entries(eggs)) {
+          const n = Number(qty || 0);
+          globalEggs += n;
+          eggTotalsByType[etype] = (eggTotalsByType[etype] || 0) + n;
+        }
+        const items = gData.items || {};
+        for (const qty of Object.values(items)) globalItems += Number(qty || 0);
+        const curr = gData.currency || {};
+        for (const [ck, cv] of Object.entries(curr)) currencyTotals[ck] = (currencyTotals[ck] || 0) + Number(cv || 0);
+      }
+      // top egg types
+      const topEggs = Object.entries(eggTotalsByType).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k}: ${v}`);
+      const topEggsGuild = Object.entries(guildData.eggs || {}).sort((a, b) => (Number(b[1]||0) - Number(a[1]||0))).slice(0, 3).map(([k, v]) => `${k}: ${v}`);
+      // currencies
+      const guildCurrencyLines = Object.entries(guildData.currency || {}).map(([k, v]) => `${k}: ${v}`);
+      const globalCurrencyLines = Object.entries(currencyTotals).map(([k, v]) => `${k}: ${v}`);
       const royal = await userModel.getCurrencyForGuild(String(target.id), guildId, 'royal_jelly');
 
+      const accountCreated = user && user.created_at ? new Date(user.created_at).toISOString().split('T')[0] : 'n/a';
+
       const embed = new EmbedBuilder()
-        .setTitle(`${target.username}'s Game Stats`)
+        .setTitle(`${target.username}#${target.discriminator} — Game Stats`)
         .setColor(0x00b2ff)
         .setThumbnail(typeof target.displayAvatarURL === 'function' ? target.displayAvatarURL({ size: 512, extension: 'png' }) : null)
         .addFields(
-          { name: 'Catches', value: String(stats.catches || 0), inline: true },
-          { name: 'Purrfect', value: String(stats.purrfect || 0), inline: true },
-          { name: 'Avg Catch', value: msToHuman(stats.avg || null), inline: true },
-          { name: 'Fastest', value: msToHuman(stats.fastest || null), inline: true },
-          { name: 'Slowest', value: msToHuman(stats.slowest || null), inline: true },
-          { name: 'Total Eggs (this server)', value: String(totalEggs), inline: true },
-          { name: 'Total Items (this server)', value: String(totalItems), inline: true },
-          { name: 'Royal Jelly', value: String(royal || 0), inline: true }
+          { name: 'Performance', value: `Catches: ${stats.catches || 0}\nPurrfect: ${stats.purrfect || 0} (${((stats.purrfect || 0) && stats.catches ? Math.round(100 * (stats.purrfect || 0) / stats.catches) : 0)}%)\nAvg: ${msToHuman(stats.avg || null)}\nFastest: ${msToHuman(stats.fastest || null)}\nSlowest: ${msToHuman(stats.slowest || null)}`, inline: false },
+          { name: 'Inventory (this server)', value: `Eggs: ${totalEggs}\nItems: ${totalItems}`, inline: true },
+          { name: 'Inventory (global)', value: `Eggs: ${globalEggs}\nItems: ${globalItems}`, inline: true },
+          { name: 'Top Eggs (this server)', value: topEggsGuild.length ? topEggsGuild.join('\n') : 'none', inline: true },
+          { name: 'Top Eggs (global)', value: topEggs.length ? topEggs.join('\n') : 'none', inline: true },
+          { name: 'Currency (this server)', value: guildCurrencyLines.length ? guildCurrencyLines.join('\n') : `royal_jelly: ${royal || 0}`, inline: false },
+          { name: 'Currency (global)', value: globalCurrencyLines.length ? globalCurrencyLines.join('\n') : 'none', inline: false },
+          { name: 'Misc', value: `Account created: ${accountCreated}\nUser ID: ${target.id}`, inline: false }
         )
         .setFooter({ text: 'Game stats' });
 
