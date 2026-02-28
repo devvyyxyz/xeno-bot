@@ -23,7 +23,7 @@ function chunkPages(fields) {
   return pages;
 }
 
-function makeEmbed(target, type, pageIdx, pages, royalJelly = 0) {
+function makeEmbed(target, type, pageIdx, pages, balances = {}) {
   const embed = new EmbedBuilder().setTitle(`${target.username}'s Inventory`).setColor(cmd.embedColor || 0x00b2ff);
   try {
     const avatarUrl = target && typeof target.displayAvatarURL === 'function' ? target.displayAvatarURL({ size: 512, extension: 'png' }) : null;
@@ -37,7 +37,9 @@ function makeEmbed(target, type, pageIdx, pages, royalJelly = 0) {
   } else {
     embed.addFields(page);
   }
-  embed.setFooter({ text: `Royal Jelly: ${royalJelly} • ${type === 'eggs' ? 'Eggs' : 'Items'} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}` });
+  const royal = Number(balances.royal_jelly || 0);
+  const credits = Number(balances.credits || 0);
+  embed.setFooter({ text: `Royal Jelly: ${royal} • Credits: ${credits} • ${type === 'eggs' ? 'Eggs' : type === 'items' ? 'Items' : 'Currencies'} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}` });
   return embed;
 }
 
@@ -85,6 +87,7 @@ module.exports = {
 
     // Build initial view: default to eggs
     const items = user?.data?.guilds?.[guildId]?.items || {};
+    const currencies = user?.data?.guilds?.[guildId]?.currency || {};
     const getFieldsForType = (viewType) => {
       const out = [];
       if (viewType === 'eggs') {
@@ -92,6 +95,12 @@ module.exports = {
           const count = eggs[type.id];
           if (count && count > 0) out.push({ name: `${type.emoji} ${type.name}`, value: String(count), inline: true });
         }
+        return out;
+      }
+
+      if (viewType === 'currencies') {
+        out.push({ name: 'Credits', value: String(currencies.credits || 0), inline: true });
+        out.push({ name: 'Royal Jelly', value: String(currencies.royal_jelly || 0), inline: true });
         return out;
       }
 
@@ -120,9 +129,12 @@ module.exports = {
     let fieldsForType = getFieldsForType(currentType);
     let pages = chunkPages(fieldsForType);
     let page = 0;
-    const royalJellyBalance = await userModel.getCurrencyForGuild(String(target.id), guildId, 'royal_jelly');
+    const [royalJellyBalance, creditsBalance] = await Promise.all([
+      userModel.getCurrencyForGuild(String(target.id), guildId, 'royal_jelly'),
+      userModel.getCurrencyForGuild(String(target.id), guildId, 'credits')
+    ]);
 
-    const embed = makeEmbed(target, currentType, page, pages, royalJellyBalance);
+    const embed = makeEmbed(target, currentType, page, pages, { royal_jelly: royalJellyBalance, credits: creditsBalance });
 
     const components = [
       new ActionRowBuilder().addComponents(
@@ -169,25 +181,31 @@ module.exports = {
           fieldsForType = getFieldsForType(currentType);
           pages = chunkPages(fieldsForType);
           page = 0;
-          const bal = await userModel.getCurrencyForGuild(String(target.id), guildId, 'royal_jelly');
-          const e = makeEmbed(target, currentType, page, pages, bal);
+          const [balRoyal, balCredits] = await Promise.all([
+            userModel.getCurrencyForGuild(String(target.id), guildId, 'royal_jelly'),
+            userModel.getCurrencyForGuild(String(target.id), guildId, 'credits')
+          ]);
+          const e = makeEmbed(target, currentType, page, pages, { royal_jelly: balRoyal, credits: balCredits });
           const newNav = new ActionRowBuilder().addComponents(
             new SecondaryButtonBuilder().setLabel('Previous').setCustomId('inventory-prev').setDisabled(page === 0),
             new SecondaryButtonBuilder().setLabel('Next').setCustomId('inventory-next').setDisabled(pages.length <= 1)
           );
-          await i.update({ embeds: [e], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('inventory-type').setPlaceholder('Type').addOptions(new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(currentType==='eggs'), new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items').setDefault(currentType==='items'))), newNav] });
+          await i.update({ embeds: [e], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('inventory-type').setPlaceholder('Type').addOptions(new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(currentType==='eggs'), new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items').setDefault(currentType==='items'), new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies').setDefault(currentType==='currencies'))), newNav] });
           return;
         }
         if (i.customId === 'inventory-prev' || i.customId === 'inventory-next') {
           if (i.customId === 'inventory-next' && page < pages.length - 1) page++;
           if (i.customId === 'inventory-prev' && page > 0) page--;
-          const bal2 = await userModel.getCurrencyForGuild(String(target.id), guildId, 'royal_jelly');
-          const e = makeEmbed(target, currentType, page, pages, bal2);
+          const [bal2Royal, bal2Credits] = await Promise.all([
+            userModel.getCurrencyForGuild(String(target.id), guildId, 'royal_jelly'),
+            userModel.getCurrencyForGuild(String(target.id), guildId, 'credits')
+          ]);
+          const e = makeEmbed(target, currentType, page, pages, { royal_jelly: bal2Royal, credits: bal2Credits });
           const newNav = new ActionRowBuilder().addComponents(
             new SecondaryButtonBuilder().setLabel('Previous').setCustomId('inventory-prev').setDisabled(page === 0),
             new SecondaryButtonBuilder().setLabel('Next').setCustomId('inventory-next').setDisabled(page >= pages.length - 1)
           );
-          await i.update({ embeds: [e], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('inventory-type').setPlaceholder('Type').addOptions(new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(currentType==='eggs'), new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items').setDefault(currentType==='items'))), newNav] });
+          await i.update({ embeds: [e], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('inventory-type').setPlaceholder('Type').addOptions(new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(currentType==='eggs'), new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items').setDefault(currentType==='items'), new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies').setDefault(currentType==='currencies'))), newNav] });
           return;
         }
       } catch (err) {
