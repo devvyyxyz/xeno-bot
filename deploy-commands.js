@@ -44,7 +44,20 @@ if (fs.existsSync(commandsPath)) {
 }
 
 // Determine bot profile and token/client selection
-const profile = process.env.BOT_PROFILE || (process.env.NODE_ENV === 'development' ? 'dev' : 'public');
+// Priority: BOT_PROFILE env var, then npm lifecycle event (script name), then NODE_ENV
+const explicitProfile = process.env.BOT_PROFILE && String(process.env.BOT_PROFILE).toLowerCase();
+let inferredProfile = null;
+if (process.env.npm_lifecycle_event) {
+  const ev = String(process.env.npm_lifecycle_event).toLowerCase();
+  if (ev.includes('dev') || ev.includes('start:dev') || ev === 'dev') inferredProfile = 'dev';
+  else inferredProfile = 'public';
+}
+// Accept `dev` as a CLI arg (e.g. `npm start dev`) forwarded by npm
+if (!inferredProfile && process.argv && process.argv.length > 2) {
+  const hasDevArg = process.argv.slice(2).some(a => /(^|\W)(dev|development)(\W|$)/i.test(String(a)));
+  if (hasDevArg) inferredProfile = 'dev';
+}
+const profile = explicitProfile || inferredProfile || (process.env.NODE_ENV === 'development' ? 'dev' : 'public');
 let clientId = process.env.CLIENT_ID;
 let token = process.env.TOKEN;
 let profileCfg = null;
@@ -98,26 +111,31 @@ const rest = new REST({ version: '10' }).setToken(token);
     console.log('Refreshing application (/) commands...');
     // Priority: if GUILD_ID is set, register to that guild first for fast testing.
     // Also allow the profile file to specify a default guildId (useful for dev profile).
-    // Always attempt global registration afterwards (best-effort); failures are logged but do not abort.
+    // IMPORTANT SAFETY: dev profile should NEVER register global commands.
     const targetGuild = process.env.GUILD_ID || (profileCfg && profileCfg.guildId);
+    const isDevProfile = profile === 'dev';
     if (targetGuild) {
-      logger.info('Registering guild commands', { clientId, guildId: targetGuild });
+      logger.info('Registering guild commands', { clientId, guildId: targetGuild, profile });
       await rest.put(Routes.applicationGuildCommands(clientId, targetGuild), { body: commands });
       console.log('Successfully registered guild commands.');
+    } else if (isDevProfile) {
+      logger.warn('Dev profile selected but no GUILD_ID configured; skipping registration to avoid global registration', { profile });
     }
-    try {
-      // By default do not register global commands to avoid accidental duplication.
-      // To allow global registration set `ALLOW_GLOBAL_REGISTRATION=true` in env.
-      const allowGlobal = process.env.ALLOW_GLOBAL_REGISTRATION === 'true';
-      if (!allowGlobal) {
-        logger.info('Global registration disabled by default; set ALLOW_GLOBAL_REGISTRATION=true to enable', { profile });
-      } else {
-        logger.info('Registering global commands (best-effort)', { clientId });
-        await rest.put(Routes.applicationCommands(clientId), { body: commands });
-        console.log('Successfully registered global commands.');
+
+    // Only attempt global registration for non-dev profiles and only when explicitly allowed.
+    if (!isDevProfile) {
+      try {
+        const allowGlobal = process.env.ALLOW_GLOBAL_REGISTRATION === 'true';
+        if (!allowGlobal) {
+          logger.info('Global registration disabled by default; set ALLOW_GLOBAL_REGISTRATION=true to enable', { profile });
+        } else {
+          logger.info('Registering global commands (best-effort)', { clientId, profile });
+          await rest.put(Routes.applicationCommands(clientId), { body: commands });
+          console.log('Successfully registered global commands.');
+        }
+      } catch (globalErr) {
+        logger.warn('Global command registration failed (best-effort)', { error: globalErr && (globalErr.stack || globalErr) });
       }
-    } catch (globalErr) {
-      logger.warn('Global command registration failed (best-effort)', { error: globalErr && (globalErr.stack || globalErr) });
     }
   } catch (error) {
     console.error(error);

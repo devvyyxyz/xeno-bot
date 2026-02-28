@@ -2,9 +2,23 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 // Determine which bot profile to use (public vs dev). Priority:
-// 1) process.env.BOT_PROFILE, 2) NODE_ENV === 'production' => public, otherwise dev
-const profile = (process.env.BOT_PROFILE && String(process.env.BOT_PROFILE).toLowerCase())
-  || (process.env.NODE_ENV === 'production' ? 'public' : 'dev');
+// 1) process.env.BOT_PROFILE
+// 2) npm script name (process.env.npm_lifecycle_event) when available (helps hosts using `npm start` vs `npm run start:dev`)
+// 3) NODE_ENV === 'production' => public, otherwise dev
+const explicit = process.env.BOT_PROFILE && String(process.env.BOT_PROFILE).toLowerCase();
+let inferred = null;
+// Infer from npm lifecycle event when available (script name)
+if (process.env.npm_lifecycle_event) {
+  const ev = String(process.env.npm_lifecycle_event).toLowerCase();
+  if (ev.includes('dev') || ev.includes('start:dev') || ev === 'dev') inferred = 'dev';
+  else inferred = 'public';
+}
+// Also accept a plain 'dev' CLI arg (e.g. `npm start dev`) or `--dev` flag passed through npm
+if (!inferred && process.argv && process.argv.length > 2) {
+  const hasDevArg = process.argv.slice(2).some(a => /(^|\W)(dev|development)(\W|$)/i.test(String(a)));
+  if (hasDevArg) inferred = 'dev';
+}
+const profile = explicit || inferred || (process.env.NODE_ENV === 'production' ? 'public' : 'dev');
 // Load non-secret metadata for chosen profile and map token env var into process.env.TOKEN if available.
 try {
   const botCfgPath = path.join(__dirname, '..', 'config', `bot.${profile}.json`);
