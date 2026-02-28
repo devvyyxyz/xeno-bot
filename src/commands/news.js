@@ -193,7 +193,8 @@ module.exports = {
       const embed = buildHomeEmbed(links.general || links, firstArticle, 0, botAvatar);
       const categoryRow = buildCategoryRow(supportBuilders, categoryKeys);
       const navRow = buildRow(supportBuilders, true, true);
-      const components = categoryRow.concat(navRow);
+      // Home page: only show category buttons (no navigation/home row)
+      const components = categoryRow;
 
       const createCollector = require('../utils/collectorHelper');
       const { collector, message } = await createCollector(interaction, { embeds: [embed], components, time: 1000 * 60 * 10, ephemeral: false, filter: i => i.user.id === interaction.user.id });
@@ -232,7 +233,8 @@ module.exports = {
           let newComponents;
           if (showHome) {
             newEmbed = buildHomeEmbed(links.general || links, firstArticle, 0, botAvatar);
-            newComponents = categoryRow.concat(buildRow(supportBuilders, true, true));
+            // Home view should only contain category buttons
+            newComponents = categoryRow;
           } else {
             newEmbed = renderArticleEmbed(articles[idx], idx, total);
             newComponents = buildRow(supportBuilders, idx === 0, idx === total - 1);
