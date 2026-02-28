@@ -9,5 +9,14 @@
     { "id": "royal_egg", "name": "Royal Egg", "description": "A rare royal egg.", "category": "eggs", "price": 500, "sellPrice": 250, "sellable": true },
     { "id": "speed_boost", "name": "Speed Boost", "description": "Shortens egg spawn time.", "category": "boosts", "price": 250, "sellPrice": 125, "sellable": true },
     { "id": "profile_bg", "name": "Profile Background", "description": "Customizes your profile.", "category": "cosmetics", "price": 300, "sellPrice": 0, "sellable": false }
+    ,
+    { "id": "pathogen_spores", "name": "Pathogen Spores (Motes)", "description": "Consumable used to infect a Human Host and trigger Neomorph evolution pathways.", "category": "boosts", "price": 1000, "sellPrice": 250, "sellable": true, "rarity": "rare" },
+    { "id": "pathogen_liquid", "name": "Pathogen Liquid", "description": "Converts a Xeno Queen into a Pathogen Runner to enable Pathogen Hive mechanics.", "category": "boosts", "price": 2500, "sellPrice": 500, "sellable": false, "rarity": "legendary" },
+    { "id": "cyborg_parts", "name": "Cyborg Parts", "description": "Mechanical enhancements for cyborg xenos, improves battle stats.", "category": "boosts", "price": 1200, "sellPrice": 300, "sellable": true, "rarity": "rare" },
+    { "id": "golden_gen", "name": "Golden Gen", "description": "Mutagenal reagent that increases chance to hatch rare or hybrid xenos.", "category": "boosts", "price": 2000, "sellPrice": 800, "sellable": false, "rarity": "epic" },
+    { "id": "mutation_stabilizer", "name": "Mutation Stabilizer", "description": "Prevents mutation penalties during hybrid evolution pathways.", "category": "boosts", "price": 800, "sellPrice": 200, "sellable": true, "rarity": "uncommon" },
+    { "id": "incubation_accelerator", "name": "Incubation Accelerator", "description": "Reduces hatch times by 50-75% for a single egg.", "category": "boosts", "price": 900, "sellPrice": 225, "sellable": true, "rarity": "uncommon" },
+    { "id": "defensive_pheromones", "name": "Defensive Pheromones", "description": "Reduces hive losses during invasions for a short period.", "category": "boosts", "price": 1100, "sellPrice": 275, "sellable": true, "rarity": "rare" },
+    { "id": "jelly_extractor", "name": "Jelly Extractor", "description": "Doubles royal jelly production for 1-2 hours.", "category": "boosts", "price": 1500, "sellPrice": 375, "sellable": true, "rarity": "epic" }
   ]
 }

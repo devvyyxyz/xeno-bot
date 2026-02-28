@@ -8,6 +8,8 @@
     "collect": { "name": "collect", "description": "Collect a spawned egg from the channel.", "usage": "" },
     "eggs": { "name": "eggs", "description": "Manage your egg collection (list, info, destroy).", "usage": "/eggs list | /eggs info <egg_id> | /eggs destroy <egg_id>" },
     "nextspawn": { "name": "nextspawn", "description": "Show time until the next egg spawn for this server.", "usage": "" }
+    ,
+    "item": { "name": "item", "description": "Use or inspect items (use/info/combine)", "usage": "/item <use|info|combine>", "embedColor": 46031 }
   },
 
   "General": {
