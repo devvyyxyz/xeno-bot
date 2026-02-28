@@ -168,7 +168,10 @@ if (process.env.NODE_ENV !== 'production') {
   if (forceColor) {
     logger.add(new transports.Console({ format: combine(forceColorFormat(), timestamp({ format: shortTimestamp }), consoleFormat) }));
   } else {
-    logger.add(new transports.Console({ format: combine(timestamp({ format: shortTimestamp }), fileFormat) }));
+    // Use the console-friendly format in production too (no meta JSON),
+    // but do not inject ANSI codes unless forced. This makes `npm start`
+    // output match `npm run dev` while keeping file transports unchanged.
+    logger.add(new transports.Console({ format: combine(colorize({ all: false }), timestamp({ format: shortTimestamp }), consoleFormat) }));
   }
 }
 
