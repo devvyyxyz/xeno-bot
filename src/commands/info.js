@@ -3,9 +3,9 @@ const process = require('process');
 const { getCommandConfig } = require('../utils/commandsConfig');
 const db = require('../db');
 const fallbackLogger = require('../utils/fallbackLogger');
-const { version: nodeVersion } = process;
 const { execSync } = require('child_process');
 const pkg = require('../../package.json');
+const discord = require('discord.js');
 
 const cmd = getCommandConfig('info') || {
   name: 'info',
@@ -23,15 +23,25 @@ module.exports = {
   description: cmd.description,
   data: { name: cmd.name, description: cmd.description },
   async executeInteraction(interaction) {
+    const { EmbedBuilder } = require('discord.js');
     // System
     const osVersion = `${os.type()} ${os.release()}-${os.arch()}`;
     let pythonVersion = 'N/A';
     try {
       pythonVersion = execSync('python3 --version').toString().trim().replace('Python ', '');
     } catch (e) { try { logger.warn('Failed detecting python version for info command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging python detection error for info command', le && (le.stack || le)); } }
-    const discordjsVersion = pkg.dependencies['discord.js'] || 'unknown';
+    const discordjsVersion = (discord && discord.version) || pkg.dependencies['discord.js'] || 'unknown';
     const cpuUsage = (os.loadavg()[0] / os.cpus().length * 100).toFixed(1) + '%';
     const ramUsage = ((process.memoryUsage().rss / os.totalmem()) * 100).toFixed(1) + '%';
+
+    // runtime client info
+    const client = interaction.client;
+    const botUser = client && client.user ? `${client.user.tag} (${client.user.id})` : 'unknown';
+    const clientGuilds = client && client.guilds && client.guilds.cache ? client.guilds.cache.size : 'unknown';
+    const clientUsers = client && client.users && client.users.cache ? client.users.cache.size : 'unknown';
+    const clientChannels = client && client.channels && client.channels.cache ? client.channels.cache.size : 'unknown';
+    const gatewayPing = client && client.ws && typeof client.ws.ping === 'number' ? `${client.ws.ping} ms` : 'n/a';
+    const intents = (client && client.options && client.options.intents) ? String(client.options.intents) : 'n/a';
 
     // Tech
     const hardUptimeMs = os.uptime() * 1000;
@@ -50,12 +60,11 @@ module.exports = {
       lastUpdate = fmt(Date.now() - last);
     } catch (e) { try { logger.warn('Failed getting last git update for info command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging git update error for info command', le && (le.stack || le)); } }
     const loops = ++global._loopCount;
-    // Sharding (simulate)
-    const shards = 192;
-    const guildShard = 1;
+    const shardCount = client && client.shard && typeof client.shard.count === 'number' ? client.shard.count : (client && client.options && client.options.shards ? client.options.shards : 'n/a');
+    const shardIds = client && client.shard && Array.isArray(client.shard.ids) ? client.shard.ids.join(',') : (client && client.options && client.options.shards ? String(client.options.shards) : 'n/a');
 
     // Global Stats
-    let guilds = 'unknown', dbProfiles = 'unknown', dbUsers = 'unknown', dbChannels = 'unknown';
+    let guilds = clientGuilds, dbProfiles = 'unknown', dbUsers = clientUsers, dbChannels = clientChannels;
     try {
       const g = await db.knex('guild_settings').count('* as c').first();
       guilds = g && (g.c ?? g['count(*)']) ? g.c || g['count(*)'] : '0';
@@ -73,34 +82,15 @@ module.exports = {
       dbChannels = c && (c.c ?? c['count(*)']) ? c.c || c['count(*)'] : '0';
     } catch (e) { try { logger.warn('Failed querying channels count for info command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging channels count query error for info command', le && (le.stack || le)); } }
 
-    const embed = {
-      title: '📊 Bot Info',
-      color: cmd.embedColor || 0x00b2ff,
-      description: '**System**\n'
-        + '```\n'
-        + `OS Version:   ${osVersion}\n`
-        + `Python:       ${pythonVersion}\n`
-        + `discord.js:   ${discordjsVersion}\n`
-        + `CPU usage:    ${cpuUsage}\n`
-        + `RAM usage:    ${ramUsage}`
-        + '\n```\n'
-        + '\n**Tech**\n'
-        + '```\n'
-        + `Hard uptime:  ${fmt(hardUptimeMs)}\n`
-        + `Soft uptime:  ${fmt(softUptimeMs)}\n`
-        + `Last update:  ${lastUpdate}\n`
-        + `Loops:        ${loops}\n`
-        + `Shards:       ${shards}\n`
-        + `Guild shard:  ${guildShard}`
-        + '\n```\n'
-        + '\n**Global Stats**\n'
-        + '```\n'
-        + `Guilds:       ${guilds}\n`
-        + `DB Profiles:  ${dbProfiles}\n`
-        + `DB Users:     ${dbUsers}\n`
-        + `DB Channels:  ${dbChannels}`
-        + '\n```',
-    };
+    const embed = new EmbedBuilder()
+      .setTitle('📊 Bot Info')
+      .setColor(cmd.embedColor || 0x00b2ff)
+      .addFields(
+        { name: 'System', value: `OS: ${osVersion}\nNode: ${process.version}\ndiscord.js: ${discordjsVersion}\nPython: ${pythonVersion}\nCPU: ${cpuUsage}\nRAM: ${ramUsage}`, inline: false },
+        { name: 'Tech', value: `Hard uptime: ${fmt(hardUptimeMs)}\nSoft uptime: ${fmt(softUptimeMs)}\nLast update: ${lastUpdate}\nLoops: ${loops}\nShards: ${shardCount}\nShard IDs: ${shardIds}\nGateway ping: ${gatewayPing}\nIntents: ${intents}`, inline: false },
+        { name: 'Global Stats', value: `Guilds (cache): ${guilds}\nDB Profiles: ${dbProfiles}\nUsers (cache): ${dbUsers}\nChannels (cache): ${dbChannels}`, inline: false },
+        { name: 'Client', value: `User: ${botUser}`, inline: false }
+      );
     const safeReply = require('../utils/safeReply');
     await safeReply(interaction, { embeds: [embed], ephemeral: cmd.ephemeral === true }, { loggerName: 'command:info' });
   }
