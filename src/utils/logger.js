@@ -32,6 +32,18 @@ const ANSI = {
   reset: '\x1b[0m'
 };
 
+// Pick label colors deterministically so categories have distinct colours
+const _labelPalette = ['magenta', 'cyan', 'blue', 'yellow', 'green', 'gray'];
+const pickLabelColor = (label) => {
+  if (!label || typeof label !== 'string') return '';
+  let h = 0;
+  for (let i = 0; i < label.length; i++) h = ((h << 5) - h + label.charCodeAt(i)) >>> 0;
+  const colorName = _labelPalette[h % _labelPalette.length];
+  return ANSI[colorName] || '';
+};
+
+const shouldColorLabels = () => forceColor || (process.stdout && process.stdout.isTTY);
+
 // Custom format to inject ANSI color codes when forcing colors (avoids relying on TTY)
 const forceColorFormat = format((info) => {
   const lvl = String(info.level || 'info');
@@ -42,15 +54,70 @@ const forceColorFormat = format((info) => {
   return info;
 });
 
+// NOTE: fileTransportFormat is defined after `shortTimestamp` below.
+
 const fileFormat = printf(({ timestamp, level, message, label, stack, ...meta }) => {
-  const metaStr = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
+  // Sanitize metadata to avoid leaking secrets (DB URLs, tokens, passwords)
+  const sanitizeValue = (v) => {
+    if (typeof v !== 'string') return v;
+    // Mask URL credentials: protocol://user:pass@host -> protocol://user:****@host
+    try {
+      if (/^[a-zA-Z]+:\/\//.test(v)) {
+        try {
+          const u = new URL(v);
+          if (u.username || u.password) {
+            u.password = '****';
+            return u.toString();
+          }
+          return v;
+        } catch (e) {
+          // fallback to regex masking
+          return v.replace(/:\/\/([^:@\/]+):([^@\/]+)@/, '://$1:****@');
+        }
+      }
+    } catch (_) {}
+    // Mask obvious tokens/keys
+    if (/token|password|passwd|secret|dsn/i.test(v)) return 'REDACTED';
+    return v;
+  };
+
+  const sanitizeMeta = (m) => {
+    const out = {};
+    for (const [k, v] of Object.entries(m || {})) {
+      if (v === undefined) continue;
+      if (k.match(/password|pass|token|secret|dsn|url/i)) {
+        // redact or sanitize known sensitive keys
+        if (typeof v === 'string') out[k] = sanitizeValue(v);
+        else out[k] = 'REDACTED';
+      } else if (typeof v === 'object' && v !== null) {
+        try { out[k] = JSON.parse(JSON.stringify(v)); } catch (_) { out[k] = String(v); }
+      } else {
+        out[k] = sanitizeValue(v);
+      }
+    }
+    return out;
+  };
+
+  const cleanMeta = sanitizeMeta(meta);
+  const metaStr = Object.keys(cleanMeta).length ? ` ${JSON.stringify(cleanMeta)}` : '';
   const msg = stack || message;
   return `${timestamp} [${level}]${label ? ` [${label}]` : ''} ${msg}${metaStr}`;
 });
 
 const consoleFormat = printf(({ timestamp, level, message, label, stack }) => {
   const msg = stack || message;
-  return `${timestamp} [${level}]${label ? ` [${label}]` : ''} ${msg}`;
+  let labelPart = '';
+  if (label) {
+    // If label already contains ANSI sequences (e.g. forceColorFormat applied), don't recolor
+    const hasAnsi = /\x1b\[/.test(String(label));
+    if (!hasAnsi && shouldColorLabels()) {
+      const code = pickLabelColor(label);
+      labelPart = ` [${code}${label}${ANSI.reset}]`;
+    } else {
+      labelPart = ` [${label}]`;
+    }
+  }
+  return `${timestamp} [${level}]${labelPart} ${msg}`;
 });
 
 // Short UTC timestamp helper: "MM-DD HH:mm" (year removed)
@@ -59,6 +126,13 @@ const shortTimestamp = () => {
   const pad = (n) => String(n).padStart(2, '0');
   return `${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 };
+
+// Determine the format used for file transports. When LOG_FORCE_COLOR is set,
+// inject ANSI color codes into file logs as well so hosts that support ANSI
+// rendering (web consoles) will display colored log lines.
+const fileTransportFormat = forceColor
+  ? combine(forceColorFormat(), timestamp({ format: shortTimestamp }), fileFormat)
+  : combine(timestamp({ format: shortTimestamp }), fileFormat);
 
 const logger = createLogger({
   level: process.env.LOG_LEVEL || 'info',
@@ -71,10 +145,10 @@ const logger = createLogger({
       zippedArchive: true,
       maxSize: '20m',
       maxFiles: '14d',
-      format: combine(timestamp({ format: shortTimestamp }), fileFormat)
+      format: fileTransportFormat
     }),
     // Keep a separate error file for quick access
-    new transports.File({ filename: path.join(logsDir, 'error.log'), level: 'error', format: combine(timestamp({ format: shortTimestamp }), fileFormat) })
+    new transports.File({ filename: path.join(logsDir, 'error.log'), level: 'error', format: fileTransportFormat })
   ],
   exitOnError: false
 });
@@ -85,11 +159,17 @@ if (process.env.NODE_ENV !== 'production') {
     // Force ANSI-coded colors even when stdout isn't a TTY
     logger.add(new transports.Console({ format: combine(forceColorFormat(), timestamp({ format: shortTimestamp }), consoleFormat) }));
   } else {
-    logger.add(new transports.Console({ format: combine(colorize({ all: true }), timestamp({ format: shortTimestamp }), consoleFormat) }));
+    // Only colorize the `level` itself via winston; labels are colored above
+    logger.add(new transports.Console({ format: combine(colorize({ all: false }), timestamp({ format: shortTimestamp }), consoleFormat) }));
   }
 } else {
-  // In production still log to console (no colors)
-  logger.add(new transports.Console({ format: combine(timestamp({ format: shortTimestamp }), fileFormat) }));
+  // In production: normally no colors, but allow forcing ANSI colors via
+  // `LOG_FORCE_COLOR=1` or `FORCE_COLOR=1` for hosts/terminals that support it.
+  if (forceColor) {
+    logger.add(new transports.Console({ format: combine(forceColorFormat(), timestamp({ format: shortTimestamp }), consoleFormat) }));
+  } else {
+    logger.add(new transports.Console({ format: combine(timestamp({ format: shortTimestamp }), fileFormat) }));
+  }
 }
 
 // Optional Papertrail remote logging

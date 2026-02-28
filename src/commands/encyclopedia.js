@@ -1,5 +1,6 @@
 const { getCommandConfig } = require('../utils/commandsConfig');
 const eggTypes = require('../../config/eggTypes.json');
+const fallbackLogger = require('../utils/fallbackLogger');
 // userModel not needed here
 const eggModel = require('../models/egg');
 const emojis = require('../utils/emojis');
@@ -34,22 +35,22 @@ module.exports = {
     if (baseLogger && baseLogger.sentry) {
       try {
         baseLogger.sentry.addBreadcrumb({ message: 'db.ensureEggTypes.start', category: 'db', data: { guildId } });
-      } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (ensureEggTypes.start)', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging breadcrumb failure (ensureEggTypes.start)', le && (le.stack || le)); } }
+      } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (ensureEggTypes.start)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (ensureEggTypes.start)', le && (le.stack || le)); } }
     }
       await eggModel.ensureEggTypesForGuild(guildId, eggTypes);
     if (baseLogger && baseLogger.sentry) {
       try {
         baseLogger.sentry.addBreadcrumb({ message: 'db.ensureEggTypes.finish', category: 'db', data: { guildId } });
-      } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (ensureEggTypes.finish)', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging breadcrumb failure (ensureEggTypes.finish)', le && (le.stack || le)); } }
+      } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (ensureEggTypes.finish)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (ensureEggTypes.finish)', le && (le.stack || le)); } }
     }
     // Get stats from DB
     if (baseLogger && baseLogger.sentry) {
       try {
         baseLogger.sentry.addBreadcrumb({ message: 'db.getEggStats.start', category: 'db', data: { guildId } });
-      } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (getEggStats.start)', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging breadcrumb failure (getEggStats.start)', le && (le.stack || le)); } }
+      } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (getEggStats.start)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (getEggStats.start)', le && (le.stack || le)); } }
     }
     const stats = await eggModel.getEggStatsForGuild(guildId);
-    if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.getEggStats.finish', category: 'db', data: { guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.getEggStats.finish)', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging sentry breadcrumb failure (db.getEggStats.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
+    if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.getEggStats.finish', category: 'db', data: { guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.getEggStats.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (db.getEggStats.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
     const totalWeight = eggTypes.reduce((a, b) => a + b.weight, 0);
     const hiddenEmoji = emojis.get('egg_hidden');
     const eggsPerPage = 9;
@@ -96,7 +97,7 @@ module.exports = {
       await i.update({ embeds: [getEmbed(page)], components: [newRow] });
     });
     collector.on('end', async () => {
-      try { await interaction.editReply({ components: [] }); } catch (e) { try { const l = require('../utils/logger').get('command:encyclopedia'); l && l.warn && l.warn('Failed clearing components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging encyclopedia component clear failure', le && (le.stack || le)); } catch (ignored) {} } }
+      try { await interaction.editReply({ components: [] }); } catch (e) { try { const l = require('../utils/logger').get('command:encyclopedia'); l && l.warn && l.warn('Failed clearing components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging encyclopedia component clear failure', le && (le.stack || le)); } catch (ignored) {} } }
     });
   }
 };

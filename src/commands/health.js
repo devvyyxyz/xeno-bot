@@ -1,4 +1,5 @@
 const { getCommandConfig } = require('../utils/commandsConfig');
+const fallbackLogger = require('../utils/fallbackLogger');
 const cmd = getCommandConfig('health') || { name: 'health', description: 'Show bot health (DB and telemetry)' };
 const logger = require('../utils/logger').get('command:health');
 const db = require('../db');
@@ -37,7 +38,7 @@ module.exports = {
           const parsed = new URL(process.env.DATABASE_URL);
           dbInfo += ` | Host: ${parsed.hostname}` + (parsed.pathname ? ` | DB: ${parsed.pathname.replace('/', '')}` : '');
         } catch (e) {
-          try { logger && logger.warn && logger.warn('Failed parsing DATABASE_URL in health command', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging DATABASE_URL parse error in health command', le && (le.stack || le)); } catch (ignored) {} }
+          try { logger && logger.warn && logger.warn('Failed parsing DATABASE_URL in health command', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging DATABASE_URL parse error in health command', le && (le.stack || le)); } catch (ignored) {} }
         }
       }
         try {

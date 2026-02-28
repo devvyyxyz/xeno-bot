@@ -38,6 +38,26 @@ Development (private/dev bot):
 npm run start:dev
 ```
 
+Recommended local alias:
+
+```bash
+npm run start:local   # same as NODE_ENV=development node src/index.js
+```
+
+Environment variables
+- Copy `.env.example` to `.env` and fill secrets (do NOT commit `.env`). Important vars:
+	- `TOKEN` — bot token used by the selected profile (or set profile-specific token env names in `config/bot.*.json`).
+	- `GUILD_ID` — test guild id for fast dev command registration.
+	- `ALLOW_GLOBAL_REGISTRATION` — set to `true` when you intend to register global commands (use on CI/host only).
+	- `DEV_AUTO_DEPLOY` — when `true` and running dev profile, the bot will auto-run `deploy-commands.js` to register guild commands on startup (safe: guild-only).
+	- `AUTO_DEPLOY_PUBLIC` — when `true` and running public profile on the host, the bot will auto-run `deploy-commands.js` with global registration enabled (use with caution).
+
+Scripts (use these to avoid accidental registration):
+- `npm run deploy:public` — explicitly deploy commands for the public bot (sets `BOT_PROFILE=public`).
+- `npm run deploy-dev-commands` — deploy commands for the dev profile.
+- `npm run start:local` — start the bot in local/dev mode (recommended for local testing).
+
+
 Development
 
 - `npm run dev` — run with `nodemon` and auto-restart on changes.

@@ -2,6 +2,7 @@
 const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
 const { SecondaryButtonBuilder } = require('@discordjs/builders');
 const { getCommandConfig, getCommandsObject } = require('../utils/commandsConfig');
+const fallbackLogger = require('../utils/fallbackLogger');
 const cmd = getCommandConfig('help') || { name: 'help', description: 'Show help for available commands' };
 
 function getCategories() {
@@ -52,9 +53,9 @@ module.exports = {
         if (interaction.guild) {
           appCommands = await interaction.guild.commands.fetch();
         }
-      } catch (e) { try { logger && logger.warn && logger.warn('Failed fetching application commands in help command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging help fetch failure', le && (le.stack || le)); } }
+      } catch (e) { try { logger && logger.warn && logger.warn('Failed fetching application commands in help command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging help fetch failure', le && (le.stack || le)); } }
       if (!appCommands) {
-        try { appCommands = await interaction.client.application.commands.fetch(); } catch (e) { try { logger && logger.warn && logger.warn('Failed fetching app commands for help view', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging app commands fetch failure', le && (le.stack || le)); } }
+        try { appCommands = await interaction.client.application.commands.fetch(); } catch (e) { try { logger && logger.warn && logger.warn('Failed fetching app commands for help view', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging app commands fetch failure', le && (le.stack || le)); } }
       }
 
       const usageHints = {
@@ -78,7 +79,7 @@ module.exports = {
             const found = appCommands.find(ac => ac.name === c.name);
             if (found) id = found.id;
           }
-        } catch (e) { try { logger && logger.warn && logger.warn('Failed updating help view state', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging help view update failure', le && (le.stack || le)); } }
+        } catch (e) { try { logger && logger.warn && logger.warn('Failed updating help view state', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging help view update failure', le && (le.stack || le)); } }
         const mention = id ? `</${c.name}:${id}>` : `/${c.name}`;
         const usage = usageHints[c.name] || `/${c.name}`;
         return { mention, description: c.description || '', usage };
@@ -161,11 +162,11 @@ module.exports = {
           return;
         }
       } catch (err) {
-        try { const safeReply = require('../utils/safeReply'); await safeReply(i, { content: 'Failed to update help view.', ephemeral: true }, { loggerName: 'command:help' }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to send failure safeReply in help command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging safeReply failure in help', le && (le.stack || le)); } }
+        try { const safeReply = require('../utils/safeReply'); await safeReply(i, { content: 'Failed to update help view.', ephemeral: true }, { loggerName: 'command:help' }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to send failure safeReply in help command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging safeReply failure in help', le && (le.stack || le)); } }
       }
     });
     collector.on('end', async () => {
-      try { await msg.edit({ components: [] }); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing help components after collector end', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging help component clear failure', le && (le.stack || le)); } }
+      try { await msg.edit({ components: [] }); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing help components after collector end', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging help component clear failure', le && (le.stack || le)); } }
     });
   },
   // text-mode handler removed; use slash command

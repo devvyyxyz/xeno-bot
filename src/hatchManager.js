@@ -1,5 +1,6 @@
 const db = require('./db');
 const logger = require('./utils/logger').get('hatch');
+const fallbackLogger = require('./utils/fallbackLogger');
 const userModel = require('./models/user');
 const eggTypes = require('../config/eggTypes.json');
 
@@ -107,7 +108,7 @@ module.exports = { init, startHatch, skipHatch, collectHatch, listHatches };
 async function shutdown() {
   try {
     for (const [id, t] of timers.entries()) {
-      try { clearTimeout(t); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing hatch timer during shutdown', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging timer clear error during hatchManager shutdown', le && (le.stack || le)); } catch (ignored) {} } }
+      try { clearTimeout(t); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing hatch timer during shutdown', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging timer clear error during hatchManager shutdown', le && (le.stack || le)); } catch (ignored) {} } }
     }
     timers.clear();
     logger.info('hatchManager shutdown: cleared timers');

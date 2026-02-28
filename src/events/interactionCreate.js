@@ -1,5 +1,6 @@
 const logger = require('../utils/logger').get('interactionCreate');
 const safeReply = require('../utils/safeReply');
+const fallbackLogger = require('../utils/fallbackLogger');
 const { PermissionsBitField } = require('discord.js');
 
 module.exports = {
@@ -53,7 +54,7 @@ module.exports = {
                 data: { command: interaction.commandName, user: interaction.user?.id, guild: interaction.guildId, options: interaction.options?.data }
               });
               if (baseLogger.sentry.setTag) baseLogger.sentry.setTag('command', interaction.commandName);
-            } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (command.execute.start)', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging breadcrumb failure (command.execute.start)', le && (le.stack || le)); } }
+            } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (command.execute.start)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (command.execute.start)', le && (le.stack || le)); } }
           }
           if (command.executeInteraction) {
             try {
@@ -66,7 +67,7 @@ module.exports = {
           if (baseLogger && baseLogger.sentry) {
             try {
               baseLogger.sentry.addBreadcrumb({ message: 'command.execute.finish', category: 'command', data: { command: interaction.commandName } });
-            } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (command.execute.finish)', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging breadcrumb failure (command.execute.finish)', le && (le.stack || le)); } }
+            } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (command.execute.finish)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (command.execute.finish)', le && (le.stack || le)); } }
           }
         } finally {
           // noop; outer catch will handle errors and capture

@@ -1,4 +1,5 @@
 const baseLogger = require('./logger');
+const fallbackLogger = require('./fallbackLogger');
 
 async function safeReply(interaction, payload = {}, opts = {}) {
   const logger = (baseLogger && baseLogger.get) ? baseLogger.get(opts.loggerName || 'utils:safeReply') : console;
@@ -34,7 +35,7 @@ async function safeReply(interaction, payload = {}, opts = {}) {
       }
     }
   } catch (finalErr) {
-    try { logger && logger.error && logger.error('safeReply: unexpected error', { error: finalErr && (finalErr.stack || finalErr) }); } catch (e) { try { console.warn('safeReply: failed logging unexpected error', e && (e.stack || e)); } catch (ignored) {} }
+    try { logger && logger.error && logger.error('safeReply: unexpected error', { error: finalErr && (finalErr.stack || finalErr) }); } catch (e) { try { fallbackLogger.warn('safeReply: failed logging unexpected error', e && (e.stack || e)); } catch (ignored) {} }
   }
 }
 

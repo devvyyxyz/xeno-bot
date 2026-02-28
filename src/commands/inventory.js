@@ -5,6 +5,7 @@ const {
   SecondaryButtonBuilder
 } = require('@discordjs/builders');
 const { EmbedBuilder } = require('discord.js');
+const fallbackLogger = require('../utils/fallbackLogger');
 
 const { getCommandConfig, commands: commandsConfig } = require('../utils/commandsConfig');
 const { DiscordAPIError } = require('discord.js');
@@ -27,7 +28,7 @@ function makeEmbed(target, type, pageIdx, pages, royalJelly = 0) {
     const avatarUrl = target && typeof target.displayAvatarURL === 'function' ? target.displayAvatarURL({ size: 512, extension: 'png' }) : null;
     if (avatarUrl) embed.setThumbnail(avatarUrl);
   } catch (e) {
-    try { require('../utils/logger').get('command:inventory').warn('Failed computing avatar URL in inventory makeEmbed', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging inventory avatar URL error', le && (le.stack || le)); } catch (ignored) {} }
+    try { require('../utils/logger').get('command:inventory').warn('Failed computing avatar URL in inventory makeEmbed', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging inventory avatar URL error', le && (le.stack || le)); } catch (ignored) {} }
   }
   const page = pages[pageIdx] || [];
   if (!page || page.length === 0) {
@@ -73,11 +74,11 @@ module.exports = {
     const guildId = interaction.guildId;
     const baseLogger = require('../utils/logger');
     if (baseLogger && baseLogger.sentry) {
-      try { baseLogger.sentry.addBreadcrumb({ message: 'db.getUser.start', category: 'db', data: { userId: target.id, guildId } }); } catch (e) { try { require('../utils/logger').get('command:inventory').warn('Failed to add sentry breadcrumb (db.getUser.start) in inventory', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging sentry breadcrumb (db.getUser.start) error', le && (le.stack || le)); } catch (ignored) {} } }
+      try { baseLogger.sentry.addBreadcrumb({ message: 'db.getUser.start', category: 'db', data: { userId: target.id, guildId } }); } catch (e) { try { require('../utils/logger').get('command:inventory').warn('Failed to add sentry breadcrumb (db.getUser.start) in inventory', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb (db.getUser.start) error', le && (le.stack || le)); } catch (ignored) {} } }
     }
     const user = await userModel.getUserByDiscordId(target.id);
     if (baseLogger && baseLogger.sentry) {
-      try { baseLogger.sentry.addBreadcrumb({ message: 'db.getUser.finish', category: 'db', data: { userId: target.id, guildId } }); } catch (e) { try { require('../utils/logger').get('command:inventory').warn('Failed to add sentry breadcrumb (db.getUser.finish) in inventory', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging sentry breadcrumb (db.getUser.finish) error', le && (le.stack || le)); } catch (ignored) {} } }
+      try { baseLogger.sentry.addBreadcrumb({ message: 'db.getUser.finish', category: 'db', data: { userId: target.id, guildId } }); } catch (e) { try { require('../utils/logger').get('command:inventory').warn('Failed to add sentry breadcrumb (db.getUser.finish) in inventory', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb (db.getUser.finish) error', le && (le.stack || le)); } catch (ignored) {} } }
     }
     const eggs = user?.data?.guilds?.[guildId]?.eggs || {};
 
@@ -92,7 +93,7 @@ module.exports = {
           const avatarLabel = avatarUrl ? `[View Avatar](${avatarUrl})` : 'Profile picture';
           out.push({ name: 'Avatar', value: avatarLabel, inline: true });
         } catch (e) {
-          try { require('../utils/logger').get('command:inventory').warn('Failed computing avatar URL in inventory getFieldsForType', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging inventory avatar URL error in getFieldsForType', le && (le.stack || le)); } catch (ignored) {} }
+          try { require('../utils/logger').get('command:inventory').warn('Failed computing avatar URL in inventory getFieldsForType', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging inventory avatar URL error in getFieldsForType', le && (le.stack || le)); } catch (ignored) {} }
         }
       }
       if (viewType === 'eggs') {
@@ -146,7 +147,7 @@ module.exports = {
         await interaction.editReply({ content, components });
         return;
       } catch (err2) {
-        try { await interaction.editReply({ content: 'Failed to render inventory.' }); } catch (e) { try { require('../utils/logger').get('command:inventory').warn('Failed to editReply in inventory command', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging editReply error in inventory', le && (le.stack || le)); } catch (ignored) {} } }
+        try { await interaction.editReply({ content: 'Failed to render inventory.' }); } catch (e) { try { require('../utils/logger').get('command:inventory').warn('Failed to editReply in inventory command', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging editReply error in inventory', le && (le.stack || le)); } catch (ignored) {} } }
         throw err2;
       }
     }
@@ -184,10 +185,10 @@ module.exports = {
           return;
         }
       } catch (err) {
-        try { await i.reply({ content: 'Error handling interaction.', ephemeral: true }); } catch (e) { try { require('../utils/logger').get('command:inventory').warn('Failed sending interaction error reply in inventory', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging interaction error reply failure in inventory', le && (le.stack || le)); } catch (ignored) {} } }
+        try { await i.reply({ content: 'Error handling interaction.', ephemeral: true }); } catch (e) { try { require('../utils/logger').get('command:inventory').warn('Failed sending interaction error reply in inventory', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging interaction error reply failure in inventory', le && (le.stack || le)); } catch (ignored) {} } }
       }
     });
-    collector.on('end', async () => { try { await interaction.editReply({ components: [] }); } catch (e) { try { require('../utils/logger').get('command:inventory').warn('Failed clearing components after inventory collector end', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging clearing components error in inventory collector end', le && (le.stack || le)); } catch (ignored) {} } } });
+    collector.on('end', async () => { try { await interaction.editReply({ components: [] }); } catch (e) { try { require('../utils/logger').get('command:inventory').warn('Failed clearing components after inventory collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging clearing components error in inventory collector end', le && (le.stack || le)); } catch (ignored) {} } } });
   },
   // Text-mode handlers removed: use slash commands (`executeInteraction`) instead.
 };

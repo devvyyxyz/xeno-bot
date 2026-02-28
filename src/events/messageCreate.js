@@ -1,5 +1,6 @@
 const logger = require('../utils/logger').get('messageCreate');
 const spawnManager = require('../spawnManager');
+const fallbackLogger = require('../utils/fallbackLogger');
 
 module.exports = {
   name: 'messageCreate',
@@ -29,11 +30,11 @@ module.exports = {
         try {
           baseLogger.sentry.addBreadcrumb({ message: 'command.execute.start', category: 'command', data: { command: commandName, user: message.author.id, channel: message.channel.id } });
           if (baseLogger.sentry.setTag) baseLogger.sentry.setTag('command', commandName);
-        } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (command.execute.start)', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging breadcrumb failure (command.execute.start)', le && (le.stack || le)); } }
+        } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (command.execute.start)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (command.execute.start)', le && (le.stack || le)); } }
       }
       await command.executeMessage(message, args);
       if (baseLogger && baseLogger.sentry) {
-        try { baseLogger.sentry.addBreadcrumb({ message: 'command.execute.finish', category: 'command', data: { command: commandName } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (command.execute.finish)', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging breadcrumb failure (command.execute.finish)', le && (le.stack || le)); } }
+        try { baseLogger.sentry.addBreadcrumb({ message: 'command.execute.finish', category: 'command', data: { command: commandName } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (command.execute.finish)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (command.execute.finish)', le && (le.stack || le)); } }
       }
     } catch (err) {
       logger.error('Error executing message command', { error: err.stack || err, command: commandName, user: message.author.id });

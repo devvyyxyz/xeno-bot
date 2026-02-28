@@ -2,6 +2,7 @@ const os = require('os');
 const process = require('process');
 const { getCommandConfig } = require('../utils/commandsConfig');
 const db = require('../db');
+const fallbackLogger = require('../utils/fallbackLogger');
 const { version: nodeVersion } = process;
 const { execSync } = require('child_process');
 const pkg = require('../../package.json');
@@ -27,7 +28,7 @@ module.exports = {
     let pythonVersion = 'N/A';
     try {
       pythonVersion = execSync('python3 --version').toString().trim().replace('Python ', '');
-    } catch (e) { try { logger.warn('Failed detecting python version for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging python detection error for info command', le && (le.stack || le)); } }
+    } catch (e) { try { logger.warn('Failed detecting python version for info command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging python detection error for info command', le && (le.stack || le)); } }
     const discordjsVersion = pkg.dependencies['discord.js'] || 'unknown';
     const cpuUsage = (os.loadavg()[0] / os.cpus().length * 100).toFixed(1) + '%';
     const ramUsage = ((process.memoryUsage().rss / os.totalmem()) * 100).toFixed(1) + '%';
@@ -47,7 +48,7 @@ module.exports = {
       const git = execSync('git log -1 --format=%ct').toString().trim();
       const last = Number(git) * 1000;
       lastUpdate = fmt(Date.now() - last);
-    } catch (e) { try { logger.warn('Failed getting last git update for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging git update error for info command', le && (le.stack || le)); } }
+    } catch (e) { try { logger.warn('Failed getting last git update for info command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging git update error for info command', le && (le.stack || le)); } }
     const loops = ++global._loopCount;
     // Sharding (simulate)
     const shards = 192;
@@ -58,19 +59,19 @@ module.exports = {
     try {
       const g = await db.knex('guild_settings').count('* as c').first();
       guilds = g && (g.c ?? g['count(*)']) ? g.c || g['count(*)'] : '0';
-    } catch (e) { try { logger.warn('Failed querying guild count for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging guild count query error for info command', le && (le.stack || le)); } }
+    } catch (e) { try { logger.warn('Failed querying guild count for info command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging guild count query error for info command', le && (le.stack || le)); } }
     try {
       const p = await db.knex('profiles').count('* as c').first();
       dbProfiles = p && (p.c ?? p['count(*)']) ? p.c || p['count(*)'] : '0';
-    } catch (e) { try { logger.warn('Failed querying profiles count for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging profiles count query error for info command', le && (le.stack || le)); } }
+    } catch (e) { try { logger.warn('Failed querying profiles count for info command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging profiles count query error for info command', le && (le.stack || le)); } }
     try {
       const u = await db.knex('users').count('* as c').first();
       dbUsers = u && (u.c ?? u['count(*)']) ? u.c || u['count(*)'] : '0';
-    } catch (e) { try { logger.warn('Failed querying users count for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging users count query error for info command', le && (le.stack || le)); } }
+    } catch (e) { try { logger.warn('Failed querying users count for info command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging users count query error for info command', le && (le.stack || le)); } }
     try {
       const c = await db.knex('channels').count('* as c').first();
       dbChannels = c && (c.c ?? c['count(*)']) ? c.c || c['count(*)'] : '0';
-    } catch (e) { try { logger.warn('Failed querying channels count for info command', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging channels count query error for info command', le && (le.stack || le)); } }
+    } catch (e) { try { logger.warn('Failed querying channels count for info command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging channels count query error for info command', le && (le.stack || le)); } }
 
     const embed = {
       title: '📊 Bot Info',

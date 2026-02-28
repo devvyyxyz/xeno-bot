@@ -1,13 +1,12 @@
 const fs = require('fs');
 const path = require('path');
+const logger = require('./logger').get('clearErrorLog');
 
 const logPath = path.join(__dirname, '../../logs/error.log');
 
 try {
   fs.writeFileSync(logPath, '');
-  // eslint-disable-next-line no-console
-  console.log('Cleared error.log');
+  logger.info('Cleared error.log');
 } catch (err) {
-  // eslint-disable-next-line no-console
-  console.error('Failed to clear error.log:', err);
+  logger.error('Failed to clear error.log', { error: err && (err.stack || err) });
 }

@@ -4,6 +4,7 @@ const emojis = require('../../config/emojis.json');
 const spawnManager = require('../spawnManager');
 const safeReply = require('../utils/safeReply');
 const { getCommandConfig } = require('../utils/commandsConfig');
+const fallbackLogger = require('../utils/fallbackLogger');
 const cmd = getCommandConfig('forcespawn') || { name: 'forcespawn', description: 'Force spawn eggs in the configured channel (admin only)', category: 'Admin' };
 
 module.exports = {
@@ -44,14 +45,14 @@ module.exports = {
       const eggTypeId = interaction.options.getString('eggtype');
       const baseLogger = require('../utils/logger');
       const logger = baseLogger && baseLogger.get ? baseLogger.get('command:forcespawn') : console;
-      if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.start', category: 'spawn', data: { guildId: interaction.guildId, eggTypeId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.start)', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.start)', le && (le.stack || le)); } catch (ignored) {} } } }
+      if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.start', category: 'spawn', data: { guildId: interaction.guildId, eggTypeId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.start)', le && (le.stack || le)); } catch (ignored) {} } } }
       let spawned = false;
       if (typeof spawnManager.forceSpawn === 'function') {
         spawned = await spawnManager.forceSpawn(interaction.guildId, eggTypeId);
       } else {
         spawned = await spawnManager.doSpawn(interaction.guildId, eggTypeId);
       }
-      if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.finish', category: 'spawn', data: { guildId: interaction.guildId, eggTypeId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.finish)', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
+      if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.finish', category: 'spawn', data: { guildId: interaction.guildId, eggTypeId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
       if (spawned) {
         await safeReply(interaction, { content: `${emojis.egg || ''} Forced egg spawn triggered${eggTypeId ? `: ${eggTypeId}` : ''}!` }, { loggerName: 'command:forcespawn' });
       } else {

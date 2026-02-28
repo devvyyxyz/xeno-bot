@@ -6,6 +6,7 @@ const emojis = require('../../config/emojis.json');
 const { getCommandConfig } = require('../utils/commandsConfig');
 const cmd = getCommandConfig('setup') || { name: 'setup', description: 'Manage bot settings for this server' };
 const logger = require('../utils/logger').get('command:setup');
+const fallbackLogger = require('../utils/fallbackLogger');
 
 module.exports = {
   name: cmd.name,
@@ -94,7 +95,7 @@ module.exports = {
     } catch (deferErr) {
       const logger = require('../utils/logger').get('command:setup');
       const ageMs = Date.now() - (interaction.createdTimestamp || Date.now());
-      try { logger.warn('Failed to defer reply for interaction', { error: deferErr && (deferErr.stack || deferErr), ageMs }); } catch (le) { console.warn('Failed logging defer reply failure in setup', le && (le.stack || le)); }
+        try { require('../utils/fallbackLogger').warn('Failed to defer reply for interaction', { error: deferErr && (deferErr.stack || deferErr), ageMs }); } catch (le) { fallbackLogger.warn('Failed logging defer reply failure in setup', le && (le.stack || le)); }
       // If the interaction is too old, bail quietly
       if (ageMs > 10000) return;
       // otherwise try to continue but avoid trying to reply later
@@ -138,11 +139,11 @@ module.exports = {
       }
       const baseLogger = require('../utils/logger');
       if (baseLogger && baseLogger.sentry) {
-        try { baseLogger.sentry.addBreadcrumb({ message: 'db.upsertGuild.start', category: 'db', data: { guildId: interaction.guildId, channel: channel.id } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.upsertGuild.start)', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging breadcrumb failure (db.upsertGuild.start)', le && (le.stack || le)); } catch (ignored) {} } }
+        try { baseLogger.sentry.addBreadcrumb({ message: 'db.upsertGuild.start', category: 'db', data: { guildId: interaction.guildId, channel: channel.id } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.upsertGuild.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging breadcrumb failure (db.upsertGuild.start)', le && (le.stack || le)); } catch (ignored) {} } }
       }
       await guildModel.upsertGuildConfig(interaction.guildId, { channel_id: channel.id });
       if (baseLogger && baseLogger.sentry) {
-        try { baseLogger.sentry.addBreadcrumb({ message: 'db.upsertGuild.finish', category: 'db', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.upsertGuild.finish)', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging breadcrumb failure (db.upsertGuild.finish)', le && (le.stack || le)); } catch (ignored) {} } }
+        try { baseLogger.sentry.addBreadcrumb({ message: 'db.upsertGuild.finish', category: 'db', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.upsertGuild.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging breadcrumb failure (db.upsertGuild.finish)', le && (le.stack || le)); } catch (ignored) {} } }
       }
       const safeReply = require('../utils/safeReply');
       await safeReply(interaction, { content: `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Egg spawn channel set to ${channel}.`, ephemeral: true }, { loggerName: 'command:setup' });
@@ -150,9 +151,11 @@ module.exports = {
         try {
           const spawnManager = require('../spawnManager');
             if (spawnManager && typeof spawnManager.doSpawn === 'function') {
-            if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.start', category: 'spawn', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.start)', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.start)', le && (le.stack || le)); } catch (ignored) {} } } }
+            if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.start', category: 'spawn', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.start)', le && (le.stack || le)); } catch (ignored) {} } } }
+                        if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.start', category: 'spawn', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.start)', le && (le.stack || le)); } catch (ignored) {} } } }
             await spawnManager.doSpawn(interaction.guildId);
-            if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.finish', category: 'spawn', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.finish)', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
+            if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.finish', category: 'spawn', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
+                      if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.finish', category: 'spawn', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
           }
         } catch (err) {
           // Log but don't fail the command
@@ -188,7 +191,7 @@ module.exports = {
       try {
         const spawnManager = require('../spawnManager');
         if (spawnManager && typeof spawnManager.requestReschedule === 'function') spawnManager.requestReschedule(interaction.guildId);
-      } catch (e) { try { require('../utils/logger').get('command:setup').warn('Failed to request spawn reschedule', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging requestReschedule error in setup', le && (le.stack || le)); } catch (ignored) {} } }
+      } catch (e) { try { require('../utils/logger').get('command:setup').warn('Failed to request spawn reschedule', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging requestReschedule error in setup', le && (le.stack || le)); } catch (ignored) {} } }
       await safeReply(interaction, { content: `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Spawn rate set: min ${min}s, max ${max}s. (interpreted as ${units})`, ephemeral: true }, { loggerName: 'command:setup' });
     } else if (sub === 'egg-limit') {
       const num = interaction.options.getInteger('number');
@@ -196,7 +199,7 @@ module.exports = {
       try {
         const spawnManager = require('../spawnManager');
         if (spawnManager && typeof spawnManager.requestReschedule === 'function') spawnManager.requestReschedule(interaction.guildId);
-      } catch (e) { try { require('../utils/logger').get('command:setup').warn('Failed to request spawn reschedule', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging requestReschedule error in setup', le && (le.stack || le)); } catch (ignored) {} } }
+      } catch (e) { try { require('../utils/logger').get('command:setup').warn('Failed to request spawn reschedule', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging requestReschedule error in setup', le && (le.stack || le)); } catch (ignored) {} } }
       await safeReply(interaction, { content: `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Egg limit set to ${num}.`, ephemeral: true }, { loggerName: 'command:setup' });
     } else {
       if (sub === 'details') {
@@ -240,9 +243,9 @@ module.exports = {
         const data = existing.data || {};
         data.botAvatar = url;
         const baseLogger = require('../utils/logger');
-        if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.upsertGuild.start', category: 'db', data: { guildId: interaction.guildId, botAvatar: url } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.upsertGuild.start)', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging breadcrumb failure (db.upsertGuild.start)', le && (le.stack || le)); } } }
+        if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.upsertGuild.start', category: 'db', data: { guildId: interaction.guildId, botAvatar: url } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.upsertGuild.start)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (db.upsertGuild.start)', le && (le.stack || le)); } } }
         await guildModel.upsertGuildConfig(interaction.guildId, { data });
-        if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.upsertGuild.finish', category: 'db', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.upsertGuild.finish)', { error: e && (e.stack || e) }); } catch (le) { console.warn('Failed logging breadcrumb failure (db.upsertGuild.finish)', le && (le.stack || le)); } } }
+        if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.upsertGuild.finish', category: 'db', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.upsertGuild.finish)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (db.upsertGuild.finish)', le && (le.stack || le)); } } }
 
         // Attempt to apply guild-specific avatar if supported by library/runtime
         let applied = false;

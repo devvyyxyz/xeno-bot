@@ -1,6 +1,7 @@
 const { getCommandConfig } = require('../utils/commandsConfig');
 const userModel = require('../models/user');
 const eggTypes = require('../../config/eggTypes.json');
+const fallbackLogger = require('../utils/fallbackLogger');
 
 const cmd = getCommandConfig('leaderboard') || {
   name: 'leaderboard',
@@ -44,9 +45,9 @@ module.exports = {
     }
     // Get all users in DB
     const baseLogger = require('../utils/logger');
-    if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.getAllUsers.start', category: 'db' }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to add sentry breadcrumb (db.getAllUsers.start)', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging leaderboard breadcrumb (db.getAllUsers.start)', le && (le.stack || le)); } catch (ignored) {} } } }
+    if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.getAllUsers.start', category: 'db' }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to add sentry breadcrumb (db.getAllUsers.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard breadcrumb (db.getAllUsers.start)', le && (le.stack || le)); } catch (ignored) {} } } }
     const rows = await userModel.getAllUsers();
-    if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.getAllUsers.finish', category: 'db', data: { count: rows.length } }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to add sentry breadcrumb (db.getAllUsers.finish)', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging leaderboard breadcrumb (db.getAllUsers.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
+    if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.getAllUsers.finish', category: 'db', data: { count: rows.length } }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to add sentry breadcrumb (db.getAllUsers.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard breadcrumb (db.getAllUsers.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
     const guildId = interaction.guildId;
     // Build leaderboard data
     let leaderboard = [];
@@ -157,7 +158,7 @@ module.exports = {
         }
       });
       collector.on('end', async () => {
-        try { await msg.edit({ components: [] }); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing leaderboard components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { console.warn('Failed logging leaderboard component clear failure', le && (le.stack || le)); } catch (ignored) {} } }
+        try { await msg.edit({ components: [] }); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing leaderboard components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard component clear failure', le && (le.stack || le)); } catch (ignored) {} } }
       });
     }
   }
