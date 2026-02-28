@@ -175,6 +175,14 @@
       "developerOnly": true,
       "hidden": true
     }
+    ,
+    "devgive": {
+      "name": "devgive",
+      "description": "Give credits to a user (owner only)",
+      "usage": "!devgive @user <amount>",
+      "developerOnly": true,
+      "hidden": true
+    }
   },
   "Social": {
     "trade": {
