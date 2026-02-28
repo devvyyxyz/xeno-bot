@@ -126,17 +126,18 @@ module.exports = {
         // Introduction
         embed.addFields({ name: 'Introduction', value: "Welcome to the Xeno Bot news hub — read the latest updates, find quick links, and browse recent articles.", inline: false });
 
-        // Quick Links: create one field per category with a list of links
+        // Quick Links: support either a flat map (key -> url) or categorized map (category -> { key -> url })
         try {
-          const categories = Object.keys(pageLinks || {});
-          if (!categories || categories.length === 0) {
+          const keys = Object.keys(pageLinks || {});
+          if (!keys || keys.length === 0) {
             embed.addFields({ name: 'Quick Links', value: 'No quick links configured.', inline: false });
           } else {
-            for (const cat of categories) {
-              const items = pageLinks[cat] || {};
-              const displayCat = String(cat).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const values = Object.values(pageLinks || {});
+            const isFlat = values.length > 0 && values.every(v => typeof v === 'string');
+            if (isFlat) {
+              // Render a single Quick Links field listing each key -> url
               let value = '';
-              for (const [key, url] of Object.entries(items)) {
+              for (const [key, url] of Object.entries(pageLinks)) {
                 try {
                   if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
                     const label = String(key).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -144,8 +145,24 @@ module.exports = {
                   }
                 } catch (e) { /* ignore malformed */ }
               }
-              if (!value) value = 'No links configured for this category.';
-              embed.addFields({ name: `Quick Links — ${displayCat}`, value: value.trim(), inline: false });
+              embed.addFields({ name: 'Quick Links', value: value.trim() || 'No quick links configured.', inline: false });
+            } else {
+              // Categorized: one field per category
+              for (const cat of keys) {
+                const items = pageLinks[cat] || {};
+                const displayCat = String(cat).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                let value = '';
+                for (const [key, url] of Object.entries(items)) {
+                  try {
+                    if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+                      const label = String(key).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                      value += `• [${label}](${url})\n`;
+                    }
+                  } catch (e) { /* ignore malformed */ }
+                }
+                if (!value) value = 'No links configured for this category.';
+                embed.addFields({ name: `Quick Links — ${displayCat}`, value: value.trim(), inline: false });
+              }
             }
           }
         } catch (e) {
