@@ -92,10 +92,3 @@ Date: 2026-02-28
 - Various small fixes and compatibility updates across commands, configuration, and deploy flows.
 
 ----
-
-----
-
-Notes:
-
-- This file was generated from the repository commit history. Commit SHAs referenced above appear in the git history and can be examined for full diffs; see `git log` for the latest details.
-- If you would like a strictly semantic version mapping (i.e., exact commits grouped under explicit version tags), I can create annotated tags and produce a canonical changelog per tag.
