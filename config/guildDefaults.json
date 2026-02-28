@@ -2,5 +2,8 @@
   "channel_id": null,
   "spawn_min_seconds": 60,
   "spawn_max_seconds": 300,
-  "egg_limit": 3
+  "egg_limit": 3,
+  "data": {
+    "delete_spawn_message": true
+  }
 }

@@ -141,3 +141,20 @@ This release introduces multiple user-facing features, bug fixes, and developer 
 
 - Version bumped to `1.2.0`.
 - Tests run locally and passed after changes.
+
+## v1.3.0 — Help UX, embed colour unification, spawn deletion toggle
+
+Date: 2026-02-28
+
+- Added a guild-level toggle to delete the original spawn message after it is caught (`/setup message-delete enabled:<true|false>`). The setting is persisted under `guild_settings.data.delete_spawn_message` and defaults to `false` in `config/guildDefaults.json`.
+- Implemented spawn-message deletion in the spawn manager with robust channel/message fetch and a `Manage Messages` permission check. Failures are logged but do not surface user-facing errors.
+- Unified embed colour across commands: added a top-level `colour` in `config/commands.json`, normalized color strings to numeric values in the commands loader, and fixed EmbedBuilder ValidationErrors by using numeric fallbacks.
+- Improved Help UX: added "About" and "Setup (Server Admins)" sections, removed the `usage` display (and removed `usage` fields from the commands config), fixed category listing and selection bugs, and restored clickable setup mentions where application command IDs are available.
+- Added a developer-only `devgive` command and registered it for owner use.
+- Migrated many commands to a per-command directory layout while keeping legacy files to preserve history and ease rollout.
+- Logging and diagnostics: event/load logs now include event names, spawn/hatch logs include `guildName` when available, and fallback logging was hardened for edge cases.
+- Fixed several runtime and syntax issues introduced during refactors (help selection population, truncated help file syntax, and embed color validation).
+
+Notes:
+- The spawn deletion feature defaults to off; enable via `/setup message-delete enabled:true` to start deleting spawn messages after a catch.
+- Additional followups: add an admin-facing notice when the bot lacks `Manage Messages` permission in the spawn channel, and consider de-duplicating legacy flat command files in a future cleanup release.
