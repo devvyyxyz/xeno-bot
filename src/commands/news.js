@@ -5,14 +5,27 @@ const links = require('../../config/links.json');
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const safeReply = require('../utils/safeReply');
 
-const NEWS_FILE = path.join(__dirname, '..', '..', 'config', 'news.md');
+const ARTICLES_DIR = path.join(__dirname, '..', '..', 'config', 'articles');
 
-function loadArticles() {
-  if (!fs.existsSync(NEWS_FILE)) return [];
-  const raw = fs.readFileSync(NEWS_FILE, 'utf8');
-  // split on lines containing only ---
-  const parts = raw.split(/^[ \t]*---[ \t]*$/m).map(s => s.trim()).filter(Boolean);
-  return parts;
+function loadArticlesByCategory() {
+  const out = {};
+  try {
+    if (!fs.existsSync(ARTICLES_DIR)) return out;
+    const files = fs.readdirSync(ARTICLES_DIR).filter(f => f.endsWith('.md'));
+    for (const f of files) {
+      const key = path.basename(f, '.md');
+      try {
+        const raw = fs.readFileSync(path.join(ARTICLES_DIR, f), 'utf8');
+        const parts = raw.split(/^[ \t]*---[ \t]*$/m).map(s => s.trim()).filter(Boolean);
+        out[key] = parts;
+      } catch (e) {
+        out[key] = [];
+      }
+    }
+  } catch (e) {
+    logger.warn('Failed loading articles by category', { error: e && (e.stack || e) });
+  }
+  return out;
 }
 
 function renderArticleEmbed(article, index, total) {
@@ -67,8 +80,12 @@ module.exports = {
   data: { name: 'news', description: 'Read the latest news articles' },
   async executeInteraction(interaction) {
     try {
-      const articles = loadArticles();
-      if (!articles || articles.length === 0) {
+      // Load all articles by category
+      const articlesByCategory = loadArticlesByCategory();
+      // Check if any articles exist
+      let anyCount = 0;
+      for (const k of Object.keys(articlesByCategory)) anyCount += (articlesByCategory[k] || []).length;
+      if (!anyCount) {
         await safeReply(interaction, { content: 'No news articles available.', ephemeral: true }, { loggerName: 'command:news' });
         return;
       }
@@ -76,7 +93,9 @@ module.exports = {
       // Start on the Home page view
       let idx = 0;
       let showHome = true;
-      const total = articles.length;
+      let articles = [];
+      let total = 0;
+      let currentCategory = null;
       const supportBuilders = (() => {
         try { const { ButtonBuilder } = require('discord.js'); return typeof ButtonBuilder === 'function'; } catch (_) { return false; }
       })();
@@ -146,8 +165,35 @@ module.exports = {
       }
 
       const botAvatar = interaction && interaction.client && interaction.client.user ? interaction.client.user.displayAvatarURL({ size: 512, extension: 'png' }) : null;
-      const embed = buildHomeEmbed(links.general || links, articles[0], total, botAvatar);
-      const components = buildRow(supportBuilders, true, total === 0);
+      const categoryKeys = Object.keys(articlesByCategory).length ? Object.keys(articlesByCategory) : ['release','events','newsletter','other'];
+
+      // helper to build category selector row
+      function buildCategoryRow(supportBuilders, categories) {
+        if (!categories || categories.length === 0) return [];
+        if (supportBuilders) {
+          const { ActionRowBuilder, ButtonBuilder } = require('discord.js');
+          const row = new ActionRowBuilder();
+          for (const k of categories.slice(0, 5)) {
+            const label = String(k).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            row.addComponents(new ButtonBuilder().setCustomId(`news:cat:${k}`).setLabel(label).setStyle(ButtonStyle.Primary));
+          }
+          return [row];
+        }
+        const comps = categories.slice(0, 5).map(k => ({ type: 2, style: 1, custom_id: `news:cat:${k}`, label: String(k) }));
+        return [{ type: 1, components: comps }];
+      }
+
+      // Determine initial latest article (first article of first category that has content)
+      let firstArticle = null;
+      for (const k of categoryKeys) {
+        const arr = articlesByCategory[k] || [];
+        if (arr.length > 0) { firstArticle = arr[0]; break; }
+      }
+
+      const embed = buildHomeEmbed(links.general || links, firstArticle, 0, botAvatar);
+      const categoryRow = buildCategoryRow(supportBuilders, categoryKeys);
+      const navRow = buildRow(supportBuilders, true, true);
+      const components = categoryRow.concat(navRow);
 
       const createCollector = require('../utils/collectorHelper');
       const { collector, message } = await createCollector(interaction, { embeds: [embed], components, time: 1000 * 60 * 10, ephemeral: false, filter: i => i.user.id === interaction.user.id });
@@ -155,7 +201,27 @@ module.exports = {
       collector.on('collect', async (btn) => {
         try {
           await btn.deferUpdate();
-          const [, action] = btn.customId.split(':');
+          const parts = btn.customId.split(':');
+          const action = parts[1];
+          const param = parts[2];
+          if (action === 'cat' && param) {
+            // open category
+            const cat = param;
+            const catArticles = articlesByCategory[cat] || [];
+            showHome = false;
+            idx = 0;
+            total = catArticles.length;
+            if (total === 0) {
+              const emptyEmbed = new EmbedBuilder().setTitle(`No articles in ${cat}`).setDescription('No articles found.').setColor(0x5865F2);
+              try { await message.edit({ embeds: [emptyEmbed], components: buildRow(supportBuilders, true, true) }); } catch (_) {}
+              return;
+            }
+            // set current articles into a temporary variable by reassigning articles
+            articles = catArticles;
+            const art = renderArticleEmbed(articles[idx], idx, total);
+            try { await message.edit({ embeds: [art], components: buildRow(supportBuilders, idx === 0, idx === total - 1) }); } catch (_) {}
+            return;
+          }
           if (action === 'farleft') { showHome = false; idx = 0; }
           else if (action === 'left') { showHome = false; idx = Math.max(0, idx - 1); }
           else if (action === 'home') { showHome = true; }
@@ -165,8 +231,8 @@ module.exports = {
           let newEmbed;
           let newComponents;
           if (showHome) {
-            newEmbed = buildHomeEmbed(links.general || links, articles[0], total);
-            newComponents = buildRow(supportBuilders, true, total === 0);
+            newEmbed = buildHomeEmbed(links.general || links, firstArticle, 0, botAvatar);
+            newComponents = categoryRow.concat(buildRow(supportBuilders, true, true));
           } else {
             newEmbed = renderArticleEmbed(articles[idx], idx, total);
             newComponents = buildRow(supportBuilders, idx === 0, idx === total - 1);
