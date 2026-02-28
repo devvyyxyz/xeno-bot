@@ -28,7 +28,7 @@ module.exports = {
         description: 'Start hatching an egg',
         options: [
           { type: 3, name: 'egg', description: 'Egg type id', required: true, autocomplete: true },
-          { type: 4, name: 'time', description: 'Hatch time in seconds', required: false }
+          { type: 4, name: 'amount', description: 'Amount to hatch', required: false }
         ]
       }
     ]
@@ -93,7 +93,7 @@ module.exports = {
       if (sub === 'hatch') {
         await interaction.deferReply({ ephemeral: true });
         const eggId = interaction.options.getString('egg');
-        const timeSec = interaction.options.getInteger('time') || 60;
+        const amount = interaction.options.getInteger('amount') || 1;
         const eggConfig = eggTypes.find(e => e.id === eggId);
         if (!eggConfig) {
           const safeReply = require('../utils/safeReply');
@@ -101,9 +101,23 @@ module.exports = {
           return;
         }
         try {
-          const h = await hatchManager.startHatch(discordId, guildId, eggId, Number(timeSec) * 1000);
+          // Validate user has enough eggs
+          const u = await userModel.getUserByDiscordId(discordId);
+          const curQty = Number((u?.data?.guilds?.[guildId]?.eggs?.[eggId]) || 0);
+          if (curQty < amount) {
+            const safeReply = require('../utils/safeReply');
+            await safeReply(interaction, { content: `You only have ${curQty} x ${eggConfig.name}.`, ephemeral: true }, { loggerName: 'command:eggs' });
+            return;
+          }
+          const hatchSeconds = Number(eggConfig.hatch || 60);
+          const created = [];
+          for (let i = 0; i < amount; i++) {
+            // startHatch will decrement inventory per call
+            const h = await hatchManager.startHatch(discordId, guildId, eggId, hatchSeconds * 1000);
+            created.push(h.id);
+          }
           const safeReply = require('../utils/safeReply');
-          await safeReply(interaction, { content: `Started hatching ${eggConfig.name}. Hatch id: ${h.id}. It will finish in ${timeSec}s.`, ephemeral: true }, { loggerName: 'command:eggs' });
+          await safeReply(interaction, { content: `Started ${created.length} hatch(es) for ${eggConfig.name}. First hatch id: ${created[0]}. Each will finish in ${hatchSeconds}s.`, ephemeral: true }, { loggerName: 'command:eggs' });
         } catch (e) {
           const safeReply = require('../utils/safeReply');
           await safeReply(interaction, { content: `Failed to start hatch: ${e.message}`, ephemeral: true }, { loggerName: 'command:eggs' });
