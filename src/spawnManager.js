@@ -370,7 +370,7 @@ async function handleMessage(message) {
     // Track per egg type and stats
     const result = await userModel.addEggsForGuild(String(message.author.id), gid, eggEvent.numEggs, eggEvent.eggType.id, catchTimeMs);
     const catchTimeSec = (catchTimeMs / 1000).toFixed(2);
-    await message.channel.send(`${message.author} caught ${eggEvent.numEggs} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${eggEvent.numEggs > 1 ? 's' : ''}! (${catchTimeSec}s)\n\-\#You now have ${result} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${result > 1 ? 's' : ''}.`);
+    await message.channel.send(`${message.author} caught ${eggEvent.numEggs} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${eggEvent.numEggs > 1 ? 's' : ''}! (${catchTimeSec}s)\n\-\# You now have ${result} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${result > 1 ? 's' : ''}.`);
     logger.info('Egg(s) caught', { guildId: gid, user: message.author.id, numEggs: eggEvent.numEggs, eggType: eggEvent.eggType.id, catchTimeMs });
   } catch (err) {
     logger.error('Failed awarding egg', { guildId: gid, user: message.author.id, error: err.stack || err });
@@ -385,10 +385,17 @@ async function handleMessage(message) {
     try { logger.warn('Failed removing active_spawns row after catch', { guildId: gid, messageId: eggEvent && eggEvent.messageId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging removal of active_spawns row after catch', le && (le.stack || le)); } catch (ignored) {} }
   }
 
-  // If a reschedule was requested and no more active eggs, apply it now
-  if (!activeEggs.has(gid) && pendingReschedule.has(gid)) {
-    pendingReschedule.delete(gid);
-    scheduleNext(gid);
+  // If no more active eggs, schedule the next spawn (apply pending reschedule if present)
+  if (!activeEggs.has(gid)) {
+    if (pendingReschedule.has(gid)) {
+      pendingReschedule.delete(gid);
+    }
+    // Always schedule the next spawn after an event completes
+    try {
+      scheduleNext(gid);
+    } catch (e) {
+      try { logger.warn('Failed scheduling next spawn after catch', { guildId: gid, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging scheduleNext error after catch', le && (le.stack || le)); } catch (ignored) {} }
+    }
   }
   return true;
 }
