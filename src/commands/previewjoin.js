@@ -86,33 +86,40 @@ module.exports = {
       // Build buttons with compatibility fallback
       const components = [];
       try {
-        const buttons = [];
-        const makeButton = (label, url) => {
-          try {
-            // prefer constructors when available
-            const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
-            if (typeof ButtonBuilder === 'function') return new ButtonBuilder().setLabel(label).setStyle(ButtonStyle.Link).setURL(url);
-          } catch (_) {}
-          return { type: 2, style: 5, label, url };
-        };
+        // Detect whether the runtime exposes builders from discord.js
+        let supportBuilders = false;
+        try { const { ButtonBuilder } = require('discord.js'); supportBuilders = typeof ButtonBuilder === 'function'; } catch (_) { supportBuilders = false; }
 
+        const buttons = [];
         if (links && typeof links.wiki === 'string') {
           const v = links.wiki.trim();
-          if (/^https?:\/\//i.test(v)) buttons.push(makeButton('Documentation', v));
-          else logger.warn('Invalid wiki URL in links.json, skipping Documentation button', { url: links.wiki });
+          if (/^https?:\/\//i.test(v)) {
+            if (supportBuilders) {
+              const { ButtonBuilder, ButtonStyle } = require('discord.js');
+              buttons.push(new ButtonBuilder().setLabel('Documentation').setStyle(ButtonStyle.Link).setURL(v));
+            } else {
+              buttons.push({ type: 2, style: 5, label: 'Documentation', url: v });
+            }
+          } else logger.warn('Invalid wiki URL in links.json, skipping Documentation button', { url: links.wiki });
         }
+
         if (links && typeof links.vote === 'string') {
           const v2 = links.vote.trim();
-          if (/^https?:\/\//i.test(v2)) buttons.push(makeButton('Vote', v2));
-          else logger.warn('Invalid vote URL in links.json, skipping Vote button', { url: links.vote });
+          if (/^https?:\/\//i.test(v2)) {
+            if (supportBuilders) {
+              const { ButtonBuilder, ButtonStyle } = require('discord.js');
+              buttons.push(new ButtonBuilder().setLabel('Vote').setStyle(ButtonStyle.Link).setURL(v2));
+            } else {
+              buttons.push({ type: 2, style: 5, label: 'Vote', url: v2 });
+            }
+          } else logger.warn('Invalid vote URL in links.json, skipping Vote button', { url: links.vote });
         }
 
         if (buttons.length > 0) {
-          try {
+          if (supportBuilders) {
             const { ActionRowBuilder } = require('discord.js');
-            if (typeof ActionRowBuilder === 'function') components.push(new ActionRowBuilder().addComponents(...buttons));
-            else components.push({ type: 1, components: buttons });
-          } catch (_) {
+            components.push(new ActionRowBuilder().addComponents(...buttons));
+          } else {
             components.push({ type: 1, components: buttons });
           }
         }
