@@ -49,7 +49,7 @@ module.exports = {
       const itemId = interaction.options.getString('item_id');
       const item = findItem(itemId);
       if (!item) return interaction.reply({ content: 'Item not found.', ephemeral: true });
-      const embed = new EmbedBuilder().setTitle(item.name).setDescription(item.description || '').addFields({ name: 'Price', value: String(item.price || '—') }, { name: 'Rarity', value: String(item.rarity || 'common') }).setColor(require('../utils/commandsConfig').getCommandsObject().colour || '#bab25d');
+      const embed = new EmbedBuilder().setTitle(item.name).setDescription(item.description || '').addFields({ name: 'Price', value: String(item.price || '—') }, { name: 'Rarity', value: String(item.rarity || 'common') }).setColor(require('../utils/commandsConfig').getCommandsObject().colour || '0xbab25d');
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 

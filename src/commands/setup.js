@@ -223,7 +223,7 @@ module.exports = {
           try { const row = await require('../db').knex('guild_settings').where({ guild_id: guildId }).first('next_spawn_at'); nextSpawn = row && row.next_spawn_at ? Number(row.next_spawn_at) : null; } catch (e) {}
           const embed = new EmbedBuilder()
             .setTitle(`Setup for ${interaction.guild?.name || guildId}`)
-            .setColor(require('../utils/commandsConfig').getCommandsObject().colour || '#bab25d')
+            .setColor(require('../utils/commandsConfig').getCommandsObject().colour || '0xbab25d')
             .addFields(
               { name: 'Spawn Channel', value: cfg.channel_id ? `<#${cfg.channel_id}>` : 'Not set', inline: true },
               { name: 'Egg Limit', value: String(cfg.egg_limit ?? '1'), inline: true },

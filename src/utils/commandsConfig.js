@@ -6,7 +6,18 @@ const CONFIG_PATH = path.join(__dirname, '..', '..', 'config', 'commands.json');
 function loadCommands() {
   try {
     const raw = fs.readFileSync(CONFIG_PATH, 'utf8');
-    return JSON.parse(raw);
+    const obj = JSON.parse(raw);
+    // normalize colour: allow hex string like "0xbab25d" -> numeric 0xbab25d
+    try {
+      if (obj && typeof obj.colour === 'string') {
+        const s = obj.colour.trim();
+        if (s.startsWith('#')) obj.colour = Number.parseInt(s.slice(1), 16);
+        else if (/^0x[0-9a-f]+$/i.test(s)) obj.colour = Number.parseInt(s, 16);
+      }
+    } catch (e) {
+      // ignore and return raw obj
+    }
+    return obj;
   } catch (e) {
     return {};
   }

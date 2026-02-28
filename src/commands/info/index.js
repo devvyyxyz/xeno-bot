@@ -84,7 +84,7 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setTitle('📊 Bot Info')
-      .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || '#bab25d')
+      .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || '0xbab25d')
       .setThumbnail(client && client.user && client.user.displayAvatarURL ? client.user.displayAvatarURL({ size: 512 }) : undefined)
       .addFields(
         { name: 'System', value: `OS: ${osVersion}\nNode: ${process.version}\ndiscord.js: ${discordjsVersion}\nPython: ${pythonVersion}\nCPU: ${cpuUsage}\nRAM: ${ramUsage}`, inline: false },
