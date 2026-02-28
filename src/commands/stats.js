@@ -76,27 +76,42 @@ module.exports = {
         for (const [ck, cv] of Object.entries(curr)) currencyTotals[ck] = (currencyTotals[ck] || 0) + Number(cv || 0);
       }
       // top egg types
-      const topEggs = Object.entries(eggTotalsByType).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k}: ${v}`);
-      const topEggsGuild = Object.entries(guildData.eggs || {}).sort((a, b) => (Number(b[1]||0) - Number(a[1]||0))).slice(0, 3).map(([k, v]) => `${k}: ${v}`);
+      const topEggs = Object.entries(eggTotalsByType).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => ({ k, v }));
+      const topEggsGuild = Object.entries(guildData.eggs || {}).sort((a, b) => (Number(b[1]||0) - Number(a[1]||0))).slice(0, 5).map(([k, v]) => ({ k, v }));
       // currencies
-      const guildCurrencyLines = Object.entries(guildData.currency || {}).map(([k, v]) => `${k}: ${v}`);
-      const globalCurrencyLines = Object.entries(currencyTotals).map(([k, v]) => `${k}: ${v}`);
+      const guildCurrencyLines = Object.entries(guildData.currency || {}).map(([k, v]) => ({ k, v }));
+      const globalCurrencyLines = Object.entries(currencyTotals).map(([k, v]) => ({ k, v }));
       const royal = await userModel.getCurrencyForGuild(String(target.id), guildId, 'royal_jelly');
 
       const accountCreated = user && user.created_at ? new Date(user.created_at).toISOString().split('T')[0] : 'n/a';
+
+      // Leaderboard rank by catches (scan users)
+      let rankInfo = 'n/a';
+      try {
+        const all = await userModel.getAllUsers();
+        const ranked = all.map(u => ({ id: u.discord_id, catches: userModel.getUserStats(u).catches || 0 }));
+        ranked.sort((a, b) => b.catches - a.catches);
+        const idx = ranked.findIndex(r => r.id === String(target.id));
+        if (idx >= 0) rankInfo = `${idx + 1}/${ranked.length}`;
+        else rankInfo = `n/${ranked.length}`;
+      } catch (e) {
+        try { require('../utils/logger').get('command:stats').warn('Failed computing leaderboard rank', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard rank error', le && (le.stack || le)); } catch (ignored) {} }
+      }
+
+      // Compute per-egg rates since bot soft uptime
+      const uptimeMs = (global._softUptimeStart ? (Date.now() - global._softUptimeStart) : 0) || 0;
+      const days = Math.max( (uptimeMs / 86400000) , 1/24 ); // at least one hour fraction
+      const fmtRate = (n) => `${(n / days).toFixed(2)}/day`;
 
       const embed = new EmbedBuilder()
         .setTitle(`${target.username}#${target.discriminator} — Game Stats`)
         .setColor(0x00b2ff)
         .setThumbnail(typeof target.displayAvatarURL === 'function' ? target.displayAvatarURL({ size: 512, extension: 'png' }) : null)
         .addFields(
-          { name: 'Performance', value: `Catches: ${stats.catches || 0}\nPurrfect: ${stats.purrfect || 0} (${((stats.purrfect || 0) && stats.catches ? Math.round(100 * (stats.purrfect || 0) / stats.catches) : 0)}%)\nAvg: ${msToHuman(stats.avg || null)}\nFastest: ${msToHuman(stats.fastest || null)}\nSlowest: ${msToHuman(stats.slowest || null)}`, inline: false },
-          { name: 'Inventory (this server)', value: `Eggs: ${totalEggs}\nItems: ${totalItems}`, inline: true },
-          { name: 'Inventory (global)', value: `Eggs: ${globalEggs}\nItems: ${globalItems}`, inline: true },
-          { name: 'Top Eggs (this server)', value: topEggsGuild.length ? topEggsGuild.join('\n') : 'none', inline: true },
-          { name: 'Top Eggs (global)', value: topEggs.length ? topEggs.join('\n') : 'none', inline: true },
-          { name: 'Currency (this server)', value: guildCurrencyLines.length ? guildCurrencyLines.join('\n') : `royal_jelly: ${royal || 0}`, inline: false },
-          { name: 'Currency (global)', value: globalCurrencyLines.length ? globalCurrencyLines.join('\n') : 'none', inline: false },
+          { name: 'Performance', value: `Catches: ${stats.catches || 0}\nPurrfect: ${stats.purrfect || 0} (${((stats.purrfect || 0) && stats.catches ? Math.round(100 * (stats.purrfect || 0) / stats.catches) : 0)}%)\nAvg: ${msToHuman(stats.avg || null)}\nFastest: ${msToHuman(stats.fastest || null)}\nSlowest: ${msToHuman(stats.slowest || null)}\nLeaderboard: ${rankInfo}`, inline: false },
+          { name: 'Inventory', value: `(this server) Eggs: ${totalEggs} | Items: ${totalItems}\n(global) Eggs: ${globalEggs} | Items: ${globalItems}`, inline: false },
+          { name: 'Top Eggs', value: `(this server) ${topEggsGuild.length ? topEggsGuild.map(e => `${e.k}: ${e.v} (${fmtRate(e.v)})`).join('\n') : 'none'}\n(global) ${topEggs.length ? topEggs.map(e => `${e.k}: ${e.v} (${fmtRate(e.v)})`).join('\n') : 'none'}`, inline: false },
+          { name: 'Currency', value: `(this server) ${guildCurrencyLines.length ? guildCurrencyLines.map(c => `${c.k}: ${c.v}`).join(', ') : `royal_jelly: ${royal || 0}`}\n(global) ${globalCurrencyLines.length ? globalCurrencyLines.map(c => `${c.k}: ${c.v}`).join(', ') : 'none'}`, inline: false },
           { name: 'Misc', value: `Account created: ${accountCreated}\nUser ID: ${target.id}`, inline: false }
         )
         .setFooter({ text: 'Game stats' });
