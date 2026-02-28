@@ -77,6 +77,7 @@ if (process.env.SENTRY_DSN) {
 // Perform DB migrations and ensure egg stats before starting the bot.
 const eggTypes = require('../config/eggTypes.json');
 const eggModel = require('./models/egg');
+const childProcess = require('child_process');
 
 async function startup() {
   try {
@@ -94,6 +95,37 @@ async function startup() {
     baseLogger.info('Egg stats ensured in DB');
   } catch (err) {
     baseLogger.error('Failed to ensure all eggs in DB', { error: err.stack || err });
+  }
+
+  // Optionally auto-deploy dev guild commands when developing locally.
+  try {
+    const devAuto = process.env.DEV_AUTO_DEPLOY === 'true';
+    const isDev = process.env.BOT_PROFILE === 'dev' || profile === 'dev';
+    const guildToUse = process.env.GUILD_ID || (process.env.BOT_CONFIG_PATH ? (() => {
+      try { const pc = require(process.env.BOT_CONFIG_PATH); return pc && pc.guildId; } catch (_) { return null; }
+    })() : null);
+    if (devAuto && isDev) {
+      if (!guildToUse) {
+        baseLogger.warn('DEV_AUTO_DEPLOY=true but no GUILD_ID/profile.guildId found; skipping auto-deploy');
+      } else {
+        baseLogger.info('DEV_AUTO_DEPLOY enabled — running deploy-commands for dev profile', { guild: guildToUse });
+        try {
+          const node = process.execPath || 'node';
+          const deployPath = path.join(__dirname, '..', 'deploy-commands.js');
+          const args = ['--profile=dev'];
+          // use BOT_PROFILE=dev and pass guild id via env to the child process
+          const env = Object.assign({}, process.env, { BOT_PROFILE: 'dev', GUILD_ID: guildToUse });
+          const res = childProcess.spawnSync(node, [deployPath, 'dev'], { env, stdio: 'inherit' });
+          if (res.error) baseLogger.warn('Auto-deploy child process failed to start', { error: String(res.error) });
+          else if (res.status !== 0) baseLogger.warn('Auto-deploy child process exited non-zero', { status: res.status });
+          else baseLogger.info('Auto-deploy completed successfully');
+        } catch (e) {
+          baseLogger.warn('Auto-deploy failed', { error: e && (e.stack || e) });
+        }
+      }
+    }
+  } catch (e) {
+    baseLogger.warn('DEV_AUTO_DEPLOY check failed', { error: e && (e.stack || e) });
   }
 
   // Now login the Discord client
