@@ -23,29 +23,44 @@ module.exports = {
 
     const commandsObj = getCommandsObject() || {};
     const adminCategory = commandsObj['Administration'] || {};
-    const adminList = Object.values(adminCategory).map(c => `- ${c.name}: ${c.description || ''}`);
+    const adminEntries = Object.values(adminCategory).filter(c => !(c && (c.developerOnly === true || c.hidden === true)));
 
     const devCmds = Array.from((message.client && message.client.commands) ? message.client.commands.values() : [])
       .filter(c => c && c.developerOnly)
-      .map(c => `- ${c.name}: ${c.description || ''}`);
+      .map(c => ({ name: c.name, description: c.description || '' }));
 
-    const parts = [];
-    if (adminList.length) {
-      parts.push('Administration commands:');
-      parts.push(...adminList);
+    const fields = [];
+    if (adminEntries.length) {
+      fields.push({ name: 'Administration commands', value: adminEntries.map(c => `**${c.name}** — ${c.description || ''}`).join('\n') });
     }
     if (devCmds.length) {
-      parts.push('\nDeveloper-only commands (from modules):');
-      parts.push(...devCmds);
+      fields.push({ name: 'Developer-only commands (from modules)', value: devCmds.map(c => `**${c.name}** — ${c.description || ''}`).join('\n') });
     }
-    if (parts.length === 0) parts.push('No administrative or developer-only commands found.');
+    if (fields.length === 0) {
+      try { await message.reply({ content: 'No administrative or developer-only commands found.', allowedMentions: { repliedUser: false } }); } catch (e) {}
+      return;
+    }
 
-    // Send as a single reply (no embeds to keep compatibility with message-mode)
+    // Build embeds (chunk fields into pages)
+    const { EmbedBuilder } = require('discord.js');
+    const CHUNK = 2; // number of large fields per embed (keeps embed readable)
+    const pages = [];
+    for (let i = 0; i < fields.length; i += CHUNK) {
+      const chunk = fields.slice(i, i + CHUNK);
+      const embed = new EmbedBuilder()
+        .setTitle('Developer / Admin Commands')
+        .setColor(0xffaa00)
+        .setTimestamp()
+        .setFooter({ text: `Requested by ${message.author.username}` });
+      for (const f of chunk) embed.addFields({ name: f.name, value: f.value || '\u200B' });
+      pages.push(embed);
+    }
+
     try {
-      await message.reply({ content: parts.join('\n'), allowedMentions: { repliedUser: false } });
+      await message.reply({ embeds: [pages[0]], allowedMentions: { repliedUser: false } });
+      for (let i = 1; i < pages.length; i++) await message.channel.send({ embeds: [pages[i]] });
     } catch (e) {
-      // best-effort fallback
-      try { await message.channel.send(parts.join('\n')); } catch (ignored) {}
+      try { await message.channel.send(fields.map(f => `${f.name}\n${f.value}`).join('\n\n')); } catch (ignored) {}
     }
   }
 };

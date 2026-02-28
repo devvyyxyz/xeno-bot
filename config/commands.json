@@ -15,6 +15,7 @@
     "help": { "name": "help", "description": "Show help for available commands", "usage": "/help [category]", "embedColor": 46031, "ephemeral": false },
     "credits": { "name": "credits", "description": "Show bot credits and contributors.", "usage": "", "embedColor": 46031, "ephemeral": false },
     "info": { "name": "info", "description": "Show system, tech, and global stats.", "usage": "", "embedColor": 46031, "ephemeral": false },
+    "news": { "name": "news", "description": "Read the latest news articles", "usage": "/news", "embedColor": 5865, "ephemeral": false },
     "wiki": { "name": "wiki", "description": "Get the bot wiki link.", "usage": "" },
     "vote": { "name": "vote", "description": "Vote for the bot on top.gg.", "usage": "" }
   },
@@ -33,6 +34,9 @@
     "deveval": { "name": "deveval", "description": "Evaluate JavaScript (owner only)", "usage": "!deveval <code>", "developerOnly": true, "hidden": true },
     "devget": { "name": "devget", "description": "Get runtime config or env value (owner only)", "usage": "!devget <key>", "developerOnly": true, "hidden": true },
     "devset": { "name": "devset", "description": "Set config value and update runtime (owner only)", "usage": "!devset <key> <value>", "developerOnly": true, "hidden": true }
+    ,
+    "previewjoin": { "name": "previewjoin", "description": "Preview the guild join embed in this channel (owner only)", "usage": "!previewjoin [guildId]", "developerOnly": true, "hidden": true },
+    "checkcommands": { "name": "checkcommands", "description": "Check whether slash commands are registered in this guild", "usage": "!checkcommands", "developerOnly": true, "hidden": true }
   },
 
   "Social": {

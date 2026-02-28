@@ -3,6 +3,7 @@ const logger = require('../utils/logger').get('command:checkcommands');
 module.exports = {
   name: 'checkcommands',
   description: 'Check whether slash commands are registered in this guild',
+  developerOnly: true,
   // no `data` field: this is a message-mode utility command only
   async executeMessage(message /* , args */) {
     try {

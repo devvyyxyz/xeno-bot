@@ -8,6 +8,7 @@ const guildCreateHandler = require('../events/guildCreate');
 module.exports = {
   name: 'previewjoin',
   description: 'Developer-only: preview the guild join embed in this channel',
+  developerOnly: true,
   // message-mode only
   async executeMessage(message /* , args */) {
     try {
