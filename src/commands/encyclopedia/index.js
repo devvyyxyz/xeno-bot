@@ -1,10 +1,9 @@
-const { getCommandConfig } = require('../utils/commandsConfig');
-const eggTypes = require('../../config/eggTypes.json');
-const fallbackLogger = require('../utils/fallbackLogger');
-// userModel not needed here
-const eggModel = require('../models/egg');
-const emojis = require('../utils/emojis');
-const createInteractionCollector = require('../utils/collectorHelper');
+const { getCommandConfig } = require('../../utils/commandsConfig');
+const eggTypes = require('../../../config/eggTypes.json');
+const fallbackLogger = require('../../utils/fallbackLogger');
+const eggModel = require('../../models/egg');
+const emojis = require('../../utils/emojis');
+const createInteractionCollector = require('../../utils/collectorHelper');
 
 const cmd = getCommandConfig('encyclopedia') || {
   name: 'encyclopedia',
@@ -17,38 +16,28 @@ module.exports = {
   data: { name: cmd.name, description: cmd.description },
   async executeInteraction(interaction) {
     try {
-      // Use flags: 64 for ephemeral, omit for public
       if (cmd.ephemeral === true) {
         await interaction.deferReply({ flags: 64 });
       } else {
         await interaction.deferReply();
       }
     } catch (err) {
-      // If the interaction is already expired, just return
-      const logger = require('../utils/logger').get('command:encyclopedia');
+      const logger = require('../../utils/logger').get('command:encyclopedia');
       logger.error('Failed to defer reply', { error: err && (err.stack || err) });
       return;
     }
     const guildId = interaction.guildId;
-    // Ensure all egg types exist in DB for this guild
-    const baseLogger = require('../utils/logger');
+    const baseLogger = require('../../utils/logger');
     const logger = baseLogger.get ? baseLogger.get('command:encyclopedia') : console;
     if (baseLogger && baseLogger.sentry) {
-      try {
-        baseLogger.sentry.addBreadcrumb({ message: 'db.ensureEggTypes.start', category: 'db', data: { guildId } });
-      } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (ensureEggTypes.start)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (ensureEggTypes.start)', le && (le.stack || le)); } }
+      try { baseLogger.sentry.addBreadcrumb({ message: 'db.ensureEggTypes.start', category: 'db', data: { guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (ensureEggTypes.start)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (ensureEggTypes.start)', le && (le.stack || le)); } }
     }
-      await eggModel.ensureEggTypesForGuild(guildId, eggTypes);
+    await eggModel.ensureEggTypesForGuild(guildId, eggTypes);
     if (baseLogger && baseLogger.sentry) {
-      try {
-        baseLogger.sentry.addBreadcrumb({ message: 'db.ensureEggTypes.finish', category: 'db', data: { guildId } });
-      } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (ensureEggTypes.finish)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (ensureEggTypes.finish)', le && (le.stack || le)); } }
+      try { baseLogger.sentry.addBreadcrumb({ message: 'db.ensureEggTypes.finish', category: 'db', data: { guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (ensureEggTypes.finish)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (ensureEggTypes.finish)', le && (le.stack || le)); } }
     }
-    // Get stats from DB
     if (baseLogger && baseLogger.sentry) {
-      try {
-        baseLogger.sentry.addBreadcrumb({ message: 'db.getEggStats.start', category: 'db', data: { guildId } });
-      } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (getEggStats.start)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (getEggStats.start)', le && (le.stack || le)); } }
+      try { baseLogger.sentry.addBreadcrumb({ message: 'db.getEggStats.start', category: 'db', data: { guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (getEggStats.start)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (getEggStats.start)', le && (le.stack || le)); } }
     }
     const stats = await eggModel.getEggStatsForGuild(guildId);
     if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.getEggStats.finish', category: 'db', data: { guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.getEggStats.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (db.getEggStats.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
@@ -88,7 +77,7 @@ module.exports = {
     if (pages.length === 1) return;
     const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [getEmbed(page)], components: [row], time: 120_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 2 } });
     if (!collector) {
-      try { const l = require('../utils/logger').get('command:encyclopedia'); l && l.warn && l.warn('Failed to attach encyclopedia collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach encyclopedia collector', le && (le.stack || le)); } catch (ignored) {} }
+      try { const l = require('../../utils/logger').get('command:encyclopedia'); l && l.warn && l.warn('Failed to attach encyclopedia collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach encyclopedia collector', le && (le.stack || le)); } catch (ignored) {} }
       return;
     }
     collector.on('collect', async i => {
@@ -102,7 +91,7 @@ module.exports = {
       await i.update({ embeds: [getEmbed(page)], components: [newRow] });
     });
     collector.on('end', async () => {
-      try { await interaction.editReply({ components: [] }); } catch (e) { try { const l = require('../utils/logger').get('command:encyclopedia'); l && l.warn && l.warn('Failed clearing components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging encyclopedia component clear failure', le && (le.stack || le)); } catch (ignored) {} } }
+      try { await interaction.editReply({ components: [] }); } catch (e) { try { const l = require('../../utils/logger').get('command:encyclopedia'); l && l.warn && l.warn('Failed clearing components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging encyclopedia component clear failure', le && (le.stack || le)); } catch (ignored) {} } }
     });
   }
 };

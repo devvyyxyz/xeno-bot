@@ -217,21 +217,20 @@ const client = new Client({
 client.commands = new Collection();
 client.config = config;
 
-// Load commands
+// Load commands (support both flat files and directory-based commands)
 const commandsPath = path.join(__dirname, 'commands');
 if (fs.existsSync(commandsPath)) {
-  const commandFiles = fs.readdirSync(commandsPath).filter(f => f.endsWith('.js'));
-  for (const file of commandFiles) {
-    try {
-      const command = require(path.join(commandsPath, file));
-      if (!command.name) continue;
-      client.commands.set(command.name, command);
-      	  logger.info(`Loaded command ${command.name}`, { command: command.name, file });
-    } catch (err) {
-      logger.error(`Failed loading command file: ${file}`, { file, error: err.stack || err });
+  try {
+    const loader = require('./commands/loader');
+    const loaded = loader.loadCommands(commandsPath);
+    for (const [name, cmd] of loaded) {
+      client.commands.set(name, cmd);
+      logger.info(`Loaded command ${name}`, { command: name });
     }
+    logger.info('Commands loaded', { count: client.commands.size, commands: Array.from(client.commands.keys()).sort() });
+  } catch (err) {
+    logger.error('Failed loading commands via loader', { error: err && (err.stack || err) });
   }
-  	logger.info('Commands loaded', { count: client.commands.size, commands: Array.from(client.commands.keys()).sort() });
 }
 
 // Load events
@@ -247,7 +246,7 @@ if (fs.existsSync(eventsPath)) {
       if (event.once) client.once(registeredName, handler);
       else client.on(registeredName, handler);
 
-      logger.info('Loaded event', { event: event.name, registeredAs: registeredName });
+      logger.info(`Loaded event ${event.name}`, { file, registeredAs: registeredName });
     } catch (err) {
       logger.error(`Failed loading event file: ${file}`, { file, error: err.stack || err });
     }
