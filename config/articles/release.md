@@ -1,6 +1,6 @@
 # Version History
 
-This document is a generated changelog-style history of the project built from the repository commit history (chronological). It summarizes major changes and milestones from the initial commit through the recent feature work.
+View the full changelog of xeno-bot's development progress, including all features, improvements, and fixes across versions. Each version entry includes a summary of changes and links to relevant commits for more details.
 
 ----
 
@@ -156,5 +156,6 @@ Date: 2026-02-28
 - Fixed several runtime and syntax issues introduced during refactors (help selection population, truncated help file syntax, and embed color validation).
 
 Notes:
+
 - The spawn deletion feature defaults to off; enable via `/setup message-delete enabled:true` to start deleting spawn messages after a catch.
 - Additional followups: add an admin-facing notice when the bot lacks `Manage Messages` permission in the spawn channel, and consider de-duplicating legacy flat command files in a future cleanup release.
