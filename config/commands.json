@@ -110,7 +110,7 @@
       "name": "devreload",
       "description": "Reload command modules (owner only)",
       "developerOnly": true,
-      "hidden": true
+      "hidden": false
     },
     "devrestart": {
       "name": "devrestart",
