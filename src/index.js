@@ -112,12 +112,12 @@ if (fs.existsSync(commandsPath)) {
       const command = require(path.join(commandsPath, file));
       if (!command.name) continue;
       client.commands.set(command.name, command);
-      logger.info('Loaded command', { command: command.name });
+      	  logger.info(`Loaded command ${command.name}`, { command: command.name, file });
     } catch (err) {
       logger.error('Failed loading command file', { file, error: err.stack || err });
     }
   }
-  logger.info('Commands loaded', { count: client.commands.size });
+  	logger.info('Commands loaded', { count: client.commands.size, commands: Array.from(client.commands.keys()).sort() });
 }
 
 // Load events
