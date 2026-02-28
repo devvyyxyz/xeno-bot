@@ -4,6 +4,8 @@ const logger = require('../utils/logger').get('command:news');
 const links = require('../../config/links.json');
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const safeReply = require('../utils/safeReply');
+const userModel = require('../models/user');
+const articlesUtil = require('../utils/articles');
 
 const ARTICLES_DIR = path.join(__dirname, '..', '..', 'config', 'articles');
 
@@ -228,14 +230,26 @@ module.exports = {
         return [{ type: 1, components: comps }];
       }
 
-      // Determine initial latest article (first article of first category that has content)
+      // Determine initial latest article: use newest file's last article section
       let firstArticle = null;
-      for (const k of categoryKeys) {
-        const arr = articlesByCategory[k] || [];
-        if (arr.length > 0) { firstArticle = arr[0]; break; }
-      }
+      try {
+        firstArticle = articlesUtil.getLatestArticleContent();
+      } catch (e) { firstArticle = null; }
 
       const embed = buildHomeEmbed(links.general || links, firstArticle, 0, botAvatar);
+      // Mark latest article as read for this user when they open /news so the reminder stops showing
+      try {
+        const latestInfo = articlesUtil.getLatestArticleInfo();
+        if (latestInfo && latestInfo.latest) {
+          const u = await userModel.getUserByDiscordId(interaction.user.id);
+          if (u) {
+            const data = u.data || {};
+            data.meta = data.meta || {};
+            data.meta.lastReadArticleAt = latestInfo.latest;
+            await userModel.updateUserDataRawById(u.id, data);
+          }
+        }
+      } catch (e) { try { logger.warn('Failed marking article as read for user', { error: e && (e.stack || e) }); } catch (_) {} }
       const categoryRow = buildCategoryRow(supportBuilders, categoryKeys);
       const navRow = buildRow(supportBuilders, true, true);
       // Home page: only show category buttons (no navigation/home row)

@@ -25,6 +25,29 @@ module.exports = {
         if (!command) return;
         logger.info('Interaction command received', { command: interaction.commandName, user: interaction.user?.id });
 
+          // News reminder: if there's a newer article than user's last seen, flag interaction so replies can include a reminder.
+          try {
+            const articlesUtil = require('../utils/articles');
+            const { getLatestArticleInfo } = articlesUtil;
+            const latestInfo = getLatestArticleInfo();
+            if (latestInfo && latestInfo.latest) {
+              // don't set reminder when the user is running the news command itself
+              if (interaction.commandName === 'news') {} else {
+              const userModel = require('../models/user');
+              const u = await userModel.getUserByDiscordId(interaction.user.id);
+              const lastSeen = u?.data?.meta?.lastReadArticleAt || 0;
+              if (Number(latestInfo.latest) > Number(lastSeen)) {
+                // set reminder on interaction so safeReply can prepend the notice
+                interaction._newsReminder = true;
+                interaction._newsLatest = latestInfo.latest;
+                interaction._newsTitle = latestInfo.title || null;
+              }
+              }
+            }
+          } catch (e) {
+            try { logger.warn('Failed checking latest articles for reminder', { error: e && (e.stack || e) }); } catch (_) {}
+          }
+
         // Permission guard: commands can specify `requiredPermissions: ['ManageGuild']` or similar
         try {
           const required = command.requiredPermissions || command.permissions;

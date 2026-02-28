@@ -18,6 +18,16 @@ async function safeReply(interaction, payload = {}, opts = {}) {
       }
     }
 
+    // If caller requested suppression of news reminder, skip. Otherwise prepend reminder to content if present on interaction.
+    try {
+      if (interaction && interaction._newsReminder && !payload.__suppressNewsReminder) {
+        const title = interaction._newsTitle ? ` — ${interaction._newsTitle}` : '';
+        const notice = `📢 New article posted${title}! Read it with /news\n\n`;
+        if (payload.content) payload.content = notice + payload.content;
+        else payload.content = notice;
+      }
+    } catch (e) { /* ignore reminder attach errors */ }
+
     // Not replied yet — try reply
     try {
       return await interaction.reply(payload);
