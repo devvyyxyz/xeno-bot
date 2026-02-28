@@ -16,7 +16,34 @@ function loadArticlesByCategory() {
       const key = path.basename(f, '.md');
       try {
         const raw = fs.readFileSync(path.join(ARTICLES_DIR, f), 'utf8');
-        const parts = raw.split(/^[ \t]*---[ \t]*$/m).map(s => s.trim()).filter(Boolean);
+        // split on a line of 3+ dashes, tolerant of CRLF and surrounding blank lines
+        let parts = raw.split(/(?:\r?\n){0,2}-{3,}(?:\r?\n){0,2}/).map(s => s.trim()).filter(Boolean);
+        // If any part contains multiple H2 sections (##), split them further so each is its own article
+        const expanded = [];
+        for (const p of parts) {
+          if (/^##\s+/m.test(p)) {
+            const sub = p.split(/(?=^##\s)/m).map(s => s.trim()).filter(Boolean);
+            expanded.push(...sub);
+          } else {
+            expanded.push(p);
+          }
+        }
+        parts = expanded;
+        // If no explicit separators found, try splitting by top-level headings (H1/H2)
+        if (parts.length <= 1) {
+          const headingParts = raw.split(/(?=^#{1,2}\s)/m).map(s => s.trim()).filter(Boolean);
+          if (headingParts.length > 1) {
+            // If the first part is a top-level H1 intro (e.g., "# Version History"), drop it
+            if (headingParts[0].match(/^#\s+/) && headingParts.length > 1) {
+              headingParts.shift();
+            }
+            parts = headingParts;
+          }
+        }
+        // If the first part looks like a top-level intro (starts with # ), drop it
+        if (parts.length > 0 && parts[0].match(/^#\s+/)) {
+          parts.shift();
+        }
         out[key] = parts;
       } catch (e) {
         out[key] = [];
@@ -29,23 +56,24 @@ function loadArticlesByCategory() {
 }
 
 function renderArticleEmbed(article, index, total) {
-  // Attempt to extract title (first markdown H1/H2), otherwise use index
-  const lines = article.split(/\r?\n/).map(l => l.trim());
-  let title = `News #${index + 1}`;
-  for (const l of lines) {
-    if (!l) continue;
-    const m = l.match(/^#{1,2}\s+(.+)$/);
-    if (m) { title = m[1]; break; }
-    // fallback: first non-empty line as title
-    title = l; break;
-  }
-  // Body: join lines and limit length
-  const body = article.replace(/^#{1,2}\s+.*$/m, '').trim();
-  const truncated = body.length > 3000 ? body.slice(0, 3000) + '\n\n*...truncated*' : body;
+  // Fallback article renderer (keeps backward compatibility)
+  const { title, body } = (function extract(articleText) {
+    const lines = articleText.split(/\r?\n/).map(l => l.trim());
+    let t = null;
+    for (const l of lines) {
+      if (!l) continue;
+      const m = l.match(/^#{1,2}\s+(.+)$/);
+      if (m) { t = m[1]; break; }
+      t = l; break;
+    }
+    const b = articleText.replace(/^#{1,2}\s+.*$/m, '').trim();
+    const trunc = b.length > 3000 ? b.slice(0, 3000) + '\n\n*...truncated*' : b;
+    return { title: t || `News #${index + 1}`, body: trunc };
+  })(article);
 
   const embed = new EmbedBuilder()
     .setTitle(title)
-    .setDescription(truncated || 'No content')
+    .setDescription(body || 'No content')
     .setFooter({ text: `Article ${index + 1} of ${total}` })
     .setColor(0x5865F2)
     .setTimestamp();
