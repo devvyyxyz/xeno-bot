@@ -63,12 +63,12 @@ Date: 2026-02-28
 
 - Reworked `config/links.json` into a categorized structure (e.g., `general`, `community`) and updated commands/events to support both the new shape and the legacy flat shape for backward compatibility (6c11509).
 - Improved `news` command home view to include:
-	- An Introduction field
-	- Quick Links (categorized or flat) rendered as embedded link lists
-	- Latest article preview with title and truncated body
-	- Bot avatar thumbnail on the Home embed
-	- Category selector buttons to open per-category article lists stored under `config/articles/`
-	(commits: 3ce5a60, b56c851, 3f2c915, 6afb398)
+  - An Introduction field
+  - Quick Links (categorized or flat) rendered as embedded link lists
+  - Latest article preview with title and truncated body
+  - Bot avatar thumbnail on the Home embed
+  - Category selector buttons to open per-category article lists stored under `config/articles/`
+  (commits: 3ce5a60, b56c851, 3f2c915, 6afb398)
 
 ## v1.0.0 — Minor improvements and cleanup
 
