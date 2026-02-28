@@ -4,6 +4,7 @@ const fallbackLogger = require('../utils/fallbackLogger');
 // userModel not needed here
 const eggModel = require('../models/egg');
 const emojis = require('../utils/emojis');
+const createInteractionCollector = require('../utils/collectorHelper');
 
 const cmd = getCommandConfig('encyclopedia') || {
   name: 'encyclopedia',
@@ -83,9 +84,13 @@ module.exports = {
       new SecondaryButtonBuilder().setCustomId('prev').setLabel('Previous').setDisabled(page === 0),
       new SecondaryButtonBuilder().setCustomId('next').setLabel('Next').setDisabled(page === pages.length - 1)
     );
-    const msg = await interaction.editReply({ embeds: [getEmbed(page)], components: [row] });
+    await interaction.editReply({ embeds: [getEmbed(page)], components: [row] });
     if (pages.length === 1) return;
-    const collector = (await interaction.fetchReply()).createMessageComponentCollector({ componentType: 2, time: 120_000 });
+    const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [getEmbed(page)], components: [row], time: 120_000, ephemeral: cmd.ephemeral === true, edit: true });
+    if (!collector) {
+      try { const l = require('../utils/logger').get('command:encyclopedia'); l && l.warn && l.warn('Failed to attach encyclopedia collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach encyclopedia collector', le && (le.stack || le)); } catch (ignored) {} }
+      return;
+    }
     collector.on('collect', async i => {
       if (i.user.id !== interaction.user.id) return i.reply({ content: 'Only the command user can change pages.', ephemeral: true });
       if (i.customId === 'prev' && page > 0) page--;

@@ -3,6 +3,7 @@ const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require('dis
 const { SecondaryButtonBuilder } = require('@discordjs/builders');
 const { getCommandConfig, getCommandsObject } = require('../utils/commandsConfig');
 const fallbackLogger = require('../utils/fallbackLogger');
+const createInteractionCollector = require('../utils/collectorHelper');
 const cmd = getCommandConfig('help') || { name: 'help', description: 'Show help for available commands' };
 
 function getCategories() {
@@ -120,8 +121,11 @@ module.exports = {
 
     await interaction.reply({ embeds: [built.embed], components: [row, navRow], ephemeral: cmd.ephemeral === true });
 
-    const msg = await interaction.fetchReply();
-    const collector = msg.createMessageComponentCollector({ time: 120_000 });
+    const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [built.embed], components: [row, navRow], time: 120_000, ephemeral: cmd.ephemeral === true, edit: true });
+    if (!collector) {
+      try { const l = require('../utils/logger').get('command:help'); l && l.warn && l.warn('Failed to attach help collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach help collector', le && (le.stack || le)); } catch (ignored) {} }
+      return;
+    }
     let currentCategory = initialCategory;
     let pages = built.pages || [[]];
     let page = 0;

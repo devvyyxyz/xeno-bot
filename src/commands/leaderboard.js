@@ -2,6 +2,7 @@ const { getCommandConfig } = require('../utils/commandsConfig');
 const userModel = require('../models/user');
 const eggTypes = require('../../config/eggTypes.json');
 const fallbackLogger = require('../utils/fallbackLogger');
+const createInteractionCollector = require('../utils/collectorHelper');
 
 const cmd = getCommandConfig('leaderboard') || {
   name: 'leaderboard',
@@ -144,8 +145,11 @@ module.exports = {
     } else {
       await interaction.editReply({ embeds: [embed], components });
       // Collector for sort menu
-      const msg = await interaction.fetchReply();
-      const collector = msg.createMessageComponentCollector({ componentType: 3, time: 60_000 });
+      const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [embed], components, time: 60_000, ephemeral: cmd.ephemeral === true, edit: true });
+      if (!collector) {
+        try { require('../utils/logger').get('command:leaderboard').warn('Failed to attach leaderboard collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach leaderboard collector', le && (le.stack || le)); } catch (ignored) {} }
+        return;
+      }
       collector.on('collect', async i => {
         if (i.customId === 'leaderboard-sort') {
           const newSort = i.values[0];
