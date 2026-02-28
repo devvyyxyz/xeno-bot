@@ -29,9 +29,16 @@ const consoleFormat = printf(({ timestamp, level, message, label, stack }) => {
   return `${timestamp} [${level}]${label ? ` [${label}]` : ''} ${msg}`;
 });
 
+// Short UTC timestamp helper: "YYYY-MM-DD HH:mm"
+const shortTimestamp = () => {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+};
+
 const logger = createLogger({
   level: process.env.LOG_LEVEL || 'info',
-  format: combine(errors({ stack: true }), splat(), timestamp()),
+  format: combine(errors({ stack: true }), splat(), timestamp({ format: shortTimestamp })),
   transports: [
     // Rotating application log
     new DailyRotateFile({
@@ -40,20 +47,20 @@ const logger = createLogger({
       zippedArchive: true,
       maxSize: '20m',
       maxFiles: '14d',
-      format: combine(timestamp(), fileFormat)
+      format: combine(timestamp({ format: shortTimestamp }), fileFormat)
     }),
     // Keep a separate error file for quick access
-    new transports.File({ filename: path.join(logsDir, 'error.log'), level: 'error', format: combine(timestamp(), fileFormat) })
+    new transports.File({ filename: path.join(logsDir, 'error.log'), level: 'error', format: combine(timestamp({ format: shortTimestamp }), fileFormat) })
   ],
   exitOnError: false
 });
 
 // Console with colors and stack printing in non-production
 if (process.env.NODE_ENV !== 'production') {
-  logger.add(new transports.Console({ format: combine(colorize({ all: true }), timestamp(), consoleFormat) }));
+  logger.add(new transports.Console({ format: combine(colorize({ all: true }), timestamp({ format: shortTimestamp }), consoleFormat) }));
 } else {
   // In production still log to console (no colors)
-  logger.add(new transports.Console({ format: combine(timestamp(), fileFormat) }));
+  logger.add(new transports.Console({ format: combine(timestamp({ format: shortTimestamp }), fileFormat) }));
 }
 
 // Optional Papertrail remote logging
