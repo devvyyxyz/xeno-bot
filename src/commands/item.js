@@ -13,12 +13,33 @@ function findItem(itemId) {
 module.exports = {
   name: 'item',
   description: 'Use or inspect items',
-  data: new ChatInputCommandBuilder()
-    .setName('item')
-    .setDescription('Item utilities')
-    .addSubcommands(sc => sc.setName('use').setDescription('Use an item').addStringOption(o => o.setName('item_id').setDescription('Item id').setRequired(true)).addStringOption(o => o.setName('target').setDescription('Target id (optional)')))
-    .addSubcommands(sc => sc.setName('info').setDescription('Get item info').addStringOption(o => o.setName('item_id').setDescription('Item id').setRequired(true)))
-    .addSubcommands(sc => sc.setName('combine').setDescription('Combine two items').addStringOption(o => o.setName('item1').setDescription('First item id').setRequired(true)).addStringOption(o => o.setName('item2').setDescription('Second item id').setRequired(true))),
+  data: {
+    name: 'item',
+    description: 'Item utilities',
+    options: [
+      { // use
+        type: 1,
+        name: 'use',
+        description: 'Use an item',
+        options: [
+          { type: 3, name: 'item_id', description: 'Item id', required: true },
+          { type: 3, name: 'target', description: 'Target id (optional)', required: false }
+        ]
+      },
+      { // info
+        type: 1,
+        name: 'info',
+        description: 'Get item info',
+        options: [ { type: 3, name: 'item_id', description: 'Item id', required: true } ]
+      },
+      { // combine
+        type: 1,
+        name: 'combine',
+        description: 'Combine two items',
+        options: [ { type: 3, name: 'item1', description: 'First item id', required: true }, { type: 3, name: 'item2', description: 'Second item id', required: true } ]
+      }
+    ]
+  },
 
   async executeInteraction(interaction) {
     const sub = interaction.options.getSubcommand();

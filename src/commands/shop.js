@@ -1,6 +1,6 @@
 const { getCommandConfig } = require('../utils/commandsConfig');
 const shopConfig = require('../../config/shop.json');
-const eggTypes = require('../../config/eggTypes.json');
+const emojiMap = require('../../config/emojis.json');
 const { EmbedBuilder, ActionRowBuilder } = require('discord.js');
 const { StringSelectMenuBuilder, SecondaryButtonBuilder, SuccessButtonBuilder } = require('@discordjs/builders');
 const userModel = require('../models/user');
@@ -27,7 +27,9 @@ function makeEmbedForPage(categoryName, pageIdx, pages, royalJelly = 0) {
     .setFooter({ text: `Royal Jelly: ${royalJelly} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}` });
   if (page.length === 0) embed.setDescription('No items in this category.');
   for (const it of page) {
-    embed.addFields({ name: `${it.name} — ${it.price}`, value: it.description || '\u200B', inline: true });
+    const emoji = it.emoji && emojiMap && emojiMap[it.emoji] ? emojiMap[it.emoji] : '';
+    const title = `${emoji ? `${emoji} ` : ''}${it.name} — ${it.price}`;
+    embed.addFields({ name: title, value: it.description || '\u200B', inline: true });
   }
   return embed;
 }
@@ -39,18 +41,12 @@ module.exports = {
   async executeInteraction(interaction) {
     await interaction.deferReply({ ephemeral: true });
     const categories = (shopConfig.categories || []).map(c => ({ id: c.id, name: c.name }));
-    // Add an Eggs category if we have egg types
-    if ((eggTypes || []).length > 0 && !categories.find(c => c.id === 'eggs')) {
-      categories.unshift({ id: 'eggs', name: 'Eggs' });
-    }
     if (categories.length === 0) categories.push({ id: 'all', name: 'All' });
     const initialCategory = categories[0].id;
 
     const getItemsByCategory = (catId) => {
       const items = (shopConfig.items || []).map(it => Object.assign({}, it, { type: 'item' }));
-      const eggs = (eggTypes || []).map(e => ({ id: e.id, name: e.name, price: e.price, description: e.emoji || '', type: 'egg' }));
-      if (!catId || catId === 'all') return [...items, ...eggs];
-      if (catId === 'eggs') return eggs;
+      if (!catId || catId === 'all') return items;
       return items.filter(i => (i.category || 'general') === catId);
     };
 
@@ -122,7 +118,11 @@ module.exports = {
           const itemSelect = new StringSelectMenuBuilder()
             .setCustomId('shop-buy-select')
             .setPlaceholder('Select item to buy')
-            .addOptions(pageItems.slice(0, 25).map(it => ({ label: `${it.name} — ${it.price ?? '—'}`, value: `${it.type || 'item'}:${it.id}` })));
+            .addOptions(pageItems.slice(0, 25).map(it => {
+              const emoji = it.emoji && emojiMap && emojiMap[it.emoji] ? emojiMap[it.emoji] : '';
+              const label = `${emoji ? `${emoji} ` : ''}${it.name} — ${it.price ?? '—'}`;
+              return { label: label.slice(0, 100), value: `${it.type || 'item'}:${it.id}` };
+            }));
           // Use helper to create the ephemeral select and its collector
           const { collector: selCollector, message: replyMsg } = await createInteractionCollector(i, { components: [new ActionRowBuilder().addComponents(itemSelect)], time: 60_000, ephemeral: true, edit: false });
           if (!selCollector) {
