@@ -7,7 +7,14 @@ const cmd = getCommandConfig('help') || { name: 'help', description: 'Show help 
 
 function getCategories() {
   const commandsConfig = getCommandsObject();
-  return Object.keys(commandsConfig || {});
+  const keys = Object.keys(commandsConfig || {}).filter(k => k !== 'colour' && typeof commandsConfig[k] === 'object');
+  const visible = keys.filter(k => {
+    try {
+      const cat = commandsConfig[k] || {};
+      return Object.values(cat).some(c => c && c.name && c.developerOnly !== true && c.hidden !== true);
+    } catch (e) { return false; }
+  });
+  return visible.length ? visible : keys;
 }
 
 function getCommandsByCategory(category) {
@@ -15,7 +22,7 @@ function getCommandsByCategory(category) {
   if (!commandsConfig) return [];
   if (category === 'All') {
     const out = [];
-    for (const k of Object.keys(commandsConfig)) {
+    for (const k of Object.keys(commandsConfig).filter(k => k !== 'colour' && typeof commandsConfig[k] === 'object')) {
       const cat = commandsConfig[k] || {};
       for (const cmdKey of Object.keys(cat)) {
         const entry = cat[cmdKey];

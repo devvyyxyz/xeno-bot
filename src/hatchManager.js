@@ -5,8 +5,10 @@ const userModel = require('./models/user');
 const eggTypes = require('../config/eggTypes.json');
 
 let timers = new Map(); // hatchId -> timeout
+let client = null;
 
-async function init() {
+async function init(botClient) {
+  client = botClient || null;
   try {
     const rows = await db.knex('hatches').where({ collected: false }).select('*');
     for (const r of rows) {
@@ -14,12 +16,22 @@ async function init() {
       const finishes = Number(r.finishes_at) || now;
       if (finishes <= now) {
         // ready to collect, no timer necessary
-        logger.info('Hatch ready on init', { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, egg_type: r.egg_type });
+        try {
+          const guildName = client ? (client.guilds.cache.get(r.guild_id)?.name || await (async () => { try { const g = await client.guilds.fetch(r.guild_id); return g && g.name; } catch (_) { return null; } })()) : null;
+          logger.info('Hatch ready on init', { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, guildName, egg_type: r.egg_type });
+        } catch (e) {
+          logger.info('Hatch ready on init', { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, egg_type: r.egg_type });
+        }
         continue;
       }
       const delay = finishes - now;
       scheduleTimer(r.id, delay);
-      logger.info('Restored hatch timer', { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, in_ms: delay });
+      try {
+        const guildName = client ? (client.guilds.cache.get(r.guild_id)?.name || await (async () => { try { const g = await client.guilds.fetch(r.guild_id); return g && g.name; } catch (_) { return null; } })()) : null;
+        logger.info('Restored hatch timer', { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, guildName, in_ms: delay });
+      } catch (e) {
+        logger.info('Restored hatch timer', { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, in_ms: delay });
+      }
     }
   } catch (e) {
     logger.error('Failed initializing hatch manager', { error: e && (e.stack || e) });

@@ -80,22 +80,22 @@
   "Administration": {
     "health": {
       "name": "health",
-      "description": "Show bot health (DB and telemetry)",
+      "description": "Show bot health (DB and telemetry)"
       
     },
     "setup": {
       "name": "setup",
-      "description": "Manage bot settings for this server",
+      "description": "Manage bot settings for this server"
       
     },
     "forcespawn": {
       "name": "forcespawn",
-      "description": "Force spawn eggs in the configured channel (admin only)",
+      "description": "Force spawn eggs in the configured channel (admin only)"
       
     },
     "give": {
       "name": "give",
-      "description": "Give items to users (admin only)",
+      "description": "Give items to users (admin only)"
       
     }
   },
@@ -159,7 +159,7 @@
   "Social": {
     "trade": {
       "name": "trade",
-      "description": "Trade eggs or xenomorphs with another player.",
+      "description": "Trade eggs or xenomorphs with another player."
       
     },
     "trade-log": {
@@ -168,12 +168,12 @@
     },
     "showcase": {
       "name": "showcase",
-      "description": "Show off your hive or collection to others.",
+      "description": "Show off your hive or collection to others."
       
     },
     "gift": {
       "name": "gift",
-      "description": "Gift an egg or xenomorph to another player.",
+      "description": "Gift an egg or xenomorph to another player."
       
     }
   }

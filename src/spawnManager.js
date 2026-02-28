@@ -121,7 +121,12 @@ function scheduleNext(guildId) {
     const max = (cfg && cfg.spawn_max_seconds) || 3600;
     const delay = randomInt(min, max) * 1000;
     const scheduledAt = Date.now() + delay;
-    logger.info('About to schedule next spawn', { guildId, min, max, delay, scheduledAt, pendingReschedule: pendingReschedule.has(guildId), existingTimer: timers.has(guildId), persistedNext: (await (async () => { try { const k = db.knex; const row = await k('guild_settings').where({ guild_id: guildId }).first('next_spawn_at'); return row && row.next_spawn_at; } catch (e) { return null; } })()) });
+    try {
+      const guildName = client ? (client.guilds.cache.get(guildId)?.name || null) : null;
+      logger.info('About to schedule next spawn', { guildId, guildName, min, max, delay, scheduledAt, pendingReschedule: pendingReschedule.has(guildId), existingTimer: timers.has(guildId), persistedNext: (await (async () => { try { const k = db.knex; const row = await k('guild_settings').where({ guild_id: guildId }).first('next_spawn_at'); return row && row.next_spawn_at; } catch (e) { return null; } })()) });
+    } catch (e) {
+      logger.info('About to schedule next spawn', { guildId, min, max, delay, scheduledAt });
+    }
     const t = setTimeout(() => doSpawn(guildId).catch(err => logger.error('Spawn error', { guildId, error: err.stack || err })), delay);
     timers.set(guildId, t);
     nextSpawnAt.set(guildId, scheduledAt);
@@ -132,7 +137,12 @@ function scheduleNext(guildId) {
     } catch (e) {
       try { logger.warn('Failed persisting next_spawn_at to DB', { guildId, error: e && (e.stack || e) }); } catch (le) { try { require('./utils/logger').get('spawn').warn('Failed logging next_spawn_at persistence error', { error: le && (le.stack || le) }); } catch (lle) { fallbackLogger.warn('Failed logging next_spawn_at persistence error fallback', lle && (lle.stack || lle)); } }
     }
-    logger.info('Scheduled next spawn', { guildId, in_ms: delay, scheduled_at: scheduledAt });
+    try {
+      const guildName = client ? (client.guilds.cache.get(guildId)?.name || null) : null;
+      logger.info('Scheduled next spawn', { guildId, guildName, in_ms: delay, scheduled_at: scheduledAt });
+    } catch (e) {
+      logger.info('Scheduled next spawn', { guildId, in_ms: delay, scheduled_at: scheduledAt });
+    }
   })();
 }
 
@@ -178,7 +188,12 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     return;
   }
   inProgress.add(guildId);
-  logger.info('doSpawn entered', { guildId, forcedEggTypeId, timersHas: timers.has(guildId), nextSpawnPersisted: nextSpawnAt.get(guildId) });
+  try {
+    const guildName = client ? (client.guilds.cache.get(guildId)?.name || null) : null;
+    logger.info('doSpawn entered', { guildId, guildName, forcedEggTypeId, timersHas: timers.has(guildId), nextSpawnPersisted: nextSpawnAt.get(guildId) });
+  } catch (e) {
+    logger.info('doSpawn entered', { guildId, forcedEggTypeId, timersHas: timers.has(guildId), nextSpawnPersisted: nextSpawnAt.get(guildId) });
+  }
   // suppress near-duplicate spawns (e.g., timer firing while a force spawn also triggered)
   try {
     const last = lastSpawnAt.get(guildId) || 0;
@@ -219,7 +234,12 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     const limit = (cfg && cfg.egg_limit) || 1;
     const channel = await client.channels.fetch(cfg.channel_id).catch(() => null);
     if (!channel) {
-      logger.warn('Configured channel not found', { guildId, channel_id: cfg.channel_id });
+      try {
+        const guildName = client ? (client.guilds.cache.get(guildId)?.name || null) : null;
+        logger.warn('Configured channel not found', { guildId, guildName, channel_id: cfg.channel_id });
+      } catch (e) {
+        logger.warn('Configured channel not found', { guildId, channel_id: cfg.channel_id });
+      }
       return scheduleNext(guildId);
     }
     // Randomly determine how many eggs to spawn (1 to limit, higher limit increases chance of more)

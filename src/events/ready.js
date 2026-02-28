@@ -47,7 +47,7 @@ module.exports = {
     // initialize hatch manager for egg hatches
     try {
       const hatchManager = require('../hatchManager');
-      await hatchManager.init();
+      await hatchManager.init(client);
     } catch (err) {
       logger.error('Failed initializing hatch manager', { error: err && (err.stack || err) });
     }

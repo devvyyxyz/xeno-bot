@@ -8,7 +8,15 @@ const cmd = getCommandConfig('help') || { name: 'help', description: 'Show help 
 
 function getCategories() {
   const commandsConfig = getCommandsObject();
-  return Object.keys(commandsConfig || {});
+  const keys = Object.keys(commandsConfig || {}).filter(k => k !== 'colour' && typeof commandsConfig[k] === 'object');
+  // Only include categories that have at least one visible (non-developer, non-hidden) command
+  const visible = keys.filter(k => {
+    try {
+      const cat = commandsConfig[k] || {};
+      return Object.values(cat).some(c => c && c.name && c.developerOnly !== true && c.hidden !== true);
+    } catch (e) { return false; }
+  });
+  return visible.length ? visible : keys;
 }
 
 function getCommandsByCategory(category) {
@@ -16,7 +24,7 @@ function getCommandsByCategory(category) {
   if (!commandsConfig) return [];
   if (category === 'All') {
     const out = [];
-    for (const k of Object.keys(commandsConfig)) {
+    for (const k of Object.keys(commandsConfig).filter(k => k !== 'colour' && typeof commandsConfig[k] === 'object')) {
       const cat = commandsConfig[k] || {};
       for (const cmdKey of Object.keys(cat)) {
         const entry = cat[cmdKey];
@@ -44,6 +52,7 @@ module.exports = {
   data: { name: cmd.name, description: cmd.description },
   async executeInteraction(interaction) {
     const categories = getCategories();
+    try { require('../utils/fallbackLogger').info('help: categories', { categories }); } catch (e) {}
     // include "All" category at the front
     if (!categories.includes('All')) categories.unshift('All');
     // Default: show first category
@@ -85,6 +94,11 @@ module.exports = {
         .setTitle('📖 Bot Commands')
         .setColor(getCommandsObject().colour || 0xbab25d)
         .setFooter({ text: `Category: ${cat} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}` });
+      // Intro: about and quick setup instructions
+      embed.addFields(
+        { name: 'About', value: 'Xeno Bot manages egg spawns, collections, and in-server economies. Use commands below to interact with bot features.', inline: false },
+        { name: 'Setup (Server Admins)', value: 'Configure the bot with `/setup` — subcommands: `/setup channel`, `/setup spawn-rate`, `/setup egg-limit`, `/setup avatar`, `/setup details`. Use `/setup reset` to reset a user or server (admin/owner only).', inline: false }
+      );
 
       for (const e of pageEntries) {
         const title = `${e.mention}`;
@@ -145,6 +159,11 @@ module.exports = {
             .setColor(getCommandsObject().colour || 0xbab25d)
             .setDescription(currentCategory === 'All' ? 'All commands' : `Category: ${currentCategory}`)
             .setFooter({ text: `Page ${page + 1} of ${Math.max(1, pages.length)}` });
+          // Intro: about and quick setup instructions
+          embed.addFields(
+            { name: 'About', value: 'Xeno Bot manages egg spawns, collections, and in-server economies. Use commands below to interact with bot features.', inline: false },
+            { name: 'Setup (Server Admins)', value: 'Configure the bot with `/setup` — subcommands: `/setup channel`, `/setup spawn-rate`, `/setup egg-limit`, `/setup avatar`, `/setup details`. Use `/setup reset` to reset a user or server (admin/owner only).', inline: false }
+          );
           for (const e of pageEntries) embed.addFields({ name: `${e.mention}`, value: e.description || '\u200B', inline: true });
           const newNav = new ActionRowBuilder().addComponents(
             new SecondaryButtonBuilder().setCustomId('help-prev').setLabel('Previous').setDisabled(page === 0),
