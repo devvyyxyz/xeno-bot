@@ -93,9 +93,23 @@ module.exports = {
         .setFooter({ text: `Category: ${cat} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}` });
 
       // Intro: about and quick setup instructions
+      // Build clickable mentions for setup subcommands when application command IDs are available
+      let setupIntro = 'Configure the bot with `/setup` — subcommands: `/setup channel`, `/setup spawn-rate`, `/setup egg-limit`, `/setup avatar`, `/setup details`. Use `/setup reset` to reset a user or server (admin/owner only).';
+      try {
+        if (appCommands) {
+          const setupCmd = appCommands.find(ac => ac.name === 'setup');
+          if (setupCmd && setupCmd.id) {
+            const id = setupCmd.id;
+            const sub = ['channel', 'spawn-rate', 'egg-limit', 'avatar', 'details', 'reset'];
+            const mentions = sub.map(s => `</setup ${s}:${id}>`);
+            const root = `</setup:${id}>`;
+            setupIntro = `Configure the bot with ${root} — subcommands: ${mentions.slice(0, 5).join(', ')}. Use ${mentions[5]} to reset a user or server (admin/owner only).`;
+          }
+        }
+      } catch (e) { /* ignore */ }
       embed.addFields(
         { name: 'About', value: 'Xeno Bot manages egg spawns, collections, and in-server economies. Use commands below to interact with bot features.', inline: false },
-        { name: 'Setup (Server Admins)', value: 'Configure the bot with `/setup` — subcommands: `/setup channel`, `/setup spawn-rate`, `/setup egg-limit`, `/setup avatar`, `/setup details`. Use `/setup reset` to reset a user or server (admin/owner only).', inline: false }
+        { name: 'Setup (Server Admins)', value: setupIntro, inline: false }
       );
 
       for (const e of pageEntries) {
