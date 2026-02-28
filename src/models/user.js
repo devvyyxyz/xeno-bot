@@ -80,7 +80,12 @@ async function addEggsForGuild(discordId, guildId, eggs, eggTypeId, catchTimeMs 
   // Increment egg caught count in DB
   try {
     const eggModel = require('./egg');
-    await eggModel.incrementEggCaught(guildId, eggTypeId, Number(eggs || 1));
+    // recordEggCatch will update aggregates and insert an event row with timestamp
+    if (typeof eggModel.recordEggCatch === 'function') {
+      await eggModel.recordEggCatch(guildId, eggTypeId, discordId, Number(eggs || 1));
+    } else {
+      await eggModel.incrementEggCaught(guildId, eggTypeId, Number(eggs || 1));
+    }
   } catch (e) {
     // Log but don't block user update if DB fails
     require('../utils/logger').get('models:user').error('Failed to increment egg caught in DB', { error: e.stack || e });

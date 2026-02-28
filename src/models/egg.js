@@ -33,6 +33,22 @@ async function ensureEggStatsTable() {
   }
 }
 
+// Ensure the egg_catches table exists for recording individual catch events
+async function ensureEggCatchesTable() {
+  const exists = await db.knex.schema.hasTable('egg_catches');
+  if (!exists) {
+    await db.knex.schema.createTable('egg_catches', (table) => {
+      table.increments('id').primary();
+      table.string('egg_id').notNullable();
+      table.string('guild_id').notNullable();
+      table.string('user_id').notNullable();
+      table.integer('amount').defaultTo(1);
+      table.timestamp('caught_at').defaultTo(db.knex.fn.now());
+    });
+    logger.info('Created `egg_catches` table');
+  }
+}
+
 // Ensure all egg types exist in the table for a guild
 async function ensureEggTypesForGuild(guildId, eggTypes) {
   await ensureEggStatsTable();
@@ -53,6 +69,18 @@ async function incrementEggCaught(guildId, eggId, amount = 1) {
     .increment('caught', amount);
 }
 
+// Record an egg catch event: increment aggregates and store an event row
+async function recordEggCatch(guildId, eggId, userId, amount = 1) {
+  await ensureEggStatsTable();
+  await ensureEggCatchesTable();
+  // update aggregate
+  await db.knex('egg_stats')
+    .where({ egg_id: eggId, guild_id: guildId })
+    .increment('caught', amount);
+  // insert event row
+  await db.knex('egg_catches').insert({ egg_id: eggId, guild_id: guildId, user_id: String(userId), amount: Number(amount || 1) });
+}
+
 // Get all egg stats for a guild
 async function getEggStatsForGuild(guildId) {
   await ensureEggStatsTable();
@@ -68,6 +96,7 @@ module.exports = {
   ensureEggStatsTable,
   ensureEggTypesForGuild,
   incrementEggCaught,
+  recordEggCatch,
   getEggStatsForGuild,
   ensureAllEggsInAllGuilds,
 };

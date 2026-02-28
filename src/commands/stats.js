@@ -85,23 +85,39 @@ module.exports = {
 
       const accountCreated = user && user.created_at ? new Date(user.created_at).toISOString().split('T')[0] : 'n/a';
 
-      // Leaderboard rank by catches (scan users)
+      // Leaderboard rank by catches using SQL on egg_catches (more scalable)
       let rankInfo = 'n/a';
       try {
-        const all = await userModel.getAllUsers();
-        const ranked = all.map(u => ({ id: u.discord_id, catches: userModel.getUserStats(u).catches || 0 }));
-        ranked.sort((a, b) => b.catches - a.catches);
-        const idx = ranked.findIndex(r => r.id === String(target.id));
-        if (idx >= 0) rankInfo = `${idx + 1}/${ranked.length}`;
-        else rankInfo = `n/${ranked.length}`;
+        const totalForUserRow = await db.knex('egg_catches').where({ user_id: String(target.id) }).sum('amount as c').first();
+        const totalForUser = totalForUserRow && (totalForUserRow.c || totalForUserRow['sum(`amount`)']) ? Number(totalForUserRow.c || totalForUserRow['sum(`amount`)']) : 0;
+        // count users with strictly higher totals
+        const higherRaw = await db.knex.raw('SELECT COUNT(*) as c FROM (SELECT user_id, SUM(amount) as s FROM egg_catches GROUP BY user_id HAVING s > ?) as t', [totalForUser]);
+        const higher = (higherRaw && higherRaw.rows && higherRaw.rows[0] && higherRaw.rows[0].c) || (higherRaw && higherRaw[0] && higherRaw[0].c) || (higherRaw && higherRaw.length && higherRaw[0].c) || 0;
+        // total users
+        const totalUsersRaw = await db.knex.raw('SELECT COUNT(DISTINCT user_id) as c FROM egg_catches');
+        const totalUsers = (totalUsersRaw && totalUsersRaw.rows && totalUsersRaw.rows[0] && totalUsersRaw.rows[0].c) || (totalUsersRaw && totalUsersRaw[0] && totalUsersRaw[0].c) || (totalUsersRaw && totalUsersRaw.length && totalUsersRaw[0].c) || 0;
+        rankInfo = `${(Number(higher) + 1)}/${Number(totalUsers) || 'n'}`;
       } catch (e) {
         try { require('../utils/logger').get('command:stats').warn('Failed computing leaderboard rank', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard rank error', le && (le.stack || le)); } catch (ignored) {} }
       }
 
-      // Compute per-egg rates since bot soft uptime
-      const uptimeMs = (global._softUptimeStart ? (Date.now() - global._softUptimeStart) : 0) || 0;
-      const days = Math.max( (uptimeMs / 86400000) , 1/24 ); // at least one hour fraction
-      const fmtRate = (n) => `${(n / days).toFixed(2)}/day`;
+      // Compute per-egg rates accurately using egg_catches events (server & global)
+      let serverEggCounts = {};
+      let globalEggCounts = {};
+      let firstCatchAt = null;
+      try {
+        const srows = await db.knex('egg_catches').where({ user_id: String(target.id), guild_id: guildId }).select('egg_id').sum('amount as c').groupBy('egg_id');
+        for (const r of srows) serverEggCounts[r.egg_id] = Number(r.c || r['sum(`amount`)'] || 0);
+        const grow = await db.knex('egg_catches').where({ user_id: String(target.id) }).select('egg_id').sum('amount as c').groupBy('egg_id');
+        for (const r of grow) globalEggCounts[r.egg_id] = Number(r.c || r['sum(`amount`)'] || 0);
+        const firstRow = await db.knex('egg_catches').where({ user_id: String(target.id) }).min('caught_at as m').first();
+        firstCatchAt = firstRow && (firstRow.m || firstRow['min(`caught_at`)']) ? new Date(firstRow.m || firstRow['min(`caught_at`)']) : null;
+      } catch (e) {
+        try { require('../utils/logger').get('command:stats').warn('Failed fetching egg_catches for rates', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging egg_catches fetch error', le && (le.stack || le)); } catch (ignored) {} }
+      }
+      const now = Date.now();
+      const daysSince = firstCatchAt ? Math.max((now - firstCatchAt.getTime()) / 86400000, 1/24) : Math.max((Date.now() - (global._softUptimeStart || Date.now())) / 86400000, 1/24);
+      const fmtRate = (n) => `${(n / daysSince).toFixed(2)}/day`;
 
       const embed = new EmbedBuilder()
         .setTitle(`${target.username}#${target.discriminator} — Game Stats`)
