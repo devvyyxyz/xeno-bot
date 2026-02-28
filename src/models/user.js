@@ -17,8 +17,11 @@ async function getUserByDiscordId(discordId) {
 async function createUser(discordId, initialData = {}) {
   const defaults = { guilds: {}, stats: {} };
   const gd = (userDefaults && userDefaults.guildDefaults) ? userDefaults.guildDefaults : { eggs: { classic: 1 }, items: {}, currency: { royal_jelly: 0 } };
+  const globalDefaults = (userDefaults && userDefaults.globalDefaults) ? userDefaults.globalDefaults : { currency: { credits: 0 } };
   const dataToStore = Object.assign({}, defaults, initialData || {});
   dataToStore.guilds = dataToStore.guilds || {};
+  // set global currency defaults
+  dataToStore.currency = Object.assign({}, globalDefaults.currency || { credits: 0 });
   const inserted = await db.knex('users').insert({ discord_id: discordId, data: JSON.stringify(dataToStore) });
   const id = Array.isArray(inserted) ? inserted[0] : inserted;
   logger.info('Created user', { discordId, id });
@@ -203,6 +206,17 @@ async function modifyCurrencyForGuild(discordId, guildId, currencyKey, delta = 0
   const data = user.data || {};
   data.guilds = data.guilds || {};
   const gdDefaults2 = (userDefaults && userDefaults.guildDefaults) ? userDefaults.guildDefaults : { eggs: { classic: 1 }, items: {}, currency: { royal_jelly: 0 } };
+  // credits are global -- store under data.currency
+  const globalDefaults = (userDefaults && userDefaults.globalDefaults) ? userDefaults.globalDefaults : { currency: { credits: 0 } };
+  if (currencyKey === 'credits') {
+    data.currency = data.currency || Object.assign({}, globalDefaults.currency || { credits: 0 });
+    const curVal = Number(data.currency[currencyKey] || 0);
+    const newVal = curVal + Number(delta);
+    data.currency[currencyKey] = newVal;
+    await updateUserDataRawById(user.id, data);
+    return newVal;
+  }
+
   data.guilds[guildId] = data.guilds[guildId] || { eggs: Object.assign({}, gdDefaults2.eggs || { classic: 1 }), items: Object.assign({}, gdDefaults2.items || {}), currency: Object.assign({}, gdDefaults2.currency || { royal_jelly: 0 }) };
   if (!data.guilds[guildId].currency || typeof data.guilds[guildId].currency !== 'object') data.guilds[guildId].currency = Object.assign({}, gdDefaults2.currency || { royal_jelly: 0 });
   const curVal = Number(data.guilds[guildId].currency[currencyKey] || 0);
@@ -216,6 +230,11 @@ async function getCurrencyForGuild(discordId, guildId, currencyKey) {
   const user = await getUserByDiscordId(discordId);
   if (!user) return 0;
   const data = user.data || {};
+  // credits are global
+  if (currencyKey === 'credits') {
+    if (!data.currency) return 0;
+    return Number(data.currency[currencyKey] || 0);
+  }
   const g = data.guilds && data.guilds[guildId];
   if (!g || !g.currency) return 0;
   return Number(g.currency[currencyKey] || 0);

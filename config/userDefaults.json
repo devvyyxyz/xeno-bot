@@ -4,4 +4,8 @@
     "items": {},
     "currency": { "royal_jelly": 0 }
   }
+  ,
+  "globalDefaults": {
+    "currency": { "credits": 0 }
+  }
 }
