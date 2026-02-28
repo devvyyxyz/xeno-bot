@@ -87,29 +87,31 @@ module.exports = {
     const items = user?.data?.guilds?.[guildId]?.items || {};
     const getFieldsForType = (viewType) => {
       const out = [];
-      // Add avatar as an item entry on the Items page
-      if (viewType === 'items') {
-        try {
-          const avatarUrl = target && typeof target.displayAvatarURL === 'function' ? target.displayAvatarURL({ size: 512, extension: 'png' }) : null;
-          const avatarLabel = avatarUrl ? `[View Avatar](${avatarUrl})` : 'Profile picture';
-          out.push({ name: 'Avatar', value: avatarLabel, inline: true });
-        } catch (e) {
-          try { require('../utils/logger').get('command:inventory').warn('Failed computing avatar URL in inventory getFieldsForType', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging inventory avatar URL error in getFieldsForType', le && (le.stack || le)); } catch (ignored) {} }
-        }
-      }
       if (viewType === 'eggs') {
         for (const type of eggTypes) {
           const count = eggs[type.id];
           if (count && count > 0) out.push({ name: `${type.emoji} ${type.name}`, value: String(count), inline: true });
         }
-      } else {
-        for (const [itemId, qty] of Object.entries(items || {})) {
-          if (qty && qty > 0) {
-            const shopItem = (shopConfig.items || []).find(it => it.id === itemId);
-            const label = shopItem ? shopItem.name : itemId;
-            out.push({ name: `${label}`, value: String(qty), inline: true });
-          }
-        }
+        return out;
+      }
+
+      // items view
+      const itemEntries = Object.entries(items || {}).filter(([, qty]) => qty > 0);
+      if (itemEntries.length === 0) return out; // no items -> keep fields empty so embed shows "Inventory empty"
+
+      // only show avatar when there are items to display
+      try {
+        const avatarUrl = target && typeof target.displayAvatarURL === 'function' ? target.displayAvatarURL({ size: 512, extension: 'png' }) : null;
+        const avatarLabel = avatarUrl ? `[View Avatar](${avatarUrl})` : 'Profile picture';
+        out.push({ name: 'Avatar', value: avatarLabel, inline: true });
+      } catch (e) {
+        try { require('../utils/logger').get('command:inventory').warn('Failed computing avatar URL in inventory getFieldsForType', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging inventory avatar URL error in getFieldsForType', le && (le.stack || le)); } catch (ignored) {} }
+      }
+
+      for (const [itemId, qty] of itemEntries) {
+        const shopItem = (shopConfig.items || []).find(it => it.id === itemId);
+        const label = shopItem ? shopItem.name : itemId;
+        out.push({ name: `${label}`, value: String(qty), inline: true });
       }
       return out;
     };
