@@ -77,6 +77,18 @@ try {
   logger.warn('Failed to load bot profile config; using env vars', { profile, error: e && (e.stack || e) });
 }
 
+// If the profile config explicitly declares a `profile` field (e.g. "dev"), prefer
+// that value to determine registration behaviour. This prevents cases where an
+// inferred or environment-derived profile differs from the metadata in the
+// profile file and would otherwise allow unintended global registration.
+if (profileCfg && profileCfg.profile) {
+  const cfgProfile = String(profileCfg.profile).toLowerCase();
+  if (cfgProfile !== profile) {
+    logger.info('Overriding inferred profile with profile config', { inferred: profile, profile: cfgProfile });
+    profile = cfgProfile;
+  }
+}
+
 if (!token) {
   logger.error('No bot token found in environment. Set TOKEN or the profile-specific token env var.');
   process.exit(1);
