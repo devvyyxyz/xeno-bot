@@ -126,7 +126,16 @@
     "devset": { "name": "devset", "description": "Set config value and update runtime (owner only)", "developerOnly": true, "hidden": true },
     "previewjoin": { "name": "previewjoin", "description": "Preview the guild join embed in this channel (owner only)", "developerOnly": true, "hidden": true },
     "checkcommands": { "name": "checkcommands", "description": "Check whether slash commands are registered in this guild", "developerOnly": true, "hidden": true },
-    "devgive": { "name": "devgive", "description": "Give credits to a user (owner only)", "developerOnly": true, "hidden": true }
+    "devgive": {
+      "name": "devgive",
+      "description": "Give credits or eggs to a user (owner only)",
+      "developerOnly": true,
+      "hidden": true,
+      "subcommands": {
+        "credits": { "name": "devgive credits", "description": "Give credits to a user (owner only)" },
+        "egg": { "name": "devgive egg", "description": "Give eggs to a user (owner only)" }
+      }
+    }
   },
   "Social": {
     "trade": { "name": "trade", "description": "Trade eggs or xenomorphs with another player." },
