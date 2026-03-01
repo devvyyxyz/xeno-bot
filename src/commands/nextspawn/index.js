@@ -2,6 +2,7 @@ const { getCommandConfig } = require('../../utils/commandsConfig');
 const spawnManager = require('../../spawnManager');
 const { EmbedBuilder } = require('discord.js');
 const fallbackLogger = require('../../utils/fallbackLogger');
+const safeReply = require('../../utils/safeReply');
 
 const cmd = getCommandConfig('nextspawn') || { name: 'nextspawn', description: 'Show time until the next egg spawn for this server' };
 
@@ -38,7 +39,7 @@ module.exports = {
     try {
       const info = spawnManager.getNextSpawnForGuild(interaction.guildId);
       if (!info) {
-        await interaction.editReply({ content: 'No spawn is currently scheduled for this server.' });
+        await safeReply(interaction, { content: 'No spawn is currently scheduled for this server.' }, { loggerName: 'command:nextspawn' });
         return;
       }
       if (info.active) {
@@ -54,7 +55,6 @@ module.exports = {
     } catch (err) {
       const logger = require('../../utils/logger').get('command:nextspawn');
       try {
-        const safeReply = require('../../utils/safeReply');
         await safeReply(interaction, { content: `Failed to get next spawn info: ${err && (err.message || err)}` }, { loggerName: 'command:nextspawn' });
       } catch (finalErr) {
         try { logger.error('Failed replying after nextspawn error (final)', { error: finalErr && (finalErr.stack || finalErr) }); } catch (e) { try { logger.warn('Failed logging final reply error in nextspawn', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging final reply error in nextspawn fallback', le && (le.stack || le)); } }

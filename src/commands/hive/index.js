@@ -1,4 +1,5 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ContainerBuilder, TextDisplayBuilder, MessageFlags } = require('discord.js');
+const { ActionRowBuilder, SecondaryButtonBuilder } = require('@discordjs/builders');
 const hiveModel = require('../../models/hive');
 const xenomorphModel = require('../../models/xenomorph');
 const userModel = require('../../models/user');
@@ -10,6 +11,50 @@ const hiveDefaults = require('../../../config/hiveDefaults.json');
 const db = require('../../db');
 
 const cmd = getCommandConfig('hive') || { name: 'hive', description: 'Manage your hive' };
+
+const HIVE_DELETE_CONFIRM_ID = 'hive-delete-confirm';
+const HIVE_DELETE_CANCEL_ID = 'hive-delete-cancel';
+
+function buildHiveDeleteV2Payload({ hiveName, hiveId, state = 'confirm', includeFlags = true }) {
+  const titleMap = {
+    confirm: '## Confirm Hive Deletion',
+    cancelled: '## Deletion Cancelled',
+    deleted: '## Hive Deleted',
+    timed_out: '## Timed Out'
+  };
+  const bodyMap = {
+    confirm: `This will permanently delete **${hiveName || 'your hive'}** (ID: ${hiveId}).\n\nAre you sure you want to proceed?`,
+    cancelled: 'Hive deletion has been cancelled.',
+    deleted: `Deleted hive **${hiveName || 'your hive'}** (ID: ${hiveId}).`,
+    timed_out: 'No response received. Hive deletion cancelled.'
+  };
+  const disableButtons = state !== 'confirm';
+
+  const container = new ContainerBuilder();
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(titleMap[state] || titleMap.confirm),
+    new TextDisplayBuilder().setContent(bodyMap[state] || bodyMap.confirm)
+  );
+
+  container.addActionRowComponents(
+    new ActionRowBuilder().addComponents(
+      new SecondaryButtonBuilder()
+        .setLabel('Delete')
+        .setCustomId(HIVE_DELETE_CONFIRM_ID)
+        .setDisabled(disableButtons),
+      new SecondaryButtonBuilder()
+        .setLabel('Cancel')
+        .setCustomId(HIVE_DELETE_CANCEL_ID)
+        .setDisabled(disableButtons)
+    )
+  );
+
+  const payload = {
+    components: [container]
+  };
+  if (includeFlags) payload.flags = MessageFlags.IsComponentsV2;
+  return payload;
+}
 
 module.exports = {
   name: cmd.name,
@@ -239,69 +284,51 @@ module.exports = {
         const hive = await hiveModel.getHiveByUser(userId);
         if (!hive) return safeReply(interaction, { content: 'You do not have a hive to delete.', ephemeral: true });
 
-        const embed = new EmbedBuilder()
-          .setTitle('Confirm Hive Deletion')
-          .setDescription(`This will permanently delete **${hive.name || 'your hive'}** (ID: ${hive.id}).\n\nAre you sure you want to proceed?`)
-          .setTimestamp();
+        await safeReply(interaction, {
+          ...buildHiveDeleteV2Payload({ hiveName: hive.name || 'your hive', hiveId: hive.id, state: 'confirm', includeFlags: true }),
+          ephemeral: true
+        }, { loggerName: 'command:hive' });
 
-        const row = { type: 1, components: [
-          { type: 2, style: 4, custom_id: 'hive-delete-confirm', label: 'Delete', disabled: false },
-          { type: 2, style: 2, custom_id: 'hive-delete-cancel', label: 'Cancel', disabled: false }
-        ] };
-
-        const createInteractionCollector = require('../../utils/collectorHelper');
-        // Send the ephemeral reply first so we have a message to attach the collector to
         let msg = null;
-        try {
-          msg = await interaction.reply({ embeds: [embed], components: [row], ephemeral: true, fetchReply: true });
-        } catch (e) {
-          // fallback to defer+edit path handled by collector helper
+        try { msg = await interaction.fetchReply(); } catch (_) {}
+        if (!msg || typeof msg.createMessageComponentCollector !== 'function') {
+          return safeReply(interaction, { content: 'Failed creating confirmation prompt.', ephemeral: true });
         }
-        const { collector, message: _msg } = await createInteractionCollector(interaction, { embeds: [embed], components: [row], time: 60_000, ephemeral: true, edit: true, collectorOptions: { componentType: 2 } });
-        if (!msg && _msg) msg = _msg;
-        if (!collector) return safeReply(interaction, { content: 'Failed creating confirmation prompt.', ephemeral: true });
+
+        const collector = msg.createMessageComponentCollector({
+          filter: i => i && (i.customId === HIVE_DELETE_CONFIRM_ID || i.customId === HIVE_DELETE_CANCEL_ID),
+          time: 60_000
+        });
 
         let handled = false;
         collector.on('collect', async i => {
           try {
             if (i.user.id !== interaction.user.id) {
-              await i.reply({ content: 'Only the command invoker can confirm deletion.', ephemeral: true });
+              await safeReply(i, { content: 'Only the command invoker can confirm deletion.', ephemeral: true }, { loggerName: 'command:hive' });
               return;
             }
-            if (i.customId === 'hive-delete-cancel') {
+            if (i.customId === HIVE_DELETE_CANCEL_ID) {
               handled = true;
-              const disabledRow = { type: 1, components: [
-                { type: 2, style: 4, custom_id: 'hive-delete-confirm', label: 'Delete', disabled: true },
-                { type: 2, style: 2, custom_id: 'hive-delete-cancel', label: 'Cancel', disabled: true }
-              ] };
-              await i.update({ embeds: [new EmbedBuilder().setTitle('Deletion Cancelled').setDescription('Hive deletion has been cancelled.').setTimestamp()], components: [disabledRow] });
+              await i.update(buildHiveDeleteV2Payload({ hiveName: hive.name || 'your hive', hiveId: hive.id, state: 'cancelled', includeFlags: false }));
               collector.stop('cancelled');
               return;
             }
-            if (i.customId === 'hive-delete-confirm') {
+            if (i.customId === HIVE_DELETE_CONFIRM_ID) {
               handled = true;
               await hiveModel.deleteHiveById(hive.id);
-              const disabledRow = { type: 1, components: [
-                { type: 2, style: 4, custom_id: 'hive-delete-confirm', label: 'Delete', disabled: true },
-                { type: 2, style: 2, custom_id: 'hive-delete-cancel', label: 'Cancel', disabled: true }
-              ] };
-              await i.update({ embeds: [new EmbedBuilder().setTitle('Hive Deleted').setDescription(`Deleted hive **${hive.name || 'your hive'}** (ID: ${hive.id}).`).setTimestamp()], components: [disabledRow] });
+              await i.update(buildHiveDeleteV2Payload({ hiveName: hive.name || 'your hive', hiveId: hive.id, state: 'deleted', includeFlags: false }));
               collector.stop('deleted');
               return;
             }
           } catch (err) {
-            try { await i.reply({ content: `Error handling confirmation: ${err && err.message}`, ephemeral: true }); } catch (_) {}
+            try { await safeReply(i, { content: `Error handling confirmation: ${err && err.message}`, ephemeral: true }, { loggerName: 'command:hive' }); } catch (_) {}
           }
         });
 
         collector.on('end', async (_collected, reason) => {
           if (!handled && reason === 'time') {
             try {
-              const disabledRow = { type: 1, components: [
-                { type: 2, style: 4, custom_id: 'hive-delete-confirm', label: 'Delete', disabled: true },
-                { type: 2, style: 2, custom_id: 'hive-delete-cancel', label: 'Cancel', disabled: true }
-              ] };
-              await msg.edit({ embeds: [new EmbedBuilder().setTitle('Timed Out').setDescription('No response received. Hive deletion cancelled.').setTimestamp()], components: [disabledRow] });
+              await interaction.editReply(buildHiveDeleteV2Payload({ hiveName: hive.name || 'your hive', hiveId: hive.id, state: 'timed_out', includeFlags: false }));
             } catch (_) {}
           }
         });
