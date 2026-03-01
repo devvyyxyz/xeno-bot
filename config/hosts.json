@@ -1,4 +1,5 @@
 {
+  "findChance": 0.75,
   "hosts": {
     "human": { "display": "Human", "rarity": "common", "weight": 90, "description": "A standard human host useful for basic evolutions." },
     "dog": { "display": "Dog", "rarity": "common", "weight": 40, "description": "A canine host useful for certain pathways." },

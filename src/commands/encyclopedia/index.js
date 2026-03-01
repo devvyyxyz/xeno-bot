@@ -64,6 +64,44 @@ module.exports = {
     const { EmbedBuilder, ActionRowBuilder } = require('discord.js');
     const { SecondaryButtonBuilder } = require('@discordjs/builders');
     let page = 0;
+    let currentView = 'eggs';
+    // Build host pages from config + DB counts
+    const hostsCfg = require('../../../config/hosts.json');
+    const db = require('../../db');
+    const hostKeys = Object.keys((hostsCfg && hostsCfg.hosts) || {});
+    const hostPages = [];
+    try {
+      // Fetch counts per host type if hosts table exists
+      const hasHostsTable = await (async () => { try { return await db.knex.schema.hasTable('hosts'); } catch (_) { return false; } })();
+      const counts = {};
+      if (hasHostsTable) {
+        for (const k of hostKeys) {
+          try {
+            const [row] = await db.knex('hosts').where({ host_type: k }).count('* as cnt');
+            counts[k] = row && (row.cnt || row.count || Object.values(row)[0]) ? Number(row.cnt || row.count || Object.values(row)[0]) : 0;
+          } catch (_) { counts[k] = 0; }
+        }
+      }
+      // Build pages (9 per page to match eggs layout)
+      for (let i = 0; i < hostKeys.length; i += eggsPerPage) {
+        const fields = hostKeys.slice(i, i + eggsPerPage).map(k => {
+          const h = hostsCfg.hosts[k] || {};
+          const name = `**${h.display || k}**`;
+          const valParts = [];
+          if (h.rarity) valParts.push(`Rarity: ${h.rarity}`);
+          if (counts[k] !== undefined) valParts.push(`Found: ${counts[k]}`);
+          if (h.description) valParts.push(h.description);
+          let val = valParts.join('\n');
+          if (!val) val = 'No data';
+          if (name.length > 256) name = name.slice(0, 253) + '...';
+          if (val.length > 1024) val = val.slice(0, 1021) + '...';
+          return { name, value: val, inline: true };
+        });
+        hostPages.push(fields);
+      }
+    } catch (e) {
+      // ignore host page building errors
+    }
     const getEmbed = (pageIdx) => new EmbedBuilder()
       .setTitle('📚 The Catalogue')
       .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
@@ -71,7 +109,9 @@ module.exports = {
       .addFields(pages[pageIdx]);
     const row = new ActionRowBuilder().addComponents(
       new SecondaryButtonBuilder().setCustomId('prev').setLabel('Previous').setDisabled(page === 0),
-      new SecondaryButtonBuilder().setCustomId('next').setLabel('Next').setDisabled(page === pages.length - 1)
+      new SecondaryButtonBuilder().setCustomId('next').setLabel('Next').setDisabled(page === pages.length - 1),
+      new SecondaryButtonBuilder().setCustomId('view-eggs').setLabel('Eggs').setDisabled(currentView === 'eggs'),
+      new SecondaryButtonBuilder().setCustomId('view-hosts').setLabel('Hosts').setDisabled(currentView === 'hosts')
     );
     await interaction.editReply({ embeds: [getEmbed(page)], components: [row] });
     if (pages.length === 1) return;
@@ -82,13 +122,41 @@ module.exports = {
     }
     collector.on('collect', async i => {
       if (i.user.id !== interaction.user.id) return i.reply({ content: 'Only the command user can change pages.', ephemeral: true });
-      if (i.customId === 'prev' && page > 0) page--;
-      if (i.customId === 'next' && page < pages.length - 1) page++;
-      const newRow = new ActionRowBuilder().addComponents(
-        new SecondaryButtonBuilder().setCustomId('prev').setLabel('Previous').setDisabled(page === 0),
-        new SecondaryButtonBuilder().setCustomId('next').setLabel('Next').setDisabled(page === pages.length - 1)
-      );
-      await i.update({ embeds: [getEmbed(page)], components: [newRow] });
+      try {
+        if (i.customId === 'prev') {
+          if (currentView === 'eggs') { if (page > 0) page--; }
+          else { if (page > 0) page--; }
+        }
+        if (i.customId === 'next') {
+          if (currentView === 'eggs') { if (page < pages.length - 1) page++; }
+          else { if (page < hostPages.length - 1) page++; }
+        }
+        if (i.customId === 'view-eggs') {
+          currentView = 'eggs';
+          page = 0;
+        }
+        if (i.customId === 'view-hosts') {
+          currentView = 'hosts';
+          page = 0;
+        }
+
+        const embedToSend = currentView === 'eggs' ? getEmbed(page) : new EmbedBuilder()
+          .setTitle('📚 Hosts Catalogue')
+          .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
+          .setFooter({ text: `Page ${page + 1} of ${Math.max(1, hostPages.length)}` })
+          .addFields(hostPages[page] || []);
+
+        const newRow = new ActionRowBuilder().addComponents(
+          new SecondaryButtonBuilder().setCustomId('prev').setLabel('Previous').setDisabled(page === 0),
+          new SecondaryButtonBuilder().setCustomId('next').setLabel('Next').setDisabled(currentView === 'eggs' ? page === pages.length - 1 : page === hostPages.length - 1),
+          new SecondaryButtonBuilder().setCustomId('view-eggs').setLabel('Eggs').setDisabled(currentView === 'eggs'),
+          new SecondaryButtonBuilder().setCustomId('view-hosts').setLabel('Hosts').setDisabled(currentView === 'hosts')
+        );
+
+        await i.update({ embeds: [embedToSend], components: [newRow] });
+      } catch (err) {
+        try { await i.reply({ content: 'Error changing view.', ephemeral: true }); } catch (_) {}
+      }
     });
     collector.on('end', async () => {
       try { await interaction.editReply({ components: [] }); } catch (e) { try { const l = require('../../utils/logger').get('command:encyclopedia'); l && l.warn && l.warn('Failed clearing components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging encyclopedia component clear failure', le && (le.stack || le)); } catch (ignored) {} } }

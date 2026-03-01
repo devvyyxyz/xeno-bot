@@ -29,8 +29,9 @@ module.exports = {
 
     if (sub === 'go') {
       try {
-        // Randomly determine if user finds a host (75% chance)
-        const found = Math.random() < 0.75;
+        // Randomly determine if user finds a host (configurable chance)
+        const findChance = Number((hostsCfg && hostsCfg.findChance) || 0.75);
+        const found = Math.random() < findChance;
         if (!found) return safeReply(interaction, { content: 'You searched but found no suitable hosts this time.', ephemeral: true });
 
         // Weighted random selection using config weights
