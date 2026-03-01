@@ -2,6 +2,7 @@ const { ChatInputCommandBuilder } = require('@discordjs/builders');
 const { ChannelType, PermissionsBitField } = require('discord.js');
 const guildModel = require('../../models/guild');
 const userModel = require('../../models/user');
+const hostModel = require('../../models/host');
 const emojis = require('../../../config/emojis.json');
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const cmd = getCommandConfig('setup') || { name: 'setup', description: 'Manage bot settings for this server' };
@@ -143,8 +144,14 @@ module.exports = {
           const newData = { guilds: {}, stats: {} };
           newData.guilds[interaction.guildId] = { eggs: Object.assign({}, gd.eggs || { classic: 1 }), items: Object.assign({}, gd.items || {}), currency: Object.assign({}, gd.currency || { royal_jelly: 0 }) };
           await userModel.updateUserData(String(target.id), newData);
+          // Also remove any hosts owned by this user
+          try {
+            await hostModel.deleteHostsByOwner(String(target.id));
+          } catch (hostErr) {
+            require('../../utils/logger').get('command:setup').warn('Failed to remove user hosts during reset', { error: hostErr && (hostErr.stack || hostErr) });
+          }
           const safeReply = require('../../utils/safeReply');
-          await safeReply(interaction, { content: `Reset ${target.username}'s data to default values for this server.`, ephemeral: true }, { loggerName: 'command:setup' });
+          await safeReply(interaction, { content: `Reset ${target.username}'s data to default values for this server. Removed hosts owned by the user.`, ephemeral: true }, { loggerName: 'command:setup' });
         } catch (err) {
           const safeReply = require('../../utils/safeReply');
           await safeReply(interaction, { content: `Failed to reset user: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:setup' });

@@ -29,4 +29,14 @@ async function listHostsByOwner(ownerId) {
   }
 }
 
-module.exports = { addHostForUser, listHostsByOwner };
+async function deleteHostsByOwner(ownerId) {
+  try {
+    await db.knex('hosts').where({ owner_id: String(ownerId) }).del();
+    return true;
+  } catch (e) {
+    logger.warn('Failed deleting hosts for owner', { error: e && e.message });
+    throw e;
+  }
+}
+
+module.exports = { addHostForUser, listHostsByOwner, deleteHostsByOwner };
