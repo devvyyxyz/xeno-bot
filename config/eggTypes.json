@@ -7,7 +7,8 @@
     "rarity": 1,
     "price": 10000,
     "sell": 5000,
-    "hatch": 60
+    "hatch": 60,
+    "next_stage": "facehugger"
   },
   {
     "id": "royal",
@@ -17,7 +18,8 @@
     "rarity": 6,
     "price": 60000,
     "sell": 3000,
-    "hatch": 360
+    "hatch": 360,
+    "next_stage": "facehugger"
   },
   {
     "id": "queen",
@@ -27,7 +29,8 @@
     "rarity": 7,
     "price": 70000,
     "sell": 3500,
-    "hatch": 420
+    "hatch": 420,
+    "next_stage": "facehugger"
   },
   {
     "id": "warrior",
@@ -37,7 +40,8 @@
     "rarity": 4,
     "price": 40000,
     "sell": 2000,
-    "hatch": 240
+    "hatch": 240,
+    "next_stage": "facehugger"
   },
   {
     "id": "praetorian",
@@ -47,7 +51,8 @@
     "rarity": 6,
     "price": 60000,
     "sell": 3000,
-    "hatch": 360
+    "hatch": 360,
+    "next_stage": "facehugger"
   },
   {
     "id": "runner",
@@ -57,7 +62,8 @@
     "rarity": 5,
     "price": 50000,
     "sell": 2500,
-    "hatch": 300
+    "hatch": 300,
+    "next_stage": "facehugger"
   },
   {
     "id": "predalien",
@@ -67,7 +73,8 @@
     "rarity": 8,
     "price": 80000,
     "sell": 4000,
-    "hatch": 480
+    "hatch": 480,
+    "next_stage": "facehugger"
   },
   {
     "id": "neomorph",
@@ -77,7 +84,8 @@
     "rarity": 7,
     "price": 70000,
     "sell": 3500,
-    "hatch": 420
+    "hatch": 420,
+    "next_stage": "facehugger"
   },
   {
     "id": "deacon",
@@ -87,7 +95,8 @@
     "rarity": 8,
     "price": 80000,
     "sell": 4000,
-    "hatch": 480
+    "hatch": 480,
+    "next_stage": "facehugger"
   },
   {
     "id": "trilobite",
@@ -97,7 +106,8 @@
     "rarity": 7,
     "price": 70000,
     "sell": 3500,
-    "hatch": 420
+    "hatch": 420,
+    "next_stage": "facehugger"
   },
   {
     "id": "belugamorph",
@@ -107,7 +117,8 @@
     "rarity": 8,
     "price": 80000,
     "sell": 4000,
-    "hatch": 480
+    "hatch": 480,
+    "next_stage": "facehugger"
   },
   {
     "id": "ultramorph",
@@ -117,7 +128,8 @@
     "rarity": 9,
     "price": 90000,
     "sell": 4500,
-    "hatch": 540
+    "hatch": 540,
+    "next_stage": "facehugger"
   },
   {
     "id": "crusher",
@@ -127,7 +139,8 @@
     "rarity": 7,
     "price": 70000,
     "sell": 3500,
-    "hatch": 420
+    "hatch": 420,
+    "next_stage": "facehugger"
   },
   {
     "id": "spitter",
@@ -137,7 +150,8 @@
     "rarity": 5,
     "price": 50000,
     "sell": 2500,
-    "hatch": 300
+    "hatch": 300,
+    "next_stage": "facehugger"
   },
   {
     "id": "lurker",
@@ -147,7 +161,8 @@
     "rarity": 5,
     "price": 50000,
     "sell": 2500,
-    "hatch": 300
+    "hatch": 300,
+    "next_stage": "facehugger"
   },
   {
     "id": "boiler",
@@ -157,7 +172,8 @@
     "rarity": 6,
     "price": 6000,
     "sell": 300,
-    "hatch": 360
+    "hatch": 360,
+    "next_stage": "facehugger"
   },
   {
     "id": "burster",
@@ -167,7 +183,8 @@
     "rarity": 4,
     "price": 40000,
     "sell": 2000,
-    "hatch": 240
+    "hatch": 240,
+    "next_stage": "facehugger"
   },
   {
     "id": "synthetic",
@@ -177,7 +194,8 @@
     "rarity": 9,
     "price": 90000,
     "sell": 4500,
-    "hatch": 540
+    "hatch": 540,
+    "next_stage": "facehugger"
   },
   {
     "id": "android",
@@ -187,7 +205,8 @@
     "rarity": 9,
     "price": 90000,
     "sell": 4500,
-    "hatch": 540
+    "hatch": 540,
+    "next_stage": "facehugger"
   },
   {
     "id": "spacejockey",
@@ -197,7 +216,8 @@
     "rarity": 10,
     "price": 100000,
     "sell": 5000,
-    "hatch": 600
+    "hatch": 600,
+    "next_stage": "facehugger"
   },
   {
     "id": "engineer",
@@ -207,7 +227,8 @@
     "rarity": 10,
     "price": 100000,
     "sell": 5000,
-    "hatch": 600
+    "hatch": 600,
+    "next_stage": "facehugger"
   },
   {
     "id": "weyland",
@@ -217,7 +238,8 @@
     "rarity": 10,
     "price": 100000,
     "sell": 5000,
-    "hatch": 600
+    "hatch": 600,
+    "next_stage": "facehugger"
   },
   {
     "id": "colonist",
@@ -227,7 +249,8 @@
     "rarity": 6,
     "price": 60000,
     "sell": 3000,
-    "hatch": 360
+    "hatch": 360,
+    "next_stage": "facehugger"
   },
   {
     "id": "dog",
@@ -237,7 +260,8 @@
     "rarity": 5,
     "price": 50000,
     "sell": 2500,
-    "hatch": 300
+    "hatch": 300,
+    "next_stage": "facehugger"
   },
   {
     "id": "ox",
@@ -247,7 +271,8 @@
     "rarity": 5,
     "price": 50000,
     "sell": 2500,
-    "hatch": 300
+    "hatch": 300,
+    "next_stage": "facehugger"
   },
   {
     "id": "bat",
@@ -257,7 +282,8 @@
     "rarity": 5,
     "price": 50000,
     "sell": 2500,
-    "hatch": 300
+    "hatch": 300,
+    "next_stage": "facehugger"
   },
   {
     "id": "snake",
@@ -267,7 +293,8 @@
     "rarity": 5,
     "price": 50000,
     "sell": 2500,
-    "hatch": 300
+    "hatch": 300,
+    "next_stage": "facehugger"
   },
   {
     "id": "giant",
@@ -277,6 +304,7 @@
     "rarity": 10,
     "price": 100000,
     "sell": 5000,
-    "hatch": 600
+    "hatch": 600,
+    "next_stage": "facehugger"
   }
 ]

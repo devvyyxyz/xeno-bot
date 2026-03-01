@@ -52,4 +52,14 @@ async function getXenosByOwner(ownerId) {
   });
 }
 
-module.exports = { createXeno, getXenoById, getXenosByOwner };
+async function deleteXenosByOwner(ownerId) {
+  try {
+    await db.knex('xenomorphs').where({ owner_id: String(ownerId) }).del();
+    return true;
+  } catch (e) {
+    logger.warn('Failed deleting xenomorphs for owner', { error: e && e.message });
+    throw e;
+  }
+}
+
+module.exports = { createXeno, getXenoById, getXenosByOwner, deleteXenosByOwner };

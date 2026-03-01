@@ -3,6 +3,7 @@ const { ChannelType, PermissionsBitField } = require('discord.js');
 const guildModel = require('../../models/guild');
 const userModel = require('../../models/user');
 const hostModel = require('../../models/host');
+const xenoModel = require('../../models/xenomorph');
 const emojis = require('../../../config/emojis.json');
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const cmd = getCommandConfig('setup') || { name: 'setup', description: 'Manage bot settings for this server' };
@@ -150,8 +151,14 @@ module.exports = {
           } catch (hostErr) {
             require('../../utils/logger').get('command:setup').warn('Failed to remove user hosts during reset', { error: hostErr && (hostErr.stack || hostErr) });
           }
+          // Also remove any xenomorphs owned by this user
+          try {
+            await xenoModel.deleteXenosByOwner(String(target.id));
+          } catch (xenoErr) {
+            require('../../utils/logger').get('command:setup').warn('Failed to remove user xenomorphs during reset', { error: xenoErr && (xenoErr.stack || xenoErr) });
+          }
           const safeReply = require('../../utils/safeReply');
-          await safeReply(interaction, { content: `Reset ${target.username}'s data to default values for this server. Removed hosts owned by the user.`, ephemeral: true }, { loggerName: 'command:setup' });
+          await safeReply(interaction, { content: `Reset ${target.username}'s data to default values for this server. Removed hosts and xenomorphs owned by the user.`, ephemeral: true }, { loggerName: 'command:setup' });
         } catch (err) {
           const safeReply = require('../../utils/safeReply');
           await safeReply(interaction, { content: `Failed to reset user: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:setup' });

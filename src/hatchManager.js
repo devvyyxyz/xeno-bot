@@ -97,17 +97,26 @@ async function skipHatch(discordId, guildId, hatchId, costRoyalJelly = 5) {
   return true;
 }
 
-// Collect a finished hatch, granting a facehugger to the user (item id: 'facehugger')
+// Collect a finished hatch, granting a xenomorph to the user based on egg's next_stage
 async function collectHatch(discordId, guildId, hatchId) {
   const row = await db.knex('hatches').where({ id: hatchId, discord_id: discordId, guild_id: guildId, collected: false }).first();
   if (!row) throw new Error('Hatch not found');
   const now = Date.now();
   if (Number(row.finishes_at) > now) throw new Error('Hatch is not ready yet');
-  // grant a new xenomorph record (facehugger/chestburster/xeno depending on egg)
+  // Determine the stage the new xenomorph should have (from egg config's next_stage)
+  let nextStage = 'facehugger'; // default
   try {
-    const roleName = row.egg_type || 'facehugger';
-    await xenoModel.createXeno(discordId, { pathway: 'standard', role: roleName, stage: roleName, data: { fromEgg: row.egg_type } });
+    const eggTypesConfig = require('../config/eggTypes.json');
+    const eggDef = Array.isArray(eggTypesConfig) ? eggTypesConfig.find(e => e.id === row.egg_type) : null;
+    if (eggDef && eggDef.next_stage) nextStage = eggDef.next_stage;
   } catch (e) {
+    logger.warn('Failed loading egg type config in collectHatch', { error: e && e.message });
+  }
+  // Create xenomorph record with the next_stage
+  try {
+    await xenoModel.createXeno(discordId, { pathway: 'standard', role: nextStage, stage: nextStage, data: { fromEgg: row.egg_type } });
+  } catch (e) {
+    logger.warn('Failed creating xenomorph in collectHatch', { error: e && e.message });
     // fallback to adding as an item if xeno creation fails
     try { await userModel.addItemForGuild(discordId, guildId, 'facehugger', 1); } catch (_) {}
   }
