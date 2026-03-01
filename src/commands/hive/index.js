@@ -9,6 +9,9 @@ const cmd = getCommandConfig('hive') || { name: 'hive', description: 'Manage you
 module.exports = {
   name: cmd.name,
   description: cmd.description,
+  requiredPermissions: cmd.requiredPermissions,
+  hidden: cmd.hidden === true,
+  ephemeral: cmd.ephemeral === true,
   data: new ChatInputCommandBuilder()
     .setName(cmd.name)
     .setDescription(cmd.description)

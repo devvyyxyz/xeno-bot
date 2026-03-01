@@ -9,6 +9,9 @@ const cmd = getCommandConfig('eggs') || { name: 'eggs', description: 'Manage you
 module.exports = {
   name: cmd.name,
   description: cmd.description,
+  requiredPermissions: cmd.requiredPermissions,
+  hidden: cmd.hidden === true,
+  ephemeral: cmd.ephemeral === true,
   data: {
     name: cmd.name,
     description: cmd.description,
@@ -75,7 +78,17 @@ module.exports = {
   },
 
   async executeInteraction(interaction) {
-    const sub = interaction.options.getSubcommand();
+    const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
+    const subCfg = sub ? (getCommandConfig(`eggs ${sub}`) || getCommandConfig(`eggs.${sub}`)) : null;
+    if (subCfg && subCfg.developerOnly) {
+      const cfg = require('../../../config/config.json');
+      const ownerId = (cfg && cfg.owner) ? String(cfg.owner) : null;
+      if (!ownerId || interaction.user.id !== ownerId) {
+        const safeReply = require('../../utils/safeReply');
+        await safeReply(interaction, { content: 'Only the bot developer/owner can run this subcommand.', ephemeral: true }, { loggerName: 'command:eggs' });
+        return;
+      }
+    }
     const guildId = interaction.guildId;
     const discordId = interaction.user.id;
     try {

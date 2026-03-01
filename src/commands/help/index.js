@@ -28,7 +28,17 @@ function getCommandsByCategory(category) {
         const entry = cat[cmdKey];
         // hide developer-only or explicitly hidden commands from help
         if (entry && (entry.developerOnly === true || entry.hidden === true)) continue;
-        out.push(entry);
+        // if entry defines subcommands, expand them
+        if (entry && entry.subcommands && typeof entry.subcommands === 'object') {
+          for (const [subKey, subVal] of Object.entries(entry.subcommands)) {
+            const pub = Object.assign({}, subVal);
+            pub.base = entry.name || cmdKey;
+            pub.sub = subKey;
+            out.push(pub);
+          }
+        } else {
+          out.push(entry);
+        }
       }
     }
     // dedupe by name
@@ -41,7 +51,22 @@ function getCommandsByCategory(category) {
     });
   }
   const cat = (commandsConfig && commandsConfig[category]) || {};
-  return Object.values(cat).filter(c => !(c && (c.developerOnly === true || c.hidden === true)));
+  const out = [];
+  for (const key of Object.keys(cat)) {
+    const c = cat[key];
+    if (!c || c.developerOnly === true || c.hidden === true) continue;
+    if (c.subcommands && typeof c.subcommands === 'object') {
+      for (const [subKey, subVal] of Object.entries(c.subcommands)) {
+        const pub = Object.assign({}, subVal);
+        pub.base = c.name || key;
+        pub.sub = subKey;
+        out.push(pub);
+      }
+    } else {
+      out.push(c);
+    }
+  }
+  return out;
 }
 
 module.exports = {
@@ -69,14 +94,26 @@ module.exports = {
       }
 
       const lines = await Promise.all(cmds.map(async c => {
+        // c may be a base command or a subcommand object (with c.base and c.sub)
         let id = null;
         try {
           if (appCommands) {
-            const found = appCommands.find(ac => ac.name === c.name);
+            const baseName = c.base || c.name;
+            const found = appCommands.find(ac => ac.name === baseName);
             if (found) id = found.id;
           }
         } catch (e) { try { logger && logger.warn && logger.warn('Failed updating help view state', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging help view update failure', le && (le.stack || le)); } }
-        const mention = id ? `</${c.name}:${id}>` : `/${c.name}`;
+
+        let mention = null;
+        if (c.base && c.sub) {
+          // subcommand mention format: </base sub:ID>
+          if (id) mention = `</${c.base} ${c.sub}:${id}>`;
+          else mention = `/${c.base} ${c.sub}`;
+        } else {
+          const name = c.name || c.base;
+          if (id) mention = `</${name}:${id}>`;
+          else mention = `/${name}`;
+        }
         return { mention, description: c.description || '' };
       }));
 

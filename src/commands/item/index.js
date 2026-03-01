@@ -11,8 +11,11 @@ function findItem(itemId) {
 }
 
 module.exports = {
-  name: 'item',
-  description: 'Use or inspect items',
+  name: cmdCfg.name || 'item',
+  description: cmdCfg.description || 'Use or inspect items',
+  requiredPermissions: cmdCfg.requiredPermissions,
+  hidden: cmdCfg.hidden === true,
+  ephemeral: cmdCfg.ephemeral === true,
   data: {
     name: 'item',
     description: 'Item utilities',
@@ -42,7 +45,17 @@ module.exports = {
   },
 
   async executeInteraction(interaction) {
-    const sub = interaction.options.getSubcommand();
+    const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
+    const subCfg = sub ? (getCommandConfig(`item ${sub}`) || getCommandConfig(`item.${sub}`)) : null;
+    if (subCfg && subCfg.developerOnly) {
+      const cfg = require('../../../config/config.json');
+      const ownerId = (cfg && cfg.owner) ? String(cfg.owner) : null;
+      if (!ownerId || interaction.user.id !== ownerId) {
+        const safeReply = require('../../utils/safeReply');
+        await safeReply(interaction, { content: 'Only the bot developer/owner can run this subcommand.', ephemeral: true }, { loggerName: 'command:item' });
+        return;
+      }
+    }
     const guildId = interaction.guildId;
     const userId = String(interaction.user.id);
     if (sub === 'info') {

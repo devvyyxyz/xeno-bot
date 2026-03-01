@@ -38,6 +38,9 @@ function makeEmbedForPage(categoryName, pageIdx, pages, royalJelly = 0) {
 module.exports = {
   name: cmd.name,
   description: cmd.description,
+  requiredPermissions: cmd.requiredPermissions,
+  hidden: cmd.hidden === true,
+  ephemeral: cmd.ephemeral === true,
   data: { name: cmd.name, description: cmd.description },
   async executeInteraction(interaction) {
     await interaction.deferReply({ ephemeral: true });

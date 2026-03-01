@@ -20,6 +20,9 @@ function resolveOwnerId() {
 module.exports = {
   name: cmd.name,
   description: cmd.description,
+  requiredPermissions: cmd.requiredPermissions,
+  hidden: cmd.hidden === true,
+  ephemeral: cmd.ephemeral === true,
   requiredPermissions: ['ManageGuild'],
   data: new ChatInputCommandBuilder()
     .setName(cmd.name)
@@ -97,6 +100,16 @@ module.exports = {
 ,
   async executeInteraction(interaction) {
     const safeReply = require('../../utils/safeReply');
+    const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
+    const subCfg = sub ? (getCommandConfig(`setup ${sub}`) || getCommandConfig(`setup.${sub}`)) : null;
+    if (subCfg && subCfg.developerOnly) {
+      const cfg = require('../../../config/config.json');
+      const ownerId = (cfg && cfg.owner) ? String(cfg.owner) : null;
+      if (!ownerId || interaction.user.id !== ownerId) {
+        await safeReply(interaction, { content: 'Only the bot developer/owner can run this subcommand.', ephemeral: true }, { loggerName: 'command:setup' });
+        return;
+      }
+    }
     // permission: only server administrators or guild owner can change settings
     const memberPerms = interaction.memberPermissions;
     const ownerId = resolveOwnerId();
@@ -117,7 +130,8 @@ module.exports = {
       // otherwise try to continue but avoid trying to reply later
     }
 
-    const sub = interaction.options.getSubcommand();
+    // reuse previously resolved `sub` variable
+    // const sub = interaction.options.getSubcommand();
 
     if (sub === 'reset') {
       const target = interaction.options.getUser('target');

@@ -11,7 +11,9 @@ const cmd = getCommandConfig('give') || {
 module.exports = {
   name: cmd.name,
   description: cmd.description,
-  requiredPermissions: ['Administrator'],
+  requiredPermissions: cmd.requiredPermissions || ['Administrator'],
+  hidden: cmd.hidden === true,
+  ephemeral: cmd.ephemeral === true,
   data: {
     name: cmd.name,
     description: cmd.description,
@@ -50,7 +52,18 @@ module.exports = {
     return autocomplete(interaction, eggTypes, { map: e => ({ name: e.name, value: e.id }), max: 25 });
   },
   async executeInteraction(interaction) {
-    if (interaction.options.getSubcommand() === 'egg') {
+    const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
+    const subCfg = sub ? (getCommandConfig(`give ${sub}`) || getCommandConfig(`give.${sub}`)) : null;
+    if (subCfg && subCfg.developerOnly) {
+      const cfg = require('../../../config/config.json');
+      const ownerId = (cfg && cfg.owner) ? String(cfg.owner) : null;
+      if (!ownerId || interaction.user.id !== ownerId) {
+        const safeReply = require('../../utils/safeReply');
+        await safeReply(interaction, { content: 'Only the bot developer/owner can run this subcommand.', ephemeral: true }, { loggerName: 'command:give' });
+        return;
+      }
+    }
+    if (sub === 'egg') {
       if (!interaction.memberPermissions || !interaction.memberPermissions.has('Administrator')) {
         const safeReply = require('../../utils/safeReply');
         await safeReply(interaction, { content: 'You must be an admin to use this command.', ephemeral: true }, { loggerName: 'command:give' });

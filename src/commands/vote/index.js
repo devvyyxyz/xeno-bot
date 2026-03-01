@@ -12,6 +12,9 @@ const cmd = getCommandConfig('vote') || {
 module.exports = {
   name: cmd.name,
   description: cmd.description,
+  requiredPermissions: cmd.requiredPermissions,
+  hidden: cmd.hidden === true,
+  ephemeral: cmd.ephemeral === true,
   data: { name: cmd.name, description: cmd.description },
   async executeInteraction(interaction) {
     const row = new ActionRowBuilder().addComponents(

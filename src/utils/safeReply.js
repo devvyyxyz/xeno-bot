@@ -1,5 +1,6 @@
 const baseLogger = require('./logger');
 const fallbackLogger = require('./fallbackLogger');
+const { getCommandConfig } = require('./commandsConfig');
 
 async function safeReply(interaction, payload = {}, opts = {}) {
   const logger = (baseLogger && baseLogger.get) ? baseLogger.get(opts.loggerName || 'utils:safeReply') : console;
@@ -43,6 +44,21 @@ async function safeReply(interaction, payload = {}, opts = {}) {
         else payload.content = notice;
       }
     } catch (e) { /* ignore reminder attach errors */ }
+
+    // If caller didn't set ephemeral explicitly, try to infer from commands.json config (command or subcommand)
+    try {
+      if (payload.ephemeral === undefined && interaction && interaction.commandName) {
+        let inferred = null;
+        const cmdName = String(interaction.commandName || '').trim();
+        let sub = null;
+        try { sub = interaction.options && interaction.options.getSubcommand ? (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })() : null; } catch (e) { sub = null; }
+        if (sub) {
+          inferred = getCommandConfig(`${cmdName} ${sub}`) || getCommandConfig(`${cmdName}.${sub}`) || null;
+        }
+        if (!inferred) inferred = getCommandConfig(cmdName) || null;
+        if (inferred && Object.prototype.hasOwnProperty.call(inferred, 'ephemeral')) payload.ephemeral = !!inferred.ephemeral;
+      }
+    } catch (e) { /* ignore config lookup failures */ }
 
     // Not replied yet — try reply
     try {

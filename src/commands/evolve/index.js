@@ -1,11 +1,15 @@
 const { ChatInputCommandBuilder } = require('@discordjs/builders');
 const xenoModel = require('../../models/xenomorph');
 const db = require('../../db');
+const { getCommandConfig } = require('../../utils/commandsConfig');
 const cmd = { name: 'evolve', description: 'Evolve your xenomorphs' };
 
 module.exports = {
   name: cmd.name,
   description: cmd.description,
+  requiredPermissions: cmd.requiredPermissions,
+  hidden: cmd.hidden === true,
+  ephemeral: cmd.ephemeral === true,
   data: new ChatInputCommandBuilder()
     .setName(cmd.name)
     .setDescription(cmd.description)
@@ -20,7 +24,17 @@ module.exports = {
     .addSubcommands(sub => sub.setName('cancel').setDescription('Cancel an ongoing evolution').addIntegerOptions(opt => opt.setName('job_id').setDescription('Evolution job id').setRequired(true))),
 
   async executeInteraction(interaction) {
-    const sub = interaction.options.getSubcommand();
+    const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
+    const subCfg = sub ? (getCommandConfig(`evolve ${sub}`) || getCommandConfig(`evolve.${sub}`)) : null;
+    if (subCfg && subCfg.developerOnly) {
+      const cfg = require('../../../config/config.json');
+      const ownerId = (cfg && cfg.owner) ? String(cfg.owner) : null;
+      if (!ownerId || interaction.user.id !== ownerId) {
+        const safeReply = require('../../utils/safeReply');
+        await safeReply(interaction, { content: 'Only the bot developer/owner can run this subcommand.', ephemeral: true }, { loggerName: 'command:evolve' });
+        return;
+      }
+    }
     await interaction.deferReply({ ephemeral: true });
     try {
       const userId = String(interaction.user.id);
