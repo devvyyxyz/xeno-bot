@@ -1,4 +1,6 @@
 const { getCommandConfig } = require('../../utils/commandsConfig');
+const { ContainerBuilder, TextDisplayBuilder, MessageFlags } = require('discord.js');
+const { ActionRowBuilder, StringSelectMenuBuilder } = require('@discordjs/builders');
 const userModel = require('../../models/user');
 const eggTypes = require('../../../config/eggTypes.json');
 const fallbackLogger = require('../../utils/fallbackLogger');
@@ -9,6 +11,60 @@ const cmd = getCommandConfig('leaderboard') || {
   name: 'leaderboard',
   description: 'View the top collectors and catchers.'
 };
+
+function buildLeaderboardV2Components({
+  title,
+  description,
+  footer,
+  sortChoices,
+  selectedSort,
+  showEggType = false,
+  eggTypeChoices = [],
+  expired = false
+}) {
+  const container = new ContainerBuilder();
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`## ${String(title || 'Leaderboard')}`),
+    new TextDisplayBuilder().setContent(description && String(description).trim().length ? String(description) : 'No data.')
+  );
+
+  if (!expired) {
+    const sortOptions = (sortChoices || []).slice(0, 25).map(opt => ({
+      label: String(opt.label),
+      value: String(opt.value),
+      default: String(opt.value) === String(selectedSort)
+    }));
+
+    if (sortOptions.length > 0) {
+      container.addActionRowComponents(
+        new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId('leaderboard-sort')
+            .setPlaceholder('Sort by...')
+            .addOptions(...sortOptions)
+        )
+      );
+    }
+
+    if (showEggType && Array.isArray(eggTypeChoices) && eggTypeChoices.length > 0) {
+      const eggOptions = eggTypeChoices.slice(0, 25).map(opt => ({
+        label: String(opt.label),
+        value: String(opt.value)
+      }));
+      container.addActionRowComponents(
+        new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId('leaderboard-eggtype')
+            .setPlaceholder('Sort by egg type...')
+            .addOptions(...eggOptions)
+        )
+      );
+    }
+  }
+
+  if (footer) container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`_${String(footer)}${expired ? ' • View expired' : ''}_`));
+  return [container];
+}
 
 module.exports = {
   name: cmd.name,
@@ -65,6 +121,7 @@ module.exports = {
    },
 
   async executeInteraction(interaction) {
+    const logger = require('../../utils/logger').get('command:leaderboard');
     // determine subcommand (if any)
     let sub = null;
     try { sub = interaction.options && interaction.options.getSubcommand ? (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })() : null; } catch (e) { sub = null; }
@@ -189,7 +246,6 @@ module.exports = {
       const rank = idx >= 0 ? idx + 1 : 'Unranked';
       const currentTotal = (guildStats[String(guildId)] && ((sortOpt === 'eggs') ? guildStats[String(guildId)].total : (sortOpt.startsWith('eggtype_') ? (guildStats[String(guildId)].eggsByType[sortOpt.replace('eggtype_', '')] || 0) : (sortOpt === 'rarity' ? (() => { let s=0; for(const t of eggTypes){ s += (guildStats[String(guildId)].eggsByType[t.id]||0)*(t.rarity||1);} return s; })() : 0)))) || 0;
 
-      const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
       const sortChoices = [
         { label: 'Total Eggs', value: 'eggs' },
         { label: 'Fastest Catch', value: 'fastest' },
@@ -201,32 +257,25 @@ module.exports = {
         value: `eggtype_${e.id}`.length > 25 ? `eggtype_${e.id}`.slice(0, 22) + '...' : `eggtype_${e.id}`
       }));
       const sortLabel = ({ eggs: 'Total Eggs', rarity: 'Egg Rarity', fastest: 'Fastest Catch', slowest: 'Slowest Catch' }[sortOpt] || (sortOpt.startsWith('eggtype_') ? `Egg Type ${sortOpt.replace('eggtype_','')}` : sortOpt));
-      const embed = new EmbedBuilder()
-        .setTitle('🌐 Global Leaderboard')
-        .setDescription(desc || 'No server data.')
-        .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
-        .setFooter({ text: `This server: #${rank} / ${totalServers} — ${currentTotal} ${sortLabel ? `(${sortLabel})` : ''}` });
-
-      const select = new StringSelectMenuBuilder()
-        .setCustomId('leaderboard-sort')
-        .setPlaceholder('Sort by...')
-        .addOptions(sortChoices.slice(0, 25).map(opt => ({ label: opt.label, value: opt.value, default: opt.value === sortOpt })));
-      const components = [new ActionRowBuilder().addComponents(select)];
-      if (sortOpt === 'eggs') {
-        const eggTypeSelect = new StringSelectMenuBuilder()
-          .setCustomId('leaderboard-eggtype')
-          .setPlaceholder('Sort by egg type...')
-          .addOptions(eggTypeChoices.slice(0, 25).map(opt => ({ label: opt.label, value: opt.value })));
-        components.push(new ActionRowBuilder().addComponents(eggTypeSelect));
-      }
+      const footer = `This server: #${rank} / ${totalServers} — ${currentTotal} ${sortLabel ? `(${sortLabel})` : ''}`;
+      const components = buildLeaderboardV2Components({
+        title: '🌐 Global Leaderboard',
+        description: desc || 'No server data.',
+        footer,
+        sortChoices,
+        selectedSort: sortOpt,
+        showEggType: sortOpt === 'eggs',
+        eggTypeChoices,
+        expired: false
+      });
 
       if (interaction.isStringSelectMenu && interaction.isStringSelectMenu()) {
-        await interaction.update({ embeds: [embed], components });
+        await interaction.update({ components });
         return;
       }
 
-      await safeReply(interaction, { embeds: [embed], components }, { loggerName: 'command:leaderboard' });
-      const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [embed], components, time: 60_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 3 } });
+      await safeReply(interaction, { components, flags: MessageFlags.IsComponentsV2, ephemeral: cmd.ephemeral === true }, { loggerName: 'command:leaderboard' });
+      const { collector, message: msg } = await createInteractionCollector(interaction, { components, time: 60_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 3 } });
       if (!collector) {
         try { require('../../utils/logger').get('command:leaderboard').warn('Failed to attach global leaderboard collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach global leaderboard collector', le && (le.stack || le)); } catch (ignored) {} }
         return;
@@ -243,7 +292,22 @@ module.exports = {
         }
       });
       collector.on('end', async () => {
-        try { await msg.edit({ components: [] }); } catch (e) { try { require('../../utils/logger').get('command:leaderboard').warn('Failed clearing global leaderboard components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed clearing global leaderboard components after collector end', le && (le.stack || le)); } catch (ignored) {} } }
+        try {
+          await safeReply(interaction, {
+            components: buildLeaderboardV2Components({
+              title: '🌐 Global Leaderboard',
+              description: desc || 'No server data.',
+              footer,
+              sortChoices,
+              selectedSort: sortOpt,
+              showEggType: false,
+              eggTypeChoices,
+              expired: true
+            }),
+            flags: MessageFlags.IsComponentsV2,
+            ephemeral: cmd.ephemeral === true
+          }, { loggerName: 'command:leaderboard' });
+        } catch (e) { try { require('../../utils/logger').get('command:leaderboard').warn('Failed finalizing global leaderboard view after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed finalizing global leaderboard view after collector end', le && (le.stack || le)); } catch (ignored) {} } }
       });
       return;
     }
@@ -306,7 +370,6 @@ module.exports = {
         desc += `#${i + 1} ${userTag} — ${eggType.emoji} **${entry.eggs[type] || 0}**\n`;
       }
     }
-    const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
      const sortChoices = [
        { label: 'Total Eggs', value: 'eggs' },
        { label: 'Fastest Catch', value: 'fastest' },
@@ -317,33 +380,24 @@ module.exports = {
       label: `${e.name} Eggs`.length > 25 ? `${e.name} Eggs`.slice(0, 22) + '...' : `${e.name} Eggs`,
       value: `eggtype_${e.id}`.length > 25 ? `eggtype_${e.id}`.slice(0, 22) + '...' : `eggtype_${e.id}`
     }));
-    const embed = new EmbedBuilder()
-      .setTitle('🏆 Leaderboard')
-      .setDescription(desc || 'No data.')
-      .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
-      .setFooter({ text: `Sorted by: ${sortChoices.concat(eggTypeChoices).find(c => c.value === sort)?.label || sort}` });
-
-    const select = new StringSelectMenuBuilder()
-      .setCustomId('leaderboard-sort')
-      .setPlaceholder('Sort by...')
-      .addOptions(sortChoices.slice(0, 25).map(opt => ({ label: opt.label, value: opt.value, default: opt.value === sort })));
-
-    const components = [new ActionRowBuilder().addComponents(select)];
-    // Only show egg type select on total eggs leaderboard
-    if (sort === 'eggs') {
-      const eggTypeSelect = new StringSelectMenuBuilder()
-        .setCustomId('leaderboard-eggtype')
-        .setPlaceholder('Sort by egg type...')
-        .addOptions(eggTypeChoices.slice(0, 25).map(opt => ({ label: opt.label, value: opt.value })));
-      components.push(new ActionRowBuilder().addComponents(eggTypeSelect));
-    }
+    const footer = `Sorted by: ${sortChoices.concat(eggTypeChoices).find(c => c.value === sort)?.label || sort}`;
+    const components = buildLeaderboardV2Components({
+      title: '🏆 Leaderboard',
+      description: desc || 'No data.',
+      footer,
+      sortChoices,
+      selectedSort: sort,
+      showEggType: sort === 'eggs',
+      eggTypeChoices,
+      expired: false
+    });
 
     if (interaction.isStringSelectMenu && interaction.isStringSelectMenu()) {
-      await interaction.update({ embeds: [embed], components });
+      await interaction.update({ components });
     } else {
-      await safeReply(interaction, { embeds: [embed], components }, { loggerName: 'command:leaderboard' });
+      await safeReply(interaction, { components, flags: MessageFlags.IsComponentsV2, ephemeral: cmd.ephemeral === true }, { loggerName: 'command:leaderboard' });
       // Collector for sort menu
-      const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [embed], components, time: 60_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 3 } });
+      const { collector, message: msg } = await createInteractionCollector(interaction, { components, time: 60_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 3 } });
       if (!collector) {
         try { require('../../utils/logger').get('command:leaderboard').warn('Failed to attach leaderboard collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach leaderboard collector', le && (le.stack || le)); } catch (ignored) {} }
         return;
@@ -360,7 +414,22 @@ module.exports = {
         }
       });
       collector.on('end', async () => {
-        try { await msg.edit({ components: [] }); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing leaderboard components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard component clear failure', le && (le.stack || le)); } catch (ignored) {} } }
+        try {
+          await safeReply(interaction, {
+            components: buildLeaderboardV2Components({
+              title: '🏆 Leaderboard',
+              description: desc || 'No data.',
+              footer,
+              sortChoices,
+              selectedSort: sort,
+              showEggType: false,
+              eggTypeChoices,
+              expired: true
+            }),
+            flags: MessageFlags.IsComponentsV2,
+            ephemeral: cmd.ephemeral === true
+          }, { loggerName: 'command:leaderboard' });
+        } catch (e) { try { logger && logger.warn && logger.warn('Failed finalizing leaderboard view after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard finalization failure', le && (le.stack || le)); } catch (ignored) {} } }
       });
     }
   }
