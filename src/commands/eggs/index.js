@@ -44,7 +44,7 @@ module.exports = {
           name: 'collect',
           description: 'Collect a finished hatch',
           options: [
-            { type: 3, name: 'egg', description: 'Select a ready hatch to collect', required: true, autocomplete: true }
+            { type: 3, name: 'ready_hatch', description: 'Choose a ready hatch', required: true, autocomplete: true }
           ]
         }
     ]
@@ -154,7 +154,7 @@ module.exports = {
 
         if (sub === 'collect') {
           await interaction.deferReply({ ephemeral: true });
-          const idStr = interaction.options.getString('egg');
+          const idStr = interaction.options.getString('ready_hatch');
           const id = Number.parseInt(idStr, 10);
           if (!id || Number.isNaN(id)) {
             const safeReply = require('../../utils/safeReply');
