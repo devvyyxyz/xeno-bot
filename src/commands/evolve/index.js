@@ -16,13 +16,13 @@ module.exports = {
     .setDescription(cmd.description)
     .addSubcommands(sub =>
       sub.setName('start')
-        .setDescription('Start an evolution')
-        .addIntegerOptions(opt => opt.setName('xeno_id').setDescription('Xenomorph id').setRequired(true).setAutocomplete(true))
-        .addStringOptions(opt => opt.setName('target').setDescription('Target role').setRequired(true).setAutocomplete(true))
-        .addIntegerOptions(opt => opt.setName('host_id').setDescription('Host id (required for some stages)').setRequired(false).setAutocomplete(true))
+        .setDescription('Start the next evolution step for a xenomorph')
+        .addIntegerOptions(opt => opt.setName('xenomorph').setDescription('Which xenomorph to evolve').setRequired(true).setAutocomplete(true))
+        .addStringOptions(opt => opt.setName('next_stage').setDescription('Next stage to evolve into').setRequired(true).setAutocomplete(true))
+        .addIntegerOptions(opt => opt.setName('host').setDescription('Host to consume (required for some pathways)').setRequired(false).setAutocomplete(true))
     )
     .addSubcommands(sub => sub.setName('list').setDescription('List your xenomorphs'))
-    .addSubcommands(sub => sub.setName('info').setDescription('Show evolution info').addIntegerOptions(opt => opt.setName('xeno_id').setDescription('Xenomorph id').setRequired(true).setAutocomplete(true)))
+    .addSubcommands(sub => sub.setName('info').setDescription('Show evolution info').addIntegerOptions(opt => opt.setName('xenomorph').setDescription('Xenomorph id').setRequired(true).setAutocomplete(true)))
     .addSubcommands(sub => sub.setName('cancel').setDescription('Cancel an ongoing evolution').addIntegerOptions(opt => opt.setName('job_id').setDescription('Evolution job id').setRequired(true).setAutocomplete(true))),
 
   async executeInteraction(interaction) {
@@ -48,12 +48,19 @@ module.exports = {
       }
 
       if (sub === 'start') {
-        const xenoId = interaction.options.getInteger('xeno_id');
-        const hostId = interaction.options.getInteger('host_id');
-        const target = interaction.options.getString('target');
+        const xenoId = interaction.options.getInteger('xenomorph');
+        const hostId = interaction.options.getInteger('host');
+        const target = String(interaction.options.getString('next_stage') || '').trim().toLowerCase();
         const xeno = await xenoModel.getById(xenoId);
         if (!xeno) return interaction.editReply({ content: 'Xenomorph not found.' });
         if (String(xeno.owner_id) !== userId) return interaction.editReply({ content: 'You do not own this xenomorph.' });
+
+        const existingJob = await db.knex('evolution_queue')
+          .where({ xeno_id: xenoId, user_id: userId, status: 'queued' })
+          .first();
+        if (existingJob) {
+          return interaction.editReply({ content: `This xenomorph already has a queued evolution (job #${existingJob.id}).` });
+        }
 
         const evol = require('../../../config/evolutions.json');
         const pathwayKey = String(xeno.pathway || 'standard');
@@ -66,7 +73,7 @@ module.exports = {
         }
 
         if (Array.isArray(stepReq.requires_host_types) && stepReq.requires_host_types.length > 0) {
-          if (!hostId) return interaction.editReply({ content: `This evolution requires a host (${stepReq.requires_host_types.join(', ')}). Provide host_id.` });
+          if (!hostId) return interaction.editReply({ content: `This evolution requires a host (${stepReq.requires_host_types.join(', ')}). Provide the host option.` });
           const host = await hostModel.getHostById(hostId);
           if (!host) return interaction.editReply({ content: 'Host not found.' });
           if (String(host.owner_id) !== userId) return interaction.editReply({ content: 'You do not own this host.' });
@@ -89,11 +96,12 @@ module.exports = {
         const finishes = now + defaults.time_ms;
         const inserted = await db.knex('evolution_queue').insert({ xeno_id: xenoId, user_id: userId, hive_id: xeno.hive_id || null, target_role: target, started_at: now, finishes_at: finishes, cost_jelly: defaults.cost_jelly, stabilizer_used: false, status: 'queued' });
         const id = Array.isArray(inserted) ? inserted[0] : inserted;
-        return interaction.editReply({ content: `Evolution started (job #${id}). It will finish in ~${Math.round(defaults.time_ms / 60000)} minutes.` });
+        const hostPart = hostId ? ` Host #${hostId} consumed.` : '';
+        return interaction.editReply({ content: `Evolution started (job #${id}) for xeno #${xenoId} → ${target}. Cost: ${defaults.cost_jelly} royal jelly.${hostPart} Finishes in ~${Math.round(defaults.time_ms / 60000)} minutes.` });
       }
 
       if (sub === 'info') {
-        const xenoId = interaction.options.getInteger('xeno_id');
+        const xenoId = interaction.options.getInteger('xenomorph');
         const xeno = await xenoModel.getById(xenoId);
         if (!xeno) return interaction.editReply({ content: 'Xenomorph not found.' });
         // Describe evolution pathway using config/evolutions.json
@@ -159,7 +167,7 @@ module.exports = {
       const isNumeric = /^[0-9]+$/.test(focused);
 
       // START / INFO: if numeric focused -> suggest xeno ids
-      if ((sub === 'start' || sub === 'info') && isNumeric && (focusedName === 'xeno_id' || !focusedName)) {
+      if ((sub === 'start' || sub === 'info') && (focusedName === 'xenomorph' || (!focusedName && isNumeric))) {
         try {
           const list = await xenoModel.listByOwner(String(userId));
           if (!list || list.length === 0) return autocomplete(interaction, [], { map: it => ({ name: `${it.id} ${it.role || it.stage}`, value: it.id }), max: 25 });
@@ -169,10 +177,10 @@ module.exports = {
       }
 
       // START: target autocomplete — if non-numeric focused, suggest roles from evolutions config
-      if (sub === 'start' && focusedName === 'target') {
+      if (sub === 'start' && focusedName === 'next_stage') {
         try {
           const evol = require('../../../config/evolutions.json');
-          const xenoId = interaction.options.getInteger('xeno_id');
+          const xenoId = interaction.options.getInteger('xenomorph');
           let targets = [];
           if (xenoId) {
             const xeno = await xenoModel.getById(xenoId);
@@ -194,7 +202,7 @@ module.exports = {
         } catch (e) { try { await interaction.respond([]); } catch (_) {} return; }
       }
 
-      if (sub === 'start' && focusedName === 'host_id') {
+      if (sub === 'start' && focusedName === 'host') {
         try {
           const rows = await hostModel.listHostsByOwner(String(userId));
           const items = rows.slice(0, 25).map(r => ({ id: String(r.id), name: `#${r.id} ${r.host_type}` }));
