@@ -6,6 +6,7 @@ const hostModel = require('../../models/host');
 const xenoModel = require('../../models/xenomorph');
 const emojis = require('../../../config/emojis.json');
 const { getCommandConfig } = require('../../utils/commandsConfig');
+const { buildNoticeV2Payload, buildStatsV2Payload } = require('../../utils/componentsV2');
 const cmd = getCommandConfig('setup') || { name: 'setup', description: 'Manage bot settings for this server' };
 const logger = require('../../utils/logger').get('command:setup');
 const fallbackLogger = require('../../utils/fallbackLogger');
@@ -102,13 +103,19 @@ module.exports = {
 ,
   async executeInteraction(interaction) {
     const safeReply = require('../../utils/safeReply');
+    const sendSetupNotice = async (target, message, tone = 'info', title = null) => {
+      return safeReply(target, {
+        ...buildNoticeV2Payload({ title, message, tone }),
+        ephemeral: true
+      }, { loggerName: 'command:setup' });
+    };
     const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
     const subCfg = sub ? (getCommandConfig(`setup ${sub}`) || getCommandConfig(`setup.${sub}`)) : null;
     if (subCfg && subCfg.developerOnly) {
       const cfg = require('../../../config/config.json');
       const ownerId = (cfg && cfg.owner) ? String(cfg.owner) : null;
       if (!ownerId || interaction.user.id !== ownerId) {
-        await safeReply(interaction, { content: 'Only the bot developer/owner can run this subcommand.', ephemeral: true }, { loggerName: 'command:setup' });
+        await sendSetupNotice(interaction, 'Only the bot developer/owner can run this subcommand.', 'permission');
         return;
       }
     }
@@ -117,7 +124,7 @@ module.exports = {
     const ownerId = resolveOwnerId();
     const isOwnerBypass = ownerId && String(interaction.user.id) === String(ownerId);
     if (!isOwnerBypass && memberPerms && !memberPerms.has(PermissionsBitField.Flags.ManageGuild) && interaction.user.id !== interaction.guild.ownerId) {
-      await safeReply(interaction, { content: 'You need Manage Server permission to run this.', ephemeral: true }, { loggerName: 'command:setup' });
+      await sendSetupNotice(interaction, 'You need Manage Server permission to run this.', 'permission');
       return;
     }
 
@@ -157,19 +164,16 @@ module.exports = {
           } catch (xenoErr) {
             require('../../utils/logger').get('command:setup').warn('Failed to remove user xenomorphs during reset', { error: xenoErr && (xenoErr.stack || xenoErr) });
           }
-          const safeReply = require('../../utils/safeReply');
-          await safeReply(interaction, { content: `Reset ${target.username}'s data to default values for this server. Removed hosts and xenomorphs owned by the user.`, ephemeral: true }, { loggerName: 'command:setup' });
+          await sendSetupNotice(interaction, `Reset ${target.username}'s data to default values for this server. Removed hosts and xenomorphs owned by the user.`, 'info', '✅ Reset Complete');
         } catch (err) {
-          const safeReply = require('../../utils/safeReply');
-          await safeReply(interaction, { content: `Failed to reset user: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:setup' });
+          await sendSetupNotice(interaction, `Failed to reset user: ${err && (err.message || err)}`, 'error');
         }
         return;
       } else {
         // server reset
         const defaults = require('../../../config/guildDefaults.json');
         await guildModel.upsertGuildConfig(interaction.guildId, { ...defaults });
-        const safeReply = require('../../utils/safeReply');
-        await safeReply(interaction, { content: `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Server settings reset to default values.`, ephemeral: true }, { loggerName: 'command:setup' });
+        await sendSetupNotice(interaction, `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Server settings reset to default values.`, 'info', '✅ Reset Complete');
         return;
       }
     }
@@ -181,11 +185,9 @@ module.exports = {
         const data = existing.data || {};
         data.delete_spawn_message = enabled === true;
         await guildModel.upsertGuildConfig(interaction.guildId, { data });
-        const safeReply = require('../../utils/safeReply');
-        await safeReply(interaction, { content: `Spawn message deletion after catch is now ${enabled ? 'enabled' : 'disabled'}.`, ephemeral: true }, { loggerName: 'command:setup' });
+        await sendSetupNotice(interaction, `Spawn message deletion after catch is now ${enabled ? 'enabled' : 'disabled'}.`, 'info');
       } catch (e) {
-        const safeReply = require('../../utils/safeReply');
-        await safeReply(interaction, { content: `Failed to update setting: ${e && (e.message || e)}`, ephemeral: true }, { loggerName: 'command:setup' });
+        await sendSetupNotice(interaction, `Failed to update setting: ${e && (e.message || e)}`, 'error');
       }
       return;
     }
@@ -193,8 +195,7 @@ module.exports = {
     if (sub === 'channel') {
       const channel = interaction.options.getChannel('channel');
       if (!channel) {
-        const safeReply = require('../../utils/safeReply');
-        await safeReply(interaction, { content: 'Please specify a valid text channel.', ephemeral: true }, { loggerName: 'command:setup' });
+        await sendSetupNotice(interaction, 'Please specify a valid text channel.', 'requirement');
         return;
       }
       const baseLogger = require('../../utils/logger');
@@ -205,8 +206,7 @@ module.exports = {
       if (baseLogger && baseLogger.sentry) {
         try { baseLogger.sentry.addBreadcrumb({ message: 'db.upsertGuild.finish', category: 'db', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.upsertGuild.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging breadcrumb failure (db.upsertGuild.finish)', le && (le.stack || le)); } catch (ignored) {} } }
       }
-      const safeReply = require('../../utils/safeReply');
-      await safeReply(interaction, { content: `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Egg spawn channel set to ${channel}.`, ephemeral: true }, { loggerName: 'command:setup' });
+      await sendSetupNotice(interaction, `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Egg spawn channel set to ${channel}.`, 'info');
         // Immediately spawn an egg in the new channel
         try {
           const spawnManager = require('../../spawnManager');
@@ -231,18 +231,15 @@ module.exports = {
       }
       // validate (values are in seconds now)
       if (min < 30) {
-        const safeReply = require('../../utils/safeReply');
-        await safeReply(interaction, { content: `Minimum must be at least 30 seconds.`, ephemeral: true }, { loggerName: 'command:setup' });
+        await sendSetupNotice(interaction, 'Minimum must be at least 30 seconds.', 'requirement');
         return;
       }
       if (max > 21600) {
-        const safeReply = require('../../utils/safeReply');
-        await safeReply(interaction, { content: `Maximum cannot exceed 21600 seconds (6 hours).`, ephemeral: true }, { loggerName: 'command:setup' });
+        await sendSetupNotice(interaction, 'Maximum cannot exceed 21600 seconds (6 hours).', 'requirement');
         return;
       }
       if (min > max) {
-        const safeReply = require('../../utils/safeReply');
-        await safeReply(interaction, { content: `Minimum cannot be greater than maximum.`, ephemeral: true }, { loggerName: 'command:setup' });
+        await sendSetupNotice(interaction, 'Minimum cannot be greater than maximum.', 'requirement');
         return;
       }
       await guildModel.upsertGuildConfig(interaction.guildId, { spawn_min_seconds: min, spawn_max_seconds: max });
@@ -250,7 +247,7 @@ module.exports = {
         const spawnManager = require('../../spawnManager');
         if (spawnManager && typeof spawnManager.requestReschedule === 'function') spawnManager.requestReschedule(interaction.guildId);
       } catch (e) { try { require('../../utils/logger').get('command:setup').warn('Failed to request spawn reschedule', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging requestReschedule error in setup', le && (le.stack || le)); } catch (ignored) {} } }
-      await safeReply(interaction, { content: `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Spawn rate set: min ${min}s, max ${max}s. (interpreted as ${units})`, ephemeral: true }, { loggerName: 'command:setup' });
+      await sendSetupNotice(interaction, `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Spawn rate set: min ${min}s, max ${max}s. (interpreted as ${units})`, 'info');
     } else if (sub === 'egg-limit') {
       const num = interaction.options.getInteger('number');
       await guildModel.upsertGuildConfig(interaction.guildId, { egg_limit: num });
@@ -258,31 +255,33 @@ module.exports = {
         const spawnManager = require('../../spawnManager');
         if (spawnManager && typeof spawnManager.requestReschedule === 'function') spawnManager.requestReschedule(interaction.guildId);
       } catch (e) { try { require('../../utils/logger').get('command:setup').warn('Failed to request spawn reschedule', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging requestReschedule error in setup', le && (le.stack || le)); } catch (ignored) {} } }
-      await safeReply(interaction, { content: `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Egg limit set to ${num}.`, ephemeral: true }, { loggerName: 'command:setup' });
+      await sendSetupNotice(interaction, `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Egg limit set to ${num}.`, 'info');
     } else {
       if (sub === 'details') {
         try {
-          const safeReply = require('../../utils/safeReply');
-          const { EmbedBuilder } = require('discord.js');
           const guildId = interaction.guildId;
           const cfg = await guildModel.getGuildConfig(guildId) || {};
           let nextSpawn = null;
           try { const row = await require('../../db').knex('guild_settings').where({ guild_id: guildId }).first('next_spawn_at'); nextSpawn = row && row.next_spawn_at ? Number(row.next_spawn_at) : null; } catch (e) {}
-          const embed = new EmbedBuilder()
-            .setTitle(`Setup for ${interaction.guild?.name || guildId}`)
-            .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
-            .addFields(
-              { name: 'Spawn Channel', value: cfg.channel_id ? `<#${cfg.channel_id}>` : 'Not set', inline: true },
-              { name: 'Egg Limit', value: String(cfg.egg_limit ?? '1'), inline: true },
-              { name: 'Spawn Min / Max (s)', value: `${cfg.spawn_min_seconds ?? '60'} / ${cfg.spawn_max_seconds ?? '3600'}`, inline: true }
-            )
-            .setTimestamp();
-          if (nextSpawn) embed.addFields({ name: 'Next scheduled spawn', value: new Date(nextSpawn).toLocaleString(), inline: true });
-          if (cfg && cfg.data && cfg.data.botAvatar) embed.setThumbnail(cfg.data.botAvatar);
-          await safeReply(interaction, { embeds: [embed] });
+
+          const rows = [
+            { label: 'Spawn Channel', value: cfg.channel_id ? `<#${cfg.channel_id}>` : 'Not set' },
+            { label: 'Egg Limit', value: String(cfg.egg_limit ?? '1') },
+            { label: 'Spawn Min / Max (s)', value: `${cfg.spawn_min_seconds ?? '60'} / ${cfg.spawn_max_seconds ?? '3600'}` }
+          ];
+          if (nextSpawn) rows.push({ label: 'Next scheduled spawn', value: new Date(nextSpawn).toLocaleString() });
+          if (cfg && cfg.data && cfg.data.botAvatar) rows.push({ label: 'Avatar URL', value: String(cfg.data.botAvatar) });
+
+          await safeReply(interaction, {
+            ...buildStatsV2Payload({
+              title: `Setup for ${interaction.guild?.name || guildId}`,
+              rows,
+              footer: 'Setup details'
+            }),
+            ephemeral: true
+          }, { loggerName: 'command:setup' });
         } catch (e) {
-          const safeReply = require('../../utils/safeReply');
-          await safeReply(interaction, { content: `Failed to fetch setup details: ${e && (e.message || e)}`, ephemeral: true }, { loggerName: 'command:setup' });
+          await sendSetupNotice(interaction, `Failed to fetch setup details: ${e && (e.message || e)}`, 'error');
         }
         return;
       }
@@ -291,8 +290,7 @@ module.exports = {
         const attachment = interaction.options.getAttachment('image');
         const url = attachment?.url || interaction.options.getString('url');
         if (!url) {
-          const safeReply = require('../../utils/safeReply');
-          await safeReply(interaction, { content: 'Please provide an image (attachment) or a URL.', ephemeral: true }, { loggerName: 'command:setup' });
+          await sendSetupNotice(interaction, 'Please provide an image (attachment) or a URL.', 'requirement');
           return;
         }
         // store in guild config under data.botAvatar
@@ -319,13 +317,13 @@ module.exports = {
         }
 
         if (applied) {
-          await safeReply(interaction, { content: 'Bot avatar updated for this server.', ephemeral: true }, { loggerName: 'command:setup' });
+          await sendSetupNotice(interaction, 'Bot avatar updated for this server.', 'info');
         } else {
-          await safeReply(interaction, { content: 'Saved avatar to server config. Applying it automatically is not supported by this runtime; the avatar will be used where supported.', ephemeral: true }, { loggerName: 'command:setup' });
+          await sendSetupNotice(interaction, 'Saved avatar to server config. Applying it automatically is not supported by this runtime; the avatar will be used where supported.', 'info');
         }
         return;
       }
-      await safeReply(interaction, { content: 'Unknown subcommand.', ephemeral: true }, { loggerName: 'command:setup' });
+      await sendSetupNotice(interaction, 'Unknown subcommand.', 'error');
     }
   },
 
