@@ -49,6 +49,30 @@ function getCommandConfig(key) {
 
   // drill into nested path: allow either a `subcommands` map or direct nested keys
   let node = baseConfig;
+
+  // If there are remaining parts, try to resolve the remainder as a single subcommand
+  if (parts.length > 1 && node && node.subcommands && typeof node.subcommands === 'object') {
+    const remainderParts = parts.slice(1);
+    const remainder = remainderParts.join(' ');
+    const altKeys = [remainder, remainderParts.join('_'), remainderParts.join('-'), remainderParts.join('')];
+    for (const k of altKeys) {
+      if (Object.prototype.hasOwnProperty.call(node.subcommands, k)) return node.subcommands[k];
+    }
+
+    const normalize = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+    const remNorm = normalize(remainder);
+    for (const [k, v] of Object.entries(node.subcommands)) {
+      if (Object.prototype.hasOwnProperty.call(node.subcommands, k)) {
+        if (v && typeof v.name === 'string') {
+          if (normalize(v.name).endsWith(remNorm) || normalize(k) === remNorm) return v;
+        } else if (normalize(k) === remNorm) {
+          return node.subcommands[k];
+        }
+      }
+    }
+  }
+
+  // Fallback: attempt to drill piece-by-piece (for truly nested structures)
   for (let i = 1; i < parts.length; i++) {
     const p = parts[i];
     if (node && node.subcommands && Object.prototype.hasOwnProperty.call(node.subcommands, p)) {
@@ -59,7 +83,6 @@ function getCommandConfig(key) {
       node = node[p];
       continue;
     }
-    // not found
     return undefined;
   }
   return node;
