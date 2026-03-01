@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Xeno Bot — Dashboard</title>
+    <style>
+      :root{--bg:#000;--panel:#07070a;--muted:#9aa4b2;--accent:#bbae5d}
+      html,body{height:100%}
+      body{margin:0;font-family:Inter,system-ui,-apple-system,Roboto,Arial;background:linear-gradient(180deg,#000,#05050a);color:#e6eef6}
+      .container{width:100%;max-width:1200px;margin:0 auto;padding:22px}
+      header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+      h1{margin:0;font-size:18px}
+      .lead{color:var(--muted);font-size:13px}
+      .sidebar{width:300px;display:flex;flex-direction:column;gap:12px}
+      .left{background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.02);min-height:560px}
+      .right{background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,0.02);min-height:560px}
+      .guild-list{display:flex;flex-direction:column;gap:8px;overflow:auto;max-height:56vh;padding-right:6px}
+      .guild{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;background:var(--panel);border:1px solid rgba(255,255,255,0.02);cursor:pointer}
+      .guild:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+      .avatar{width:44px;height:44px;border-radius:8px;background:linear-gradient(180deg,#0b0b0b,#111);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--muted)}
+      .muted{color:var(--muted);font-size:13px}
+      .btn{background:var(--accent);color:#0b0b00;padding:8px 12px;border-radius:8px;border:none;font-weight:700;cursor:pointer}
+      .pill{display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.02);color:var(--muted);font-size:13px}
+      .settings .row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+      label{font-weight:600}
+      input[type=checkbox]{width:18px;height:18px}
+      @media(max-width:900px){.container{padding:12px}.sidebar{width:100%}.left,.right{min-height:auto}}
+    </style>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div>
+          <h1>Xeno Bot — Dashboard</h1>
+          <div class="lead">Select a guild to edit its settings</div>
+        </div>
+        <div>
+          <a class="link" href="/">Home</a>
+        </div>
+      </header>
+
+      <main class="dashboard-shell">
+        <aside class="left-nav">
+          <div class="nav-top">
+            <div class="logo-small"><img src="/assets/images/banners/LV-426.png" alt="logo" /></div>
+            <div class="server-select">
+                <select id="server-select" class="server-select-dropdown">
+                  <option value="">Select server</option>
+                </select>
+              </div>
+          </div>
+          <div id="guilds" class="guild-list" style="margin-top:12px"><div class="muted">Loading...</div></div>
+
+          <nav class="nav-list">
+            <div class="nav-section">ESSENTIALS</div>
+            <a class="nav-item active" href="#">Dashboard</a>
+            <a class="nav-item" href="#">Leaderboard</a>
+            <a class="nav-item" href="#">Bot Personalizer</a>
+            <div class="nav-section">SERVER MANAGEMENT</div>
+            <a class="nav-item" href="#">Automations</a>
+            <a class="nav-item" href="#">Custom Commands</a>
+            <a class="nav-item" href="#">Invite Tracker</a>
+          </nav>
+
+          <div class="nav-bottom">
+            <a class="pill" href="/invite">Invite</a>
+          </div>
+        </aside>
+
+        <section class="main-panel">
+          <header class="panel-header">
+            <h2>Custom Commands</h2>
+            <div class="toggle"><label>Active</label><input type="checkbox" checked /></div>
+          </header>
+
+          <div class="panel-card large">
+            <div class="card-inner">
+              <div class="card-title">New custom command</div>
+              <div class="card-body muted">Your commands</div>
+              <div class="empty-illustration"> <!-- placeholder -->
+                <img src="/assets/images/banners/LV-426.png" alt="illustration" />
+                <div class="muted">Create your own Bot commands</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/dashboard.js" defer></script>
+  </body>
+</html>

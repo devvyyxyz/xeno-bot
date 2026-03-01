@@ -215,6 +215,43 @@ async function migrate() {
     throw err;
   }
 
+  // sessions table for dashboard/session storage
+  try {
+    const hasSessions = await knex.schema.hasTable('sessions');
+    if (!hasSessions) {
+      await knex.schema.createTable('sessions', (table) => {
+        table.string('sid').primary();
+        table.text('sess');
+        table.bigInteger('expires');
+        table.timestamps(true, true);
+      });
+      logger.info('Created `sessions` table');
+    } else {
+      logger.info('`sessions` table already exists');
+    }
+  } catch (err) {
+    logger.error('Failed ensuring sessions table', { error: err.stack || err });
+    throw err;
+  }
+
+  // bot_guilds table: cache of guild ids the bot is present in (populated by the bot or by the dashboard checks)
+  try {
+    const hasBotGuilds = await knex.schema.hasTable('bot_guilds');
+    if (!hasBotGuilds) {
+      await knex.schema.createTable('bot_guilds', (table) => {
+        table.string('guild_id').primary();
+        table.bigInteger('cached_at').notNullable();
+        table.timestamps(true, true);
+      });
+      logger.info('Created `bot_guilds` table');
+    } else {
+      logger.info('`bot_guilds` table already exists');
+    }
+  } catch (err) {
+    logger.error('Failed ensuring bot_guilds table', { error: err.stack || err });
+    throw err;
+  }
+
   // hatches table: persist egg hatching jobs so they survive restarts
   try {
     const hasHatches = await knex.schema.hasTable('hatches');
