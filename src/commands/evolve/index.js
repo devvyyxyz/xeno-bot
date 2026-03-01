@@ -50,7 +50,8 @@ function buildNavigationRow({ screen = 'list', disabled = false }) {
     new SecondaryButtonBuilder().setCustomId('evolve-nav-list').setLabel('List').setDisabled(disabled || screen === 'list'),
     new SecondaryButtonBuilder().setCustomId('evolve-nav-info').setLabel('Info').setDisabled(disabled || screen === 'info'),
     new SecondaryButtonBuilder().setCustomId('evolve-nav-cancel').setLabel('Cancel Jobs').setDisabled(disabled || screen === 'cancel'),
-    new SecondaryButtonBuilder().setCustomId('evolve-nav-start').setLabel('Start Help').setDisabled(disabled || screen === 'start-help')
+    new SecondaryButtonBuilder().setCustomId('evolve-nav-start').setLabel('Start Help').setDisabled(disabled || screen === 'start-help'),
+    new SecondaryButtonBuilder().setCustomId('evolve-new-xeno').setLabel('Evolve New').setDisabled(disabled)
   );
 }
 
@@ -334,6 +335,10 @@ module.exports = {
             return;
           }
           if (i.customId === 'evolve-nav-start') {
+            await i.update({ components: buildEvolveView({ screen: 'start-help' }) });
+            return;
+          }
+          if (i.customId === 'evolve-new-xeno') {
             await i.update({ components: buildEvolveView({ screen: 'start-help' }) });
             return;
           }
