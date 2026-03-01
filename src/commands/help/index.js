@@ -159,10 +159,22 @@ module.exports = {
 
     const built = await buildEmbed(initialCategory, commands);
 
+    const commandsCfg = getCommandsObject();
+    const catEmojis = (commandsCfg && commandsCfg.categoryEmojis) || {};
     const select = new StringSelectMenuBuilder()
       .setCustomId('help-category')
       .setPlaceholder('Select a command category')
-      .addOptions(categories.slice(0, 25).map(cat => ({ label: cat, value: cat })));
+      .addOptions(categories.slice(0, 25).map(cat => {
+        const opt = { label: cat, value: cat };
+        const raw = catEmojis[cat];
+        if (raw && typeof raw === 'string') {
+          // parse custom emoji like <:name:id>
+          const m = raw.match(/^<:([^:>]+):([0-9]+)>$/);
+          if (m) opt.emoji = { name: m[1], id: m[2] };
+          else opt.emoji = raw; // fallback (unicode)
+        }
+        return opt;
+      }));
 
     const row = new ActionRowBuilder().addComponents(select);
     const navRow = new ActionRowBuilder().addComponents(
