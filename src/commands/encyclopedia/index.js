@@ -4,6 +4,7 @@ const fallbackLogger = require('../../utils/fallbackLogger');
 const eggModel = require('../../models/egg');
 const emojis = require('../../utils/emojis');
 const createInteractionCollector = require('../../utils/collectorHelper');
+const safeReply = require('../../utils/safeReply');
 
 const cmd = getCommandConfig('encyclopedia') || {
   name: 'encyclopedia',
@@ -113,7 +114,7 @@ module.exports = {
       new SecondaryButtonBuilder().setCustomId('view-eggs').setLabel('Eggs').setDisabled(currentView === 'eggs'),
       new SecondaryButtonBuilder().setCustomId('view-hosts').setLabel('Hosts').setDisabled(currentView === 'hosts')
     );
-    await interaction.editReply({ embeds: [getEmbed(page)], components: [row] });
+    await safeReply(interaction, { embeds: [getEmbed(page)], components: [row] }, { loggerName: 'command:encyclopedia' });
     if (pages.length === 1) return;
     const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [getEmbed(page)], components: [row], time: 120_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 2 } });
     if (!collector) {
@@ -121,7 +122,7 @@ module.exports = {
       return;
     }
     collector.on('collect', async i => {
-      if (i.user.id !== interaction.user.id) return i.reply({ content: 'Only the command user can change pages.', ephemeral: true });
+      if (i.user.id !== interaction.user.id) return safeReply(i, { content: 'Only the command user can change pages.', ephemeral: true }, { loggerName: 'command:encyclopedia' });
       try {
         if (i.customId === 'prev') {
           if (currentView === 'eggs') { if (page > 0) page--; }
@@ -155,11 +156,11 @@ module.exports = {
 
         await i.update({ embeds: [embedToSend], components: [newRow] });
       } catch (err) {
-        try { await i.reply({ content: 'Error changing view.', ephemeral: true }); } catch (_) {}
+        try { await safeReply(i, { content: 'Error changing view.', ephemeral: true }, { loggerName: 'command:encyclopedia' }); } catch (_) {}
       }
     });
     collector.on('end', async () => {
-      try { await interaction.editReply({ components: [] }); } catch (e) { try { const l = require('../../utils/logger').get('command:encyclopedia'); l && l.warn && l.warn('Failed clearing components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging encyclopedia component clear failure', le && (le.stack || le)); } catch (ignored) {} } }
+      try { await safeReply(interaction, { components: [] }, { loggerName: 'command:encyclopedia' }); } catch (e) { try { const l = require('../../utils/logger').get('command:encyclopedia'); l && l.warn && l.warn('Failed clearing components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging encyclopedia component clear failure', le && (le.stack || le)); } catch (ignored) {} } }
     });
   }
 };

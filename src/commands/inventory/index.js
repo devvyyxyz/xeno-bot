@@ -20,6 +20,7 @@ const eggTypes = require('../../../config/eggTypes.json');
 const userModel = require('../../models/user');
 const hostModel = require('../../models/host');
 const xenoModel = require('../../models/xenomorph');
+const safeReply = require('../../utils/safeReply');
 
 const cmd = getCommandConfig('inventory') || { name: 'inventory', description: 'Show your egg inventory or another user\'s.' };
 const shopConfig = require('../../../config/shop.json');
@@ -230,18 +231,15 @@ module.exports = {
     );
 
     try {
-      await interaction.editReply({ components: messageComponents, flags: MessageFlags.IsComponentsV2 });
+      await safeReply(interaction, { components: messageComponents, flags: MessageFlags.IsComponentsV2 }, { loggerName: 'command:inventory' });
     } catch (err) {
       const logger = require('../../utils/logger').get('command:inventory');
       logger.warn('Inventory V2 components rejected, using minimal V2 fallback', { error: err && (err.stack || err) });
       try {
-        await interaction.editReply({ components: [new TextDisplayBuilder().setContent(`**${target.username}'s Inventory**\n${formatInventory(eggs)}`)], flags: MessageFlags.IsComponentsV2 });
+        await safeReply(interaction, { components: [new TextDisplayBuilder().setContent(`**${target.username}'s Inventory**\n${formatInventory(eggs)}`)], flags: MessageFlags.IsComponentsV2 }, { loggerName: 'command:inventory' });
         return;
       } catch (err2) {
-        try {
-          const safeReply = require('../../utils/safeReply');
-          await safeReply(interaction, { content: 'Failed to render inventory.' }, { loggerName: 'command:inventory' });
-        } catch (e) { try { require('../../utils/logger').get('command:inventory').warn('Failed to editReply in inventory command', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging editReply error in inventory', le && (le.stack || le)); } catch (ignored) {} } }
+        try { await safeReply(interaction, { content: 'Failed to render inventory.' }, { loggerName: 'command:inventory' }); } catch (e) { try { require('../../utils/logger').get('command:inventory').warn('Failed to editReply in inventory command', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging editReply error in inventory', le && (le.stack || le)); } catch (ignored) {} } }
         throw err2;
       }
     }
@@ -254,7 +252,6 @@ module.exports = {
     }
     collector.on('collect', async i => {
       if (i.user.id !== interaction.user.id) {
-        const safeReply = require('../../utils/safeReply');
         return safeReply(i, { content: 'Only the command user can interact with this view.', ephemeral: true }, { loggerName: 'command:inventory' });
       }
       try {
@@ -314,7 +311,7 @@ module.exports = {
           { royal_jelly: balRoyal, credits: balCredits },
           { showControls: false }
         );
-        await interaction.editReply({ components: finalBlocks, flags: MessageFlags.IsComponentsV2 });
+        await safeReply(interaction, { components: finalBlocks, flags: MessageFlags.IsComponentsV2 }, { loggerName: 'command:inventory' });
       } catch (e) {
         try { require('../../utils/logger').get('command:inventory').warn('Failed finalizing inventory view after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging inventory finalization error', le && (le.stack || le)); } catch (ignored) {} }
       }

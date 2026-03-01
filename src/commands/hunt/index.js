@@ -65,7 +65,6 @@ module.exports = {
 
         // Use collector helper to attach a select menu collector
         let msg = null;
-        try { msg = await interaction.reply({ embeds: [embed], components: [row], ephemeral: true, fetchReply: true }); } catch (e) { /* fallback handled below */ }
         const { collector, message: _msg } = await createInteractionCollector(interaction, { embeds: [embed], components: [row], time: 60_000, ephemeral: true, edit: true, collectorOptions: { componentType: 3 } });
         if (!msg && _msg) msg = _msg;
         if (!collector) return safeReply(interaction, { content: 'Failed creating inventory view.', ephemeral: true });

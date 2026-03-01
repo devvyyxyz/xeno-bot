@@ -225,11 +225,11 @@ module.exports = {
     let page = 0;
 
     try {
-      await interaction.reply({
+      await safeReply(interaction, {
         components: buildHelpComponents(currentCategory, pages, page, false),
         flags: MessageFlags.IsComponentsV2,
         ephemeral: cmd.ephemeral === true
-      });
+      }, { loggerName: 'command:help' });
     } catch (e) {
       try {
         logger.warn('Help V2 payload failed, using plain text fallback', { error: e && (e.stack || e) });
@@ -281,10 +281,10 @@ module.exports = {
 
     collector.on('end', async () => {
       try {
-        await interaction.editReply({
+        await safeReply(interaction, {
           components: buildHelpComponents(currentCategory, pages, page, true),
           flags: MessageFlags.IsComponentsV2
-        });
+        }, { loggerName: 'command:help' });
       } catch (e) { try { logger && logger.warn && logger.warn('Failed finalizing help view after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging help finalization failure', le && (le.stack || le)); } catch (ignored) {} } }
     });
   },

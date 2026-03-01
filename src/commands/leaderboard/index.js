@@ -3,6 +3,7 @@ const userModel = require('../../models/user');
 const eggTypes = require('../../../config/eggTypes.json');
 const fallbackLogger = require('../../utils/fallbackLogger');
 const createInteractionCollector = require('../../utils/collectorHelper');
+const safeReply = require('../../utils/safeReply');
 
 const cmd = getCommandConfig('leaderboard') || {
   name: 'leaderboard',
@@ -224,7 +225,7 @@ module.exports = {
         return;
       }
 
-      await interaction.editReply({ embeds: [embed], components });
+      await safeReply(interaction, { embeds: [embed], components }, { loggerName: 'command:leaderboard' });
       const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [embed], components, time: 60_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 3 } });
       if (!collector) {
         try { require('../../utils/logger').get('command:leaderboard').warn('Failed to attach global leaderboard collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach global leaderboard collector', le && (le.stack || le)); } catch (ignored) {} }
@@ -340,7 +341,7 @@ module.exports = {
     if (interaction.isStringSelectMenu && interaction.isStringSelectMenu()) {
       await interaction.update({ embeds: [embed], components });
     } else {
-      await interaction.editReply({ embeds: [embed], components });
+      await safeReply(interaction, { embeds: [embed], components }, { loggerName: 'command:leaderboard' });
       // Collector for sort menu
       const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [embed], components, time: 60_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 3 } });
       if (!collector) {

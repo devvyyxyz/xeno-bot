@@ -137,7 +137,7 @@ module.exports = {
         )
         .setFooter({ text: 'Game stats' });
 
-      await interaction.editReply({ embeds: [embed] });
+      await safeReply(interaction, { embeds: [embed] }, { loggerName: 'command:stats' });
     } catch (err) {
       try {
         await safeReply(interaction, { content: 'Failed to fetch stats or interaction expired.' }, { loggerName: 'command:stats' });

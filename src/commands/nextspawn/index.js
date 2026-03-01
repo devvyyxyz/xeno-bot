@@ -45,13 +45,13 @@ module.exports = {
       if (info.active) {
         const human = msToHuman(info.activeSinceMs);
         const embed = new EmbedBuilder().setTitle('Spawn Active').setDescription(`An egg event is currently active (${info.numEggs} egg(s)), started ${human} ago.`).setColor(0x00b2ff);
-        await interaction.editReply({ embeds: [embed] });
+        await safeReply(interaction, { embeds: [embed] }, { loggerName: 'command:nextspawn' });
         return;
       }
       const human = msToHuman(info.remainingMs);
       const embed = new EmbedBuilder().setTitle('Next Spawn').setDescription(`Next spawn in ${human}.`).setColor(0x00b2ff);
       if (info.pendingReschedule) embed.setFooter({ text: 'Reschedule pending: will apply after active eggs clear.' });
-      await interaction.editReply({ embeds: [embed] });
+      await safeReply(interaction, { embeds: [embed] }, { loggerName: 'command:nextspawn' });
     } catch (err) {
       const logger = require('../../utils/logger').get('command:nextspawn');
       try {

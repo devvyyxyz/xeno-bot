@@ -328,7 +328,7 @@ module.exports = {
         collector.on('end', async (_collected, reason) => {
           if (!handled && reason === 'time') {
             try {
-              await interaction.editReply(buildHiveDeleteV2Payload({ hiveName: hive.name || 'your hive', hiveId: hive.id, state: 'timed_out', includeFlags: false }));
+              await safeReply(interaction, buildHiveDeleteV2Payload({ hiveName: hive.name || 'your hive', hiveId: hive.id, state: 'timed_out', includeFlags: false }), { loggerName: 'command:hive' });
             } catch (_) {}
           }
         });

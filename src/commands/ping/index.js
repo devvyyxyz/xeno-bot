@@ -50,14 +50,14 @@ module.exports = {
 
     try {
       await interaction.deferReply({ ephemeral: cmd.ephemeral === true });
-      await interaction.editReply(buildPingPayload(interaction, customId));
+      await safeReply(interaction, buildPingPayload(interaction, customId), { loggerName: 'command:ping' });
     } catch (e) {
       logger.warn('Ping V2 payload failed, trying minimal V2 payload', { error: e && (e.stack || e) });
       try {
-        await interaction.editReply({
+        await safeReply(interaction, {
           components: [new TextDisplayBuilder().setContent('Pong!')],
           flags: MessageFlags.IsComponentsV2
-        });
+        }, { loggerName: 'command:ping' });
       } catch (e2) {
         logger.warn('Ping minimal V2 payload failed, falling back to plain text', { error: e2 && (e2.stack || e2) });
         await safeReply(interaction, { content: 'Pong!', ephemeral: true }, { loggerName: 'command:ping' });
@@ -84,7 +84,7 @@ module.exports = {
 
     collector.on('end', async () => {
       try {
-        await interaction.editReply(buildPingPayload(interaction, customId, false, 'Ping refresh expired'));
+        await safeReply(interaction, buildPingPayload(interaction, customId, false, 'Ping refresh expired'), { loggerName: 'command:ping' });
       } catch (e) {
         logger.warn('Failed to finalize ping message on collector end', { error: e && (e.stack || e) });
       }

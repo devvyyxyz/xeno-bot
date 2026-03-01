@@ -2,6 +2,7 @@ const { EmbedBuilder } = require('discord.js');
 const path = require('path');
 const fs = require('fs');
 const { getCommandConfig } = require('../../utils/commandsConfig');
+const safeReply = require('../../utils/safeReply');
 
 function chunkJoin(list, sep = ', ', max = 900) {
   const out = [];
@@ -62,6 +63,6 @@ module.exports = {
     if (credits.testers && credits.testers.length) embed.addFields({ name: 'Testers', value: credits.testers.join(', '), inline: false });
     embed.addFields({ name: 'Enjoying the bot', value: credits.enjoying || 'You <3', inline: false });
 
-    await interaction.editReply({ embeds: [embed] });
+    await safeReply(interaction, { embeds: [embed] }, { loggerName: 'command:credits' });
   }
 };
