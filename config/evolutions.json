@@ -1,41 +1,107 @@
 {
   "pathways": {
     "standard": {
-      "stages": ["egg", "drone", "warrior", "praetorian", "queen"],
-      "description": "Standard human/dog-derived evolution pathway"
+      "stages": ["facehugger", "drone", "warrior", "praetorian", "queen"],
+      "description": "Standard human-host evolution pathway"
     },
     "dog": {
-      "stages": ["egg", "drone", "sentry", "crusher", "queen"],
+      "stages": ["facehugger", "drone", "sentry", "crusher", "queen"],
       "description": "Canine-host pathway with different mid roles"
     },
     "king": {
-      "stages": ["king_egg", "king_facehugger", "king_chestburster", "knight", "grand_duke", "prince", "king"],
+      "stages": ["king_facehugger", "knight", "grand_duke", "prince", "king"],
       "description": "High-tier King pathway requiring rare eggs and hosts"
     },
     "deacon": {
-      "stages": ["deacon_egg", "hammerpede", "trilobite", "engineer_host", "deacon"],
-      "description": "Mutation-focused deacon pathway; requires special conditions"
+      "stages": ["hammerpede", "trilobite", "deacon"],
+      "description": "Mutation-focused deacon pathway"
     },
     "neomorph": {
-      "stages": ["neomorph_egg", "mote_spores", "bloodburster", "neomorph"],
-      "description": "Neomorph pathway unlocked by rare motes/hosts"
+      "stages": ["bloodburster", "neomorph"],
+      "description": "Neomorph pathway unlocked by rare eggs/hosts"
+    }
+  },
+  "eggPathways": {
+    "classic": "standard",
+    "royal": "standard",
+    "queen": "standard",
+    "warrior": "standard",
+    "praetorian": "standard",
+    "runner": "standard",
+    "crusher": "standard",
+    "spitter": "standard",
+    "lurker": "standard",
+    "boiler": "standard",
+    "burster": "standard",
+    "colonist": "standard",
+
+    "dog": "dog",
+    "ox": "dog",
+    "bat": "dog",
+    "snake": "dog",
+
+    "deacon": "deacon",
+    "trilobite": "deacon",
+    "belugamorph": "deacon",
+
+    "neomorph": "neomorph",
+
+    "predalien": "king",
+    "ultramorph": "king",
+    "synthetic": "king",
+    "android": "king",
+    "spacejockey": "king",
+    "engineer": "king",
+    "weyland": "king",
+    "giant": "king"
+  },
+  "requirements": {
+    "standard": {
+      "facehugger": { "to": "drone", "cost_jelly": 0, "requires_host_types": ["human"] },
+      "drone": { "to": "warrior", "cost_jelly": 10 },
+      "warrior": { "to": "praetorian", "cost_jelly": 25 },
+      "praetorian": { "to": "queen", "cost_jelly": 50 }
+    },
+    "dog": {
+      "facehugger": { "to": "drone", "cost_jelly": 0, "requires_host_types": ["dog", "ox", "bat", "snake"] },
+      "drone": { "to": "sentry", "cost_jelly": 12 },
+      "sentry": { "to": "crusher", "cost_jelly": 30 },
+      "crusher": { "to": "queen", "cost_jelly": 60 }
+    },
+    "king": {
+      "king_facehugger": { "to": "knight", "cost_jelly": 30, "requires_host_types": ["human", "predator", "engineer"] },
+      "knight": { "to": "grand_duke", "cost_jelly": 50 },
+      "grand_duke": { "to": "prince", "cost_jelly": 75 },
+      "prince": { "to": "king", "cost_jelly": 120 }
+    },
+    "deacon": {
+      "hammerpede": { "to": "trilobite", "cost_jelly": 15 },
+      "trilobite": { "to": "deacon", "cost_jelly": 40, "requires_host_types": ["engineer"] }
+    },
+    "neomorph": {
+      "bloodburster": { "to": "neomorph", "cost_jelly": 35, "requires_host_types": ["human"] }
     }
   },
   "minStageToCreateHive": "drone",
-  "notes": "Expand pathways and per-stage requirements here. Use `roles` for display names.",
+  "notes": "Eggs map to pathways through eggPathways. requirements defines next-stage transitions, host requirements, and jelly costs.",
   "roles": {
     "egg": { "display": "Egg" },
+    "facehugger": { "display": "Facehugger" },
     "drone": { "display": "Drone" },
     "warrior": { "display": "Warrior" },
     "praetorian": { "display": "Praetorian" },
     "queen": { "display": "Queen" },
     "sentry": { "display": "Sentry" },
     "crusher": { "display": "Crusher" },
+    "king_facehugger": { "display": "King Facehugger" },
     "knight": { "display": "Knight" },
     "grand_duke": { "display": "Grand Duke" },
     "prince": { "display": "Prince" },
     "king": { "display": "King" },
+    "hammerpede": { "display": "Hammerpede" },
+    "trilobite": { "display": "Trilobite" },
     "deacon": { "display": "Deacon" },
+    "bloodburster": { "display": "Bloodburster" },
     "neomorph": { "display": "Neomorph" }
   }
 }

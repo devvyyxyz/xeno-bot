@@ -103,18 +103,22 @@ async function collectHatch(discordId, guildId, hatchId) {
   if (!row) throw new Error('Hatch not found');
   const now = Date.now();
   if (Number(row.finishes_at) > now) throw new Error('Hatch is not ready yet');
-  // Determine the stage the new xenomorph should have (from egg config's next_stage)
+  // Determine the stage and pathway from configs
   let nextStage = 'facehugger'; // default
+  let pathway = 'standard';
   try {
     const eggTypesConfig = require('../config/eggTypes.json');
+    const evolConfig = require('../config/evolutions.json');
     const eggDef = Array.isArray(eggTypesConfig) ? eggTypesConfig.find(e => e.id === row.egg_type) : null;
     if (eggDef && eggDef.next_stage) nextStage = eggDef.next_stage;
+    if (evolConfig && evolConfig.eggPathways && evolConfig.eggPathways[row.egg_type]) pathway = String(evolConfig.eggPathways[row.egg_type]);
+    else if (eggDef && eggDef.pathway) pathway = String(eggDef.pathway);
   } catch (e) {
     logger.warn('Failed loading egg type config in collectHatch', { error: e && e.message });
   }
   // Create xenomorph record with the next_stage
   try {
-    await xenoModel.createXeno(discordId, { pathway: 'standard', role: nextStage, stage: nextStage, data: { fromEgg: row.egg_type } });
+    await xenoModel.createXeno(discordId, { pathway, role: nextStage, stage: nextStage, data: { fromEgg: row.egg_type } });
   } catch (e) {
     logger.warn('Failed creating xenomorph in collectHatch', { error: e && e.message });
     // fallback to adding as an item if xeno creation fails

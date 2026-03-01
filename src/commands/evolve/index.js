@@ -1,5 +1,6 @@
 const { ChatInputCommandBuilder } = require('@discordjs/builders');
 const xenoModel = require('../../models/xenomorph');
+const hostModel = require('../../models/host');
 const db = require('../../db');
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const cmd = { name: 'evolve', description: 'Evolve your xenomorphs' };
@@ -17,6 +18,7 @@ module.exports = {
       sub.setName('start')
         .setDescription('Start an evolution')
         .addIntegerOptions(opt => opt.setName('xeno_id').setDescription('Xenomorph id').setRequired(true).setAutocomplete(true))
+        .addIntegerOptions(opt => opt.setName('host_id').setDescription('Host id (required for some stages)').setRequired(false).setAutocomplete(true))
         .addStringOptions(opt => opt.setName('target').setDescription('Target role').setRequired(true).setAutocomplete(true))
     )
     .addSubcommands(sub => sub.setName('list').setDescription('List your xenomorphs'))
@@ -47,15 +49,42 @@ module.exports = {
 
       if (sub === 'start') {
         const xenoId = interaction.options.getInteger('xeno_id');
+        const hostId = interaction.options.getInteger('host_id');
         const target = interaction.options.getString('target');
         const xeno = await xenoModel.getById(xenoId);
         if (!xeno) return interaction.editReply({ content: 'Xenomorph not found.' });
         if (String(xeno.owner_id) !== userId) return interaction.editReply({ content: 'You do not own this xenomorph.' });
-        const defaults = { cost_jelly: 10, time_ms: 1000 * 60 * 60 };
+
+        const evol = require('../../../config/evolutions.json');
+        const pathwayKey = String(xeno.pathway || 'standard');
+        const reqByPath = (evol && evol.requirements && evol.requirements[pathwayKey]) ? evol.requirements[pathwayKey] : {};
+        const fromStage = String(xeno.role || xeno.stage || '');
+        const stepReq = reqByPath[fromStage] || null;
+        if (!stepReq) return interaction.editReply({ content: `No evolution step is configured for stage ${fromStage} in pathway ${pathwayKey}.` });
+        if (String(stepReq.to) !== String(target)) {
+          return interaction.editReply({ content: `Invalid target for ${fromStage} in ${pathwayKey}. Next allowed stage is ${stepReq.to}.` });
+        }
+
+        if (Array.isArray(stepReq.requires_host_types) && stepReq.requires_host_types.length > 0) {
+          if (!hostId) return interaction.editReply({ content: `This evolution requires a host (${stepReq.requires_host_types.join(', ')}). Provide host_id.` });
+          const host = await hostModel.getHostById(hostId);
+          if (!host) return interaction.editReply({ content: 'Host not found.' });
+          if (String(host.owner_id) !== userId) return interaction.editReply({ content: 'You do not own this host.' });
+          const hostType = String(host.host_type || '').toLowerCase();
+          const allowedTypes = stepReq.requires_host_types.map(h => String(h).toLowerCase());
+          if (!allowedTypes.includes(hostType)) {
+            return interaction.editReply({ content: `Host type ${host.host_type} is invalid for this evolution. Allowed: ${stepReq.requires_host_types.join(', ')}.` });
+          }
+          await hostModel.removeHostById(hostId);
+        }
+
+        const defaults = { cost_jelly: Number(stepReq.cost_jelly || 0), time_ms: 1000 * 60 * 60 };
         const resRow = await db.knex('user_resources').where({ user_id: userId }).first();
         const jelly = resRow ? Number(resRow.royal_jelly || 0) : 0;
         if (jelly < defaults.cost_jelly) return interaction.editReply({ content: `Insufficient royal jelly. Need ${defaults.cost_jelly}.` });
-        await db.knex('user_resources').where({ user_id: userId }).update({ royal_jelly: Math.max(0, jelly - defaults.cost_jelly), updated_at: db.knex.fn.now() });
+        if (defaults.cost_jelly > 0) {
+          await db.knex('user_resources').where({ user_id: userId }).update({ royal_jelly: Math.max(0, jelly - defaults.cost_jelly), updated_at: db.knex.fn.now() });
+        }
         const now = Date.now();
         const finishes = now + defaults.time_ms;
         const inserted = await db.knex('evolution_queue').insert({ xeno_id: xenoId, user_id: userId, hive_id: xeno.hive_id || null, target_role: target, started_at: now, finishes_at: finishes, cost_jelly: defaults.cost_jelly, stabilizer_used: false, status: 'queued' });
@@ -124,11 +153,13 @@ module.exports = {
       const userId = interaction.user.id;
       // determine focused text and whether numeric
       const focusedRaw = interaction.options.getFocused?.();
+      const focusedNamed = interaction.options.getFocused ? interaction.options.getFocused(true) : null;
+      const focusedName = focusedNamed && focusedNamed.name ? String(focusedNamed.name) : null;
       const focused = focusedRaw && typeof focusedRaw === 'object' ? String(focusedRaw.value || '') : String(focusedRaw || '');
       const isNumeric = /^[0-9]+$/.test(focused);
 
       // START / INFO: if numeric focused -> suggest xeno ids
-      if ((sub === 'start' || sub === 'info') && isNumeric) {
+      if ((sub === 'start' || sub === 'info') && isNumeric && (focusedName === 'xeno_id' || !focusedName)) {
         try {
           const list = await xenoModel.listByOwner(String(userId));
           if (!list || list.length === 0) return autocomplete(interaction, [], { map: it => ({ name: `${it.id} ${it.role || it.stage}`, value: it.id }), max: 25 });
@@ -138,11 +169,36 @@ module.exports = {
       }
 
       // START: target autocomplete — if non-numeric focused, suggest roles from evolutions config
-      if (sub === 'start' && !isNumeric) {
+      if (sub === 'start' && focusedName === 'target') {
         try {
           const evol = require('../../../config/evolutions.json');
-          const roles = evol && evol.roles ? Object.keys(evol.roles).map(k => ({ id: k, name: `${k}${evol.roles[k].display ? ` — ${evol.roles[k].display}` : ''}` })) : [];
-          return autocomplete(interaction, roles, { map: it => ({ name: it.name, value: it.id }), max: 25 });
+          const xenoId = interaction.options.getInteger('xeno_id');
+          let targets = [];
+          if (xenoId) {
+            const xeno = await xenoModel.getById(xenoId);
+            if (xeno) {
+              const path = String(xeno.pathway || 'standard');
+              const from = String(xeno.role || xeno.stage || '');
+              const req = evol && evol.requirements && evol.requirements[path] ? evol.requirements[path][from] : null;
+              if (req && req.to) {
+                const roleCfg = evol && evol.roles && evol.roles[req.to] ? evol.roles[req.to] : null;
+                targets = [{ id: req.to, name: roleCfg && roleCfg.display ? `${req.to} — ${roleCfg.display}` : req.to }];
+              }
+            }
+          }
+          if (!targets.length) {
+            const roles = evol && evol.roles ? Object.keys(evol.roles).map(k => ({ id: k, name: `${k}${evol.roles[k].display ? ` — ${evol.roles[k].display}` : ''}` })) : [];
+            targets = roles;
+          }
+          return autocomplete(interaction, targets, { map: it => ({ name: it.name, value: it.id }), max: 25 });
+        } catch (e) { try { await interaction.respond([]); } catch (_) {} return; }
+      }
+
+      if (sub === 'start' && focusedName === 'host_id') {
+        try {
+          const rows = await hostModel.listHostsByOwner(String(userId));
+          const items = rows.slice(0, 25).map(r => ({ id: String(r.id), name: `#${r.id} ${r.host_type}` }));
+          return autocomplete(interaction, items, { map: it => ({ name: it.name, value: Number(it.id) }), max: 25 });
         } catch (e) { try { await interaction.respond([]); } catch (_) {} return; }
       }
 

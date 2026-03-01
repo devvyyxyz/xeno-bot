@@ -39,4 +39,25 @@ async function deleteHostsByOwner(ownerId) {
   }
 }
 
-module.exports = { addHostForUser, listHostsByOwner, deleteHostsByOwner };
+async function getHostById(id) {
+  try {
+    const row = await db.knex('hosts').where({ id: Number(id) }).first();
+    if (!row) return null;
+    return { ...row, data: row.data ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : {} };
+  } catch (e) {
+    logger.warn('Failed getting host by id', { error: e && e.message });
+    return null;
+  }
+}
+
+async function removeHostById(id) {
+  try {
+    const deleted = await db.knex('hosts').where({ id: Number(id) }).del();
+    return deleted > 0;
+  } catch (e) {
+    logger.warn('Failed removing host by id', { error: e && e.message });
+    throw e;
+  }
+}
+
+module.exports = { addHostForUser, listHostsByOwner, deleteHostsByOwner, getHostById, removeHostById };
