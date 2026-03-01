@@ -1,0 +1,47 @@
+{
+  "capacityLevels": [
+    { "level": 1, "capacity": 5, "unlock_note": "Default" },
+    { "level": 2, "capacity": 15, "unlock_note": "Unlocks milestones tracking" },
+    { "level": 3, "capacity": 30, "unlock_note": "Unlocks Hatchery module" },
+    { "level": 4, "capacity": 50, "unlock_note": "Unlocks defensive bonuses" }
+  ],
+  "base": {
+    "base_jelly_per_hour": 1,
+    "queen_pathway": ["drone","warrior","praetorian","queen"]
+  },
+  "modules": {
+    "royal_jelly_refinery": {
+      "display": "Royal Jelly Refinery",
+      "description": "Boost jelly production rates or reduce jelly costs for evolutions and upgrades.",
+      "default_level": 0,
+      "max_level": 10,
+      "base_cost_jelly": 10
+    },
+    "hatchery": {
+      "display": "Hatchery",
+      "description": "Decrease egg hatch times; advanced levels allow multiple simultaneous hatches.",
+      "default_level": 0,
+      "max_level": 10,
+      "base_cost_jelly": 8
+    },
+    "incubation": {
+      "display": "Incubation System",
+      "description": "Improve mutation success rates during hybrid evolutions.",
+      "default_level": 0,
+      "max_level": 10,
+      "base_cost_jelly": 12
+    },
+    "defensive_walls": {
+      "display": "Defensive Walls",
+      "description": "Reduce xenomorph losses during faction battles or hive invasions.",
+      "default_level": 0,
+      "max_level": 10,
+      "base_cost_jelly": 15
+    }
+  },
+  "milestones": {
+    "hunt_100": { "description": "Complete 100 hunts", "reward": { "rare_host_chance_pct": 10 } },
+    "capacity_30": { "description": "Reach 30 xenos", "reward": { "unlock": "hybrid_evolution_research" } },
+    "jelly_1000": { "description": "Produce 1000 jelly", "reward": { "award_egg": "predalien" } }
+  }
+}

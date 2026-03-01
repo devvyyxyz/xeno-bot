@@ -1,0 +1,47 @@
+{
+  "types": {
+    "default": {
+      "id": "default",
+      "name": "Black Xeno Hive",
+      "description": "A balanced, standard hive suitable for beginners.",
+      "requirement": "own_any_xenomorph",
+      "bonuses": {
+        "evolution_cost_multiplier": 0.9,
+        "upgrade_cost_multiplier": 0.9,
+        "base_jelly_per_hour": 1
+      }
+    },
+    "pathogen": {
+      "id": "pathogen",
+      "name": "Pathogen Hive",
+      "description": "A mutation-focused hive specializing in hybrid xenomorphs, risky hunts, and rare hosts.",
+      "requirement": "evolve_pathogen_runner",
+      "notes": "Evolving into a Pathogen Runner deletes your Queen and current hive; starts fresh.",
+      "bonuses": {
+        "mutation_success_pct_increase": 20,
+        "hybrid_ability_unlock": true
+      }
+    },
+    "red": {
+      "id": "red",
+      "name": "Red Hive",
+      "description": "A battle-oriented hive with bonuses for PvP combat and faction wars.",
+      "requirement": "accumulate_host_kills:1000",
+      "bonuses": {
+        "attack_pct": 15,
+        "defense_pct": 15,
+        "battle_cooldown_multiplier": 0.85
+      }
+    },
+    "custom": {
+      "id": "custom",
+      "name": "Custom Hive",
+      "description": "A fully customizable hive (premium feature) offering unique aesthetics and flexible pathways.",
+      "requirement": "premium_or_purchase_5_egg_drops",
+      "bonuses": {
+        "customizable_jelly_output": true,
+        "exclusive_skins": true
+      }
+    }
+  }
+}
