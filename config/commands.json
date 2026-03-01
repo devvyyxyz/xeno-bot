@@ -31,7 +31,8 @@
         "destroy": { "name": "eggs destroy", "description": "Permanently destroy an egg in your inventory." },
         "list": { "name": "eggs list", "description": "List all eggs in your inventory." },
         "hatch": { "name": "eggs hatch", "description": "Hatch an egg to get a xenomorph. Requires an available hive slot." },
-        "sell": { "name": "eggs sell", "description": "Sell an egg from your inventory for credits." }
+        "sell": { "name": "eggs sell", "description": "Sell an egg from your inventory for credits." },
+        "collect": { "name": "eggs collect", "description": "Collect a finished hatch (uses autocomplete to pick ready hatches)." }
       }
     },
     "nextspawn": { "name": "nextspawn", "description": "Show time until the next egg spawn for this server." },
@@ -50,16 +51,17 @@
       "name": "hive",
       "description": "Manage your hive and xenomorphs.",
       "subcommands": {
-        "create": { "name": "hive create", "description": "Start creating a hive if you meet requirements." },
+        "create": { "name": "hive create", "description": "Create a personal hive." },
         "stats": { "name": "hive stats", "description": "Show hive stats (optional: view another user's hive)." },
         "delete": { "name": "hive delete", "description": "Permanently delete your hive and all its data." },
-        "type_info": { "name": "hive type info", "description": "Show information about different hive types and their requirements." },
+        "type-info": { "name": "hive type-info", "description": "Show information about hive types and their requirements." },
         "events": { "name": "hive events", "description": "Show recent events in your hive (battles, evolutions, etc)." },
         "defend": { "name": "hive defend", "description": "Defend against an ongoing attack on your hive." },
-        "modules": { "name": "hive modules", "description": "View all modules and their levels." },
-        "module_upgrade": { "name": "hive module upgrade", "description": "Upgrade a hive module to improve your hive's stats." },
-        "queen_status": { "name": "hive queen-status", "description": "Check the status of your hive queen (health, energy, etc)." },
-        "queen_upgrade": { "name": "hive queen-upgrade", "description": "Upgrade your hive queen to increase your hive's potential." }
+        "modules": { "name": "hive modules", "description": "View modules and their current levels." },
+        "upgrade-module": { "name": "hive upgrade-module", "description": "Upgrade a hive module to improve your hive's stats." },
+        "milestones": { "name": "hive milestones", "description": "View hive milestones and progress." },
+        "queen-status": { "name": "hive queen-status", "description": "Check the status of your hive queen (production, bonded xenomorph)." },
+        "upgrade-queen": { "name": "hive upgrade-queen", "description": "Upgrade your queen chamber to increase jelly output." }
       }
     }
   },
