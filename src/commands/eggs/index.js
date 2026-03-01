@@ -44,7 +44,7 @@ module.exports = {
           name: 'collect',
           description: 'Collect a finished hatch',
           options: [
-            { type: 4, name: 'id', description: 'Hatch id to collect', required: true }
+            { type: 3, name: 'egg', description: 'Select a ready hatch to collect', required: true, autocomplete: true }
           ]
         }
     ]
@@ -52,10 +52,34 @@ module.exports = {
   async autocomplete(interaction) {
     try {
       const autocomplete = require('../../utils/autocomplete');
+      // detect subcommand for targeted autocomplete
+      let sub = null;
+      try { sub = interaction.options && interaction.options.getSubcommand ? (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })() : null; } catch (e) { sub = null; }
       const discordId = interaction.user.id;
       const guildId = interaction.guildId;
       const logger = require('../../utils/logger').get('command:eggs');
       const u = await userModel.getUserByDiscordId(discordId);
+      // If collecting, list ready hatches for this user in this guild
+      if (sub === 'collect') {
+        try {
+          const rows = await hatchManager.listHatches(discordId, guildId);
+          const now = Date.now();
+          const ready = (rows || []).filter(r => !r.collected && (Number(r.finishes_at) || 0) <= now);
+          if (!ready || ready.length === 0) {
+            return autocomplete(interaction, [{ id: 'none', name: 'No ready hatches' }], { map: it => ({ name: it.name, value: it.id }), max: 25 });
+          }
+          const items = ready.slice(0, 25).map(r => {
+            const meta = eggTypes.find(t => t.id === r.egg_type);
+            const name = meta ? meta.name : r.egg_type;
+            // value is hatch id but label shows egg name for clarity
+            return { id: String(r.id), name: `${name} (#${r.id})` };
+          });
+          return autocomplete(interaction, items, { map: it => ({ name: it.name, value: it.id }), max: 25 });
+        } catch (e) {
+          logger.warn('Collect autocomplete failed', { error: e && (e.stack || e) });
+          return autocomplete(interaction, [], { map: it => ({ name: it.name, value: it.id }), max: 25 });
+        }
+      }
       let inventoryEggs = [];
       if (u && u.data && u.data.guilds && u.data.guilds[guildId] && u.data.guilds[guildId].eggs) {
         inventoryEggs = Object.entries(u.data.guilds[guildId].eggs).map(([id, qty]) => ({ id, qty: Number(qty) })).filter(e => e.qty > 0);
@@ -130,7 +154,13 @@ module.exports = {
 
         if (sub === 'collect') {
           await interaction.deferReply({ ephemeral: true });
-          const id = interaction.options.getInteger('id');
+          const idStr = interaction.options.getString('egg');
+          const id = Number.parseInt(idStr, 10);
+          if (!id || Number.isNaN(id)) {
+            const safeReply = require('../../utils/safeReply');
+            await safeReply(interaction, { content: 'Invalid hatch id selected.', ephemeral: true }, { loggerName: 'command:eggs' });
+            return;
+          }
           try {
             await hatchManager.collectHatch(discordId, guildId, id);
             const safeReply = require('../../utils/safeReply');
