@@ -83,11 +83,37 @@ module.exports = {
               .setDescription(info.description || '')
               .addFields(
                 { name: 'Host Type', value: String(host.host_type), inline: true },
-                { name: 'Found At', value: String(new Date(host.created_at).toLocaleString()), inline: true }
+                { name: 'Found At', value: String(new Date(Number(host.found_at || host.created_at)).toLocaleString()), inline: true }
               )
               .setTimestamp();
+
+            // Add action buttons: use for evolve
+            const buttonsRow = { type: 1, components: [
+              { type: 2, style: 1, custom_id: `hunt-use-evolve:${host.id}`, label: 'Use for /evolve', disabled: false },
+              { type: 2, style: 2, custom_id: 'hunt-inventory-close', label: 'Close', disabled: false }
+            ] };
+
             handled = true;
-            await i.update({ embeds: [detail], components: [] });
+            await i.update({ embeds: [detail], components: [buttonsRow] });
+            // Attach a short-lived collector for the buttons
+            try {
+              const msg = await interaction.fetchReply();
+              const btnCollector = msg.createMessageComponentCollector({ filter: b => b.user.id === interaction.user.id, time: 60_000 });
+              btnCollector.on('collect', async bi => {
+                try {
+                  if (bi.customId === `hunt-use-evolve:${host.id}`) {
+                    await bi.reply({ content: `To evolve a xenomorph using this host, run: /evolve start (provide xenomorph id) and include host id ${host.id} as the host parameter.`, ephemeral: true });
+                    btnCollector.stop('used');
+                    return;
+                  }
+                  if (bi.customId === 'hunt-inventory-close') {
+                    await bi.update({ embeds: [new EmbedBuilder().setTitle('Closed').setDescription('Host details closed.').setTimestamp()], components: [] });
+                    btnCollector.stop('closed');
+                    return;
+                  }
+                } catch (err) { try { await bi.reply({ content: 'Error handling button.', ephemeral: true }); } catch (_) {} }
+              });
+            } catch (_) {}
             collector.stop('selected');
           } catch (err) {
             try { await i.reply({ content: `Error handling selection: ${err && err.message}`, ephemeral: true }); } catch (_) {}

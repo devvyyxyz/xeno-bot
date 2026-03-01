@@ -1,42 +1,32 @@
-const fs = require('fs').promises;
-const path = require('path');
+const db = require('../db');
 const logger = require('../utils/logger').get('models:host');
 
-const HOSTS_FILE = path.join(__dirname, '..', '..', 'data', 'hosts.json');
-
-async function _read() {
+async function addHostForUser(ownerId, hostType, data = {}) {
+  const payload = {
+    owner_id: String(ownerId),
+    host_type: String(hostType),
+    found_at: Date.now(),
+    data: Object.keys(data).length ? JSON.stringify(data) : null
+  };
   try {
-    const raw = await fs.readFile(HOSTS_FILE, 'utf8');
-    return JSON.parse(raw || '[]');
+    const inserted = await db.knex('hosts').insert(payload);
+    const id = Array.isArray(inserted) ? inserted[0] : inserted;
+    const row = await db.knex('hosts').where({ id }).first();
+    return row;
   } catch (e) {
-    if (e.code === 'ENOENT') return [];
-    logger.warn('Failed reading hosts file', { error: e && e.message });
-    return [];
-  }
-}
-
-async function _write(rows) {
-  try {
-    await fs.writeFile(HOSTS_FILE, JSON.stringify(rows, null, 2), 'utf8');
-    return true;
-  } catch (e) {
-    logger.warn('Failed writing hosts file', { error: e && e.message });
+    logger.warn('Failed adding host to DB', { error: e && e.message });
     throw e;
   }
 }
 
-async function addHostForUser(ownerId, hostType) {
-  const rows = await _read();
-  const id = Date.now();
-  const host = { id, owner_discord_id: String(ownerId), host_type: hostType, created_at: new Date().toISOString() };
-  rows.push(host);
-  await _write(rows);
-  return host;
-}
-
 async function listHostsByOwner(ownerId) {
-  const rows = await _read();
-  return rows.filter(r => String(r.owner_discord_id) === String(ownerId));
+  try {
+    const rows = await db.knex('hosts').where({ owner_id: String(ownerId) }).orderBy('id', 'asc');
+    return rows.map(r => ({ ...r, data: r.data ? (typeof r.data === 'string' ? JSON.parse(r.data) : r.data) : {} }));
+  } catch (e) {
+    logger.warn('Failed listing hosts from DB', { error: e && e.message });
+    return [];
+  }
 }
 
 module.exports = { addHostForUser, listHostsByOwner };

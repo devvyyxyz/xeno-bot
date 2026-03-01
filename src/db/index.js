@@ -390,6 +390,27 @@ async function migrate() {
     throw err;
   }
 
+  // hosts: persist hunted hosts per user
+  try {
+    const hasHosts = await knex.schema.hasTable('hosts');
+    if (!hasHosts) {
+      await knex.schema.createTable('hosts', (table) => {
+        table.increments('id').primary();
+        table.string('owner_id').notNullable().index();
+        table.string('host_type').notNullable();
+        table.bigInteger('found_at').notNullable();
+        table.json('data');
+        table.timestamps(true, true);
+      });
+      logger.info('Created `hosts` table');
+    } else {
+      logger.info('`hosts` table already exists');
+    }
+  } catch (err) {
+    logger.error('Failed ensuring hosts table', { error: err.stack || err });
+    throw err;
+  }
+
   // evolution_queue: scheduled evolution jobs
   try {
     const hasQueue = await knex.schema.hasTable('evolution_queue');

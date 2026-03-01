@@ -3,15 +3,39 @@
     "standard": {
       "stages": ["egg", "drone", "warrior", "praetorian", "queen"],
       "description": "Standard human/dog-derived evolution pathway"
+    },
+    "dog": {
+      "stages": ["egg", "drone", "sentry", "crusher", "queen"],
+      "description": "Canine-host pathway with different mid roles"
+    },
+    "king": {
+      "stages": ["king_egg", "king_facehugger", "king_chestburster", "knight", "grand_duke", "prince", "king"],
+      "description": "High-tier King pathway requiring rare eggs and hosts"
+    },
+    "deacon": {
+      "stages": ["deacon_egg", "hammerpede", "trilobite", "engineer_host", "deacon"],
+      "description": "Mutation-focused deacon pathway; requires special conditions"
+    },
+    "neomorph": {
+      "stages": ["neomorph_egg", "mote_spores", "bloodburster", "neomorph"],
+      "description": "Neomorph pathway unlocked by rare motes/hosts"
     }
   },
   "minStageToCreateHive": "drone",
-  "notes": "This file is a minimal evolutions config. Expand pathways and requirements here.",
+  "notes": "Expand pathways and per-stage requirements here. Use `roles` for display names.",
   "roles": {
     "egg": { "display": "Egg" },
     "drone": { "display": "Drone" },
     "warrior": { "display": "Warrior" },
     "praetorian": { "display": "Praetorian" },
-    "queen": { "display": "Queen" }
+    "queen": { "display": "Queen" },
+    "sentry": { "display": "Sentry" },
+    "crusher": { "display": "Crusher" },
+    "knight": { "display": "Knight" },
+    "grand_duke": { "display": "Grand Duke" },
+    "prince": { "display": "Prince" },
+    "king": { "display": "King" },
+    "deacon": { "display": "Deacon" },
+    "neomorph": { "display": "Neomorph" }
   }
 }

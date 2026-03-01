@@ -12,6 +12,7 @@ const { getCommandConfig, commands: commandsConfig } = require('../../utils/comm
 const { DiscordAPIError } = require('discord.js');
 const eggTypes = require('../../../config/eggTypes.json');
 const userModel = require('../../models/user');
+const hostModel = require('../../models/host');
 
 const cmd = getCommandConfig('inventory') || { name: 'inventory', description: 'Show your egg inventory or another user\'s.' };
 const shopConfig = require('../../../config/shop.json');
@@ -91,7 +92,7 @@ module.exports = {
     // Build initial view: default to eggs
     const items = user?.data?.guilds?.[guildId]?.items || {};
     const currencies = user?.data?.guilds?.[guildId]?.currency || {};
-    const getFieldsForType = (viewType) => {
+    const getFieldsForType = async (viewType) => {
       const out = [];
       if (viewType === 'eggs') {
         for (const type of eggTypes) {
@@ -104,6 +105,19 @@ module.exports = {
       if (viewType === 'currencies') {
         out.push({ name: 'Credits', value: String(currencies.credits || 0), inline: true });
         out.push({ name: 'Royal Jelly', value: String(currencies.royal_jelly || 0), inline: true });
+        return out;
+      }
+
+      if (viewType === 'hosts') {
+        try {
+          const rows = await hostModel.listHostsByOwner(target.id);
+          for (const r of rows) {
+            const label = `${r.host_type} [${r.id}]`;
+            out.push({ name: label, value: `Found ${new Date(Number(r.found_at || r.created_at)).toLocaleString()}`, inline: false });
+          }
+        } catch (e) {
+          // ignore and return empty
+        }
         return out;
       }
 
@@ -129,7 +143,7 @@ module.exports = {
     };
 
     let currentType = 'eggs';
-    let fieldsForType = getFieldsForType(currentType);
+    let fieldsForType = await getFieldsForType(currentType);
     let pages = chunkPages(fieldsForType);
     let page = 0;
     const [royalJellyBalance, creditsBalance] = await Promise.all([
@@ -146,7 +160,8 @@ module.exports = {
           .setPlaceholder('Type')
           .addOptions(
             new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(true),
-            new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items')
+            new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items'),
+            new StringSelectMenuOptionBuilder().setLabel('Hosts').setValue('hosts')
           )
       ),
       new ActionRowBuilder().addComponents(
@@ -181,7 +196,7 @@ module.exports = {
       try {
         if (i.customId === 'inventory-type') {
           currentType = i.values && i.values[0] ? i.values[0] : 'eggs';
-          fieldsForType = getFieldsForType(currentType);
+          fieldsForType = await getFieldsForType(currentType);
           pages = chunkPages(fieldsForType);
           page = 0;
           const [balRoyal, balCredits] = await Promise.all([
@@ -193,7 +208,7 @@ module.exports = {
             new SecondaryButtonBuilder().setLabel('Previous').setCustomId('inventory-prev').setDisabled(page === 0),
             new SecondaryButtonBuilder().setLabel('Next').setCustomId('inventory-next').setDisabled(pages.length <= 1)
           );
-          await i.update({ embeds: [e], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('inventory-type').setPlaceholder('Type').addOptions(new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(currentType==='eggs'), new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items').setDefault(currentType==='items'), new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies').setDefault(currentType==='currencies'))), newNav] });
+          await i.update({ embeds: [e], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('inventory-type').setPlaceholder('Type').addOptions(new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(currentType==='eggs'), new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items').setDefault(currentType==='items'), new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies').setDefault(currentType==='currencies'), new StringSelectMenuOptionBuilder().setLabel('Hosts').setValue('hosts').setDefault(currentType==='hosts'))), newNav] });
           return;
         }
         if (i.customId === 'inventory-prev' || i.customId === 'inventory-next') {
@@ -208,7 +223,7 @@ module.exports = {
             new SecondaryButtonBuilder().setLabel('Previous').setCustomId('inventory-prev').setDisabled(page === 0),
             new SecondaryButtonBuilder().setLabel('Next').setCustomId('inventory-next').setDisabled(page >= pages.length - 1)
           );
-          await i.update({ embeds: [e], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('inventory-type').setPlaceholder('Type').addOptions(new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(currentType==='eggs'), new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items').setDefault(currentType==='items'), new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies').setDefault(currentType==='currencies'))), newNav] });
+          await i.update({ embeds: [e], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('inventory-type').setPlaceholder('Type').addOptions(new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(currentType==='eggs'), new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items').setDefault(currentType==='items'), new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies').setDefault(currentType==='currencies'), new StringSelectMenuOptionBuilder().setLabel('Hosts').setValue('hosts').setDefault(currentType==='hosts'))), newNav] });
           return;
         }
       } catch (err) {
