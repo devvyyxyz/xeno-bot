@@ -17,12 +17,6 @@ async function init(botClient) {
       const finishes = Number(r.finishes_at) || now;
       if (finishes <= now) {
         // ready to collect, no timer necessary
-        try {
-          const guildName = client ? (client.guilds.cache.get(r.guild_id)?.name || await (async () => { try { const g = await client.guilds.fetch(r.guild_id); return g && g.name; } catch (_) { return null; } })()) : null;
-          logger.info('Hatch ready on init', { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, guildName, egg_type: r.egg_type });
-        } catch (e) {
-          logger.info('Hatch ready on init', { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, egg_type: r.egg_type });
-        }
         continue;
       }
       const delay = finishes - now;
