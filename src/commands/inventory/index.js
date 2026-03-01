@@ -34,13 +34,21 @@ function makeEmbed(target, type, pageIdx, pages, balances = {}) {
   }
   const page = pages[pageIdx] || [];
   if (!page || page.length === 0) {
-    embed.addFields({ name: 'Inventory empty', value: 'You have no items or eggs in this server.', inline: false });
+    const emptyMessages = {
+      eggs: 'You have no eggs in this server.',
+      items: 'You have no items in this server.',
+      currencies: 'You have no currencies in this server.',
+      hosts: 'You have no hosts in this server.'
+    };
+    const emptyMsg = emptyMessages[type] || 'You have no items in this server.';
+    embed.addFields({ name: 'Inventory empty', value: emptyMsg, inline: false });
   } else {
     embed.addFields(page);
   }
   const royal = Number(balances.royal_jelly || 0);
   const credits = Number(balances.credits || 0);
-  embed.setFooter({ text: `Royal Jelly: ${royal} • Credits: ${credits} • ${type === 'eggs' ? 'Eggs' : type === 'items' ? 'Items' : 'Currencies'} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}` });
+  const typeLabel = type === 'eggs' ? 'Eggs' : type === 'items' ? 'Items' : type === 'hosts' ? 'Hosts' : 'Currencies';
+  embed.setFooter({ text: `Royal Jelly: ${royal} • Credits: ${credits} • ${typeLabel} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}` });
   return embed;
 }
 
