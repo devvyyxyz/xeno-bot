@@ -91,7 +91,7 @@ async function init(botClient) {
           const t = setTimeout(() => doSpawn(row.guild_id).catch(err => logger.error('Spawn error', { guildId: row.guild_id, error: err.stack || err })), remaining);
           timers.set(row.guild_id, t);
           nextSpawnAt.set(row.guild_id, ts);
-          logger.info('Restored scheduled spawn from DB', { guildId: row.guild_id, scheduled_at: ts, in_ms: remaining });
+          logger.debug('Restored scheduled spawn from DB', { guildId: row.guild_id, scheduled_at: ts, in_ms: remaining });
           continue;
         }
       }
@@ -123,9 +123,9 @@ function scheduleNext(guildId) {
     const scheduledAt = Date.now() + delay;
     try {
       const guildName = client ? (client.guilds.cache.get(guildId)?.name || null) : null;
-      logger.info('About to schedule next spawn', { guildId, guildName, min, max, delay, scheduledAt, pendingReschedule: pendingReschedule.has(guildId), existingTimer: timers.has(guildId), persistedNext: (await (async () => { try { const k = db.knex; const row = await k('guild_settings').where({ guild_id: guildId }).first('next_spawn_at'); return row && row.next_spawn_at; } catch (e) { return null; } })()) });
+      logger.debug('About to schedule next spawn', { guildId, guildName, min, max, delay, scheduledAt, pendingReschedule: pendingReschedule.has(guildId), existingTimer: timers.has(guildId), persistedNext: (await (async () => { try { const k = db.knex; const row = await k('guild_settings').where({ guild_id: guildId }).first('next_spawn_at'); return row && row.next_spawn_at; } catch (e) { return null; } })()) });
     } catch (e) {
-      logger.info('About to schedule next spawn', { guildId, min, max, delay, scheduledAt });
+      logger.debug('About to schedule next spawn', { guildId, min, max, delay, scheduledAt });
     }
     const t = setTimeout(() => doSpawn(guildId).catch(err => logger.error('Spawn error', { guildId, error: err.stack || err })), delay);
     timers.set(guildId, t);
@@ -139,9 +139,9 @@ function scheduleNext(guildId) {
     }
     try {
       const guildName = client ? (client.guilds.cache.get(guildId)?.name || null) : null;
-      logger.info('Scheduled next spawn', { guildId, guildName, in_ms: delay, scheduled_at: scheduledAt });
+      logger.debug('Scheduled next spawn', { guildId, guildName, in_ms: delay, scheduled_at: scheduledAt });
     } catch (e) {
-      logger.info('Scheduled next spawn', { guildId, in_ms: delay, scheduled_at: scheduledAt });
+      logger.debug('Scheduled next spawn', { guildId, in_ms: delay, scheduled_at: scheduledAt });
     }
   })();
 }

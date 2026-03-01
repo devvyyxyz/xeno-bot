@@ -23,9 +23,9 @@ async function init(botClient) {
       scheduleTimer(r.id, delay);
       try {
         const guildName = client ? (client.guilds.cache.get(r.guild_id)?.name || await (async () => { try { const g = await client.guilds.fetch(r.guild_id); return g && g.name; } catch (_) { return null; } })()) : null;
-        logger.info('Restored hatch timer', { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, guildName, in_ms: delay });
+        logger.debug('Restored hatch timer', { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, guildName, in_ms: delay });
       } catch (e) {
-        logger.info('Restored hatch timer', { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, in_ms: delay });
+        logger.debug('Restored hatch timer', { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, in_ms: delay });
       }
     }
   } catch (e) {

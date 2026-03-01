@@ -18,10 +18,11 @@ function buildPingPayload(interaction, customId, includeButton = true, footerTex
   if (includeButton) {
     container.addSectionComponents(
       new SectionBuilder()
-        .setSuccessButtonAccessory({
-          custom_id: customId,
-          label: 'Ping Again'
-        })
+        .setSuccessButtonAccessory((button) =>
+          button
+            .setCustomId(customId)
+            .setLabel('Ping Again')
+        )
         .addTextDisplayComponents(header, latency)
     );
   } else {
@@ -51,8 +52,16 @@ module.exports = {
       await interaction.deferReply({ ephemeral: cmd.ephemeral === true });
       await interaction.editReply(buildPingPayload(interaction, customId));
     } catch (e) {
-      logger.warn('Ping V2 payload failed, falling back to plain text', { error: e && (e.stack || e) });
-      await safeReply(interaction, { content: 'Pong!', ephemeral: true }, { loggerName: 'command:ping' });
+      logger.warn('Ping V2 payload failed, trying minimal V2 payload', { error: e && (e.stack || e) });
+      try {
+        await interaction.editReply({
+          components: [new TextDisplayBuilder().setContent('Pong!')],
+          flags: MessageFlags.IsComponentsV2
+        });
+      } catch (e2) {
+        logger.warn('Ping minimal V2 payload failed, falling back to plain text', { error: e2 && (e2.stack || e2) });
+        await safeReply(interaction, { content: 'Pong!', ephemeral: true }, { loggerName: 'command:ping' });
+      }
       return;
     }
 
