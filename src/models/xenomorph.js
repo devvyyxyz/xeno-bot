@@ -16,8 +16,6 @@ async function listByOwner(ownerId) {
   return rows.map(r => ({ ...r, stats: r.stats ? JSON.parse(r.stats) : {}, data: r.data ? JSON.parse(r.data) : {} }));
 }
 
-module.exports = { getById, listByOwner };
-
 async function createXeno(ownerId, opts = {}) {
   const payload = {
     owner_id: String(ownerId),
@@ -62,4 +60,13 @@ async function deleteXenosByOwner(ownerId) {
   }
 }
 
-module.exports = { createXeno, getXenoById, getXenosByOwner, deleteXenosByOwner };
+module.exports = {
+  // canonical names
+  createXeno,
+  getXenoById,
+  getXenosByOwner,
+  deleteXenosByOwner,
+  // compatibility aliases used by existing commands
+  getById,
+  listByOwner
+};

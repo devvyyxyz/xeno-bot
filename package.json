@@ -13,6 +13,8 @@
 
     "deploy-commands": "node deploy-commands.js",
     "start:local": "NODE_ENV=development node src/index.js",
+    "migrate:facehuggers:dry": "node scripts/migrate-facehuggers-to-xenos.js",
+    "migrate:facehuggers": "node scripts/migrate-facehuggers-to-xenos.js --apply",
     "test": "jest --runInBand",
     "lint": "eslint src --ext .js",
     "start:dashboard": "NODE_ENV=production node dashboard/server.js",
