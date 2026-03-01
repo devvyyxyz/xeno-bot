@@ -1,9 +1,38 @@
 const { ChatInputCommandBuilder } = require('@discordjs/builders');
 const xenoModel = require('../../models/xenomorph');
 const hostModel = require('../../models/host');
+const userModel = require('../../models/user');
 const db = require('../../db');
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const cmd = { name: 'evolve', description: 'Evolve your xenomorphs' };
+
+async function hydrateLegacyFacehuggers(userId, guildId) {
+  try {
+    const user = await userModel.getUserByDiscordId(String(userId));
+    if (!user || !user.data || !user.data.guilds || !user.data.guilds[guildId]) return 0;
+    const g = user.data.guilds[guildId];
+    const items = (g && g.items) ? g.items : {};
+    const qty = Number(items.facehugger || 0);
+    if (!qty || qty <= 0) return 0;
+
+    for (let i = 0; i < qty; i++) {
+      await xenoModel.createXeno(String(userId), {
+        pathway: 'standard',
+        role: 'facehugger',
+        stage: 'facehugger',
+        data: { source: 'legacy_item_facehugger' }
+      });
+    }
+
+    if (g.items && Object.prototype.hasOwnProperty.call(g.items, 'facehugger')) {
+      delete g.items.facehugger;
+    }
+    await userModel.updateUserDataRawById(user.id, user.data);
+    return qty;
+  } catch (_) {
+    return 0;
+  }
+}
 
 module.exports = {
   name: cmd.name,
@@ -40,11 +69,13 @@ module.exports = {
     await interaction.deferReply({ ephemeral: true });
     try {
       const userId = String(interaction.user.id);
+      const hydrated = await hydrateLegacyFacehuggers(userId, interaction.guildId);
       if (sub === 'list') {
         const list = await xenoModel.listByOwner(userId);
         if (!list.length) return interaction.editReply({ content: 'You have no xenomorphs.' });
         const lines = list.slice(0, 25).map(x => `#${x.id} ${x.role || x.stage} (path: ${x.pathway})`);
-        return interaction.editReply({ content: lines.join('\n') });
+        const prefix = hydrated > 0 ? `Converted ${hydrated} legacy facehugger item(s) into xenomorphs.\n\n` : '';
+        return interaction.editReply({ content: `${prefix}${lines.join('\n')}` });
       }
 
       if (sub === 'start') {
@@ -165,6 +196,10 @@ module.exports = {
       const focusedName = focusedNamed && focusedNamed.name ? String(focusedNamed.name) : null;
       const focused = focusedRaw && typeof focusedRaw === 'object' ? String(focusedRaw.value || '') : String(focusedRaw || '');
       const isNumeric = /^[0-9]+$/.test(focused);
+
+      if ((sub === 'start' || sub === 'info') && focusedName === 'xenomorph') {
+        await hydrateLegacyFacehuggers(String(userId), interaction.guildId);
+      }
 
       // START / INFO: if numeric focused -> suggest xeno ids
       if ((sub === 'start' || sub === 'info') && (focusedName === 'xenomorph' || (!focusedName && isNumeric))) {
