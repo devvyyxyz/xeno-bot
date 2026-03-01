@@ -6,7 +6,7 @@ const emojis = require('../config/emojis.json');
 const eggTypes = require('../config/eggTypes.json');
 const path = require('path');
 const fs = require('fs');
-const { AttachmentBuilder, PermissionsBitField } = require('discord.js');
+const { AttachmentBuilder, PermissionsBitField, ContainerBuilder, TextDisplayBuilder, MessageFlags } = require('discord.js');
 const db = require('./db');
 
 let client = null;
@@ -298,30 +298,42 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       logger.warn('Bot lacks AttachFiles permission in channel; skipping image attach', { guildId, channel: channel.id });
     }
     const content = `${eggWord} spawned! Type \`egg\` to catch ${numEggs === 1 ? 'it' : 'them'}!`;
+    const buildSpawnV2Payload = (files = null) => {
+      const container = new ContainerBuilder();
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(content)
+      );
+      const payload = {
+        components: [container],
+        flags: MessageFlags.IsComponentsV2
+      };
+      if (files) payload.files = files;
+      return payload;
+    };
     let sent;
     try {
       if (attachment) {
         // Prefer sending text+image together
         try {
-          sent = await channel.send({ content, files: [attachment] });
+          sent = await channel.send(buildSpawnV2Payload([attachment]));
         } catch (firstErr) {
           // Attempt fallback: read file into buffer and resend in one message
-          logger.warn('Combined text+image initial send failed; retrying with buffer', { guildId, error: firstErr && (firstErr.stack || firstErr) });
+          logger.warn('Combined V2 text+image initial send failed; retrying with buffer', { guildId, error: firstErr && (firstErr.stack || firstErr) });
           try {
             const buf = fs.readFileSync(imgPath);
-            sent = await channel.send({ content, files: [{ attachment: buf, name: 'egg_spawn.png' }] });
+            sent = await channel.send(buildSpawnV2Payload([{ attachment: buf, name: 'egg_spawn.png' }]));
           } catch (bufErr) {
-            // If buffer fallback also fails, rethrow to outer catch to handle text-first strategy
-            logger.warn('Buffer fallback for combined text+image failed', { guildId, error: bufErr && (bufErr.stack || bufErr) });
+            // If buffer fallback also fails, rethrow to outer catch to handle V2-only-then-legacy strategy
+            logger.warn('Buffer fallback for combined V2 text+image failed', { guildId, error: bufErr && (bufErr.stack || bufErr) });
             throw bufErr;
           }
         }
       } else {
-        sent = await channel.send({ content });
+        sent = await channel.send(buildSpawnV2Payload());
       }
     } catch (e) {
-      // If combined send ultimately fails, send the text then try image separately (also with buffer fallback)
-      logger.warn('Combined text+image send failed; sending text then image separately', { guildId, error: e && (e.stack || e) });
+      // If V2 send ultimately fails, try legacy content and then image separately.
+      logger.warn('V2 spawn send failed; falling back to legacy text/image strategy', { guildId, error: e && (e.stack || e) });
       try {
         sent = await channel.send({ content });
       } catch (textErr) {
