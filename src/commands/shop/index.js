@@ -1,13 +1,14 @@
-const { getCommandConfig } = require('../utils/commandsConfig');
-const shopConfig = require('../../config/shop.json');
-const emojiMap = require('../../config/emojis.json');
+const { getCommandConfig } = require('../../utils/commandsConfig');
+const shopConfig = require('../../../config/shop.json');
+const emojiMap = require('../../../config/emojis.json');
+const eggTypes = require('../../../config/eggTypes.json');
 const { EmbedBuilder, ActionRowBuilder } = require('discord.js');
 const { StringSelectMenuBuilder, SecondaryButtonBuilder, SuccessButtonBuilder } = require('@discordjs/builders');
-const userModel = require('../models/user');
+const userModel = require('../../models/user');
 
-const logger = require('../utils/logger').get('command:shop');
-const fallbackLogger = require('../utils/fallbackLogger');
-const createInteractionCollector = require('../utils/collectorHelper');
+const logger = require('../../utils/logger').get('command:shop');
+const fallbackLogger = require('../../utils/fallbackLogger');
+const createInteractionCollector = require('../../utils/collectorHelper');
 
 const cmd = getCommandConfig('shop') || { name: 'shop', description: 'Open the shop to buy items.' };
 
@@ -23,7 +24,7 @@ function makeEmbedForPage(categoryName, pageIdx, pages, royalJelly = 0) {
   const page = pages[pageIdx] || [];
   const embed = new EmbedBuilder()
     .setTitle(`${categoryName} Shop`)
-    .setColor(require('../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
+    .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
     .setFooter({ text: `Royal Jelly: ${royalJelly} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}` });
   if (page.length === 0) embed.setDescription('No items in this category.');
   for (const it of page) {

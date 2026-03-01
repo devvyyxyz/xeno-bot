@@ -1,8 +1,8 @@
 const { ChatInputCommandBuilder } = require('@discordjs/builders');
 const { EmbedBuilder } = require('discord.js');
-const { getCommandConfig } = require('../utils/commandsConfig');
-const shopConfig = require('../../config/shop.json');
-const userModel = require('../models/user');
+const { getCommandConfig } = require('../../utils/commandsConfig');
+const shopConfig = require('../../../config/shop.json');
+const userModel = require('../../models/user');
 
 const cmdCfg = getCommandConfig('item') || { name: 'item', description: 'Manage and use items' };
 
@@ -17,7 +17,7 @@ module.exports = {
     name: 'item',
     description: 'Item utilities',
     options: [
-      { // use
+      {
         type: 1,
         name: 'use',
         description: 'Use an item',
@@ -26,13 +26,13 @@ module.exports = {
           { type: 3, name: 'target', description: 'Target id (optional)', required: false }
         ]
       },
-      { // info
+      {
         type: 1,
         name: 'info',
         description: 'Get item info',
         options: [ { type: 3, name: 'item_id', description: 'Item id', required: true } ]
       },
-      { // combine
+      {
         type: 1,
         name: 'combine',
         description: 'Combine two items',
@@ -49,7 +49,7 @@ module.exports = {
       const itemId = interaction.options.getString('item_id');
       const item = findItem(itemId);
       if (!item) return interaction.reply({ content: 'Item not found.', ephemeral: true });
-      const embed = new EmbedBuilder().setTitle(item.name).setDescription(item.description || '').addFields({ name: 'Price', value: String(item.price || '—') }, { name: 'Rarity', value: String(item.rarity || 'common') }).setColor(require('../utils/commandsConfig').getCommandsObject().colour || 0xbab25d);
+      const embed = new EmbedBuilder().setTitle(item.name).setDescription(item.description || '').addFields({ name: 'Price', value: String(item.price || '—') }, { name: 'Rarity', value: String(item.rarity || 'common') }).setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d);
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
@@ -62,9 +62,7 @@ module.exports = {
       try {
         const currentQty = await userModel.getUserByDiscordId(userId).then(u => { if (!u) return 0; const g = (u.data && u.data.guilds && u.data.guilds[guildId]) || {}; return Number((g.items && g.items[item.id]) || 0); });
         if (!currentQty || currentQty <= 0) return interaction.editReply({ content: `You don't have any ${item.name}.` });
-        // consume one
         await userModel.removeItemForGuild(userId, guildId, item.id, 1);
-        // Apply basic effects by setting flags in user data where applicable
         const user = await userModel.getUserByDiscordId(userId);
         const data = user.data || {};
         data.guilds = data.guilds || {};
@@ -73,21 +71,19 @@ module.exports = {
         const now = Date.now();
         switch (item.id) {
           case 'incubation_accelerator':
-            // mark single egg accelerator for short duration
-            data.guilds[guildId].effects.incubation_accelerator = { applied_at: now, multiplier: 0.5, expires_at: now + 1000 * 60 * 60 }; // 1 hour
+            data.guilds[guildId].effects.incubation_accelerator = { applied_at: now, multiplier: 0.5, expires_at: now + 1000 * 60 * 60 };
             break;
           case 'jelly_extractor':
-            data.guilds[guildId].effects.jelly_extractor = { applied_at: now, multiplier: 2, expires_at: now + 1000 * 60 * 60 * 2 }; // 2 hours
+            data.guilds[guildId].effects.jelly_extractor = { applied_at: now, multiplier: 2, expires_at: now + 1000 * 60 * 60 * 2 };
             break;
           case 'defensive_pheromones':
-            data.guilds[guildId].effects.defensive_pheromones = { applied_at: now, expires_at: now + 1000 * 60 * 60 }; // 1 hour
+            data.guilds[guildId].effects.defensive_pheromones = { applied_at: now, expires_at: now + 1000 * 60 * 60 };
             break;
           case 'mutation_stabilizer':
-            data.guilds[guildId].effects.mutation_stabilizer = { applied_at: now, uses: 3 }; // 3 uses
+            data.guilds[guildId].effects.mutation_stabilizer = { applied_at: now, uses: 3 };
             break;
           case 'golden_gen':
-            // mark next hatch to have golden chance
-            data.guilds[guildId].effects.golden_next = { applied_at: now, expires_at: now + 1000 * 60 * 60 * 24 }; // 24h
+            data.guilds[guildId].effects.golden_next = { applied_at: now, expires_at: now + 1000 * 60 * 60 * 24 };
             break;
           case 'pathogen_spores':
             data.guilds[guildId].effects.pathogen_spores = { applied_at: now, uses: 1 };
@@ -115,7 +111,6 @@ module.exports = {
       const a = findItem(item1);
       const b = findItem(item2);
       if (!a || !b) return interaction.editReply({ content: 'One or both items not found.' });
-      // simple combine rules: two golden_gen -> rare token, else not implemented
       if (a.id === 'golden_gen' && b.id === 'golden_gen') {
         try {
           const user = await userModel.getUserByDiscordId(userId);
@@ -125,7 +120,6 @@ module.exports = {
           if (qtyA < 1 || qtyB < 1) return interaction.editReply({ content: 'Insufficient items to combine.' });
           await userModel.removeItemForGuild(userId, guildId, a.id, 1);
           await userModel.removeItemForGuild(userId, guildId, b.id, 1);
-          // give a new item: golden_fragment (virtual)
           await userModel.addItemForGuild(userId, guildId, 'golden_fragment', 1);
           return interaction.editReply({ content: 'Combined two Golden Gen into Golden Fragment.' });
         } catch (e) {

@@ -1,4 +1,4 @@
-const { getCommandsObject } = require('../utils/commandsConfig');
+const { getCommandsObject } = require('../../utils/commandsConfig');
 
 function resolveOwnerId() {
   try {
@@ -13,7 +13,6 @@ module.exports = {
   name: 'devgive',
   description: 'Developer-only: give credits to a user (owner only)',
   developerOnly: true,
-  // Message-mode only
   async executeMessage(message, args) {
     const ownerId = resolveOwnerId();
     if (!ownerId || String(message.author.id) !== String(ownerId)) {
@@ -21,7 +20,6 @@ module.exports = {
       return;
     }
 
-    // Usage: !devgive @user 100  OR !devgive <userId> 100
     const target = message.mentions.users && message.mentions.users.first();
     const maybeId = args && args.length ? args[0] : null;
     const amountArg = args && args.length > 1 ? args[1] : args && args.length === 1 ? args[0] : null;
@@ -41,8 +39,7 @@ module.exports = {
     }
 
     try {
-      const userModel = require('../models/user');
-      // credits are global; pass guildId as null
+      const userModel = require('../../models/user');
       const newBal = await userModel.modifyCurrencyForGuild(String(targetId), null, 'credits', amt);
       const mention = target ? `<@${targetId}>` : `<@${targetId}>`;
       await message.reply({ content: `Gave ${amt} credits to ${mention}. New balance: ${newBal}.`, allowedMentions: { repliedUser: false } });

@@ -217,6 +217,16 @@ const client = new Client({
 client.commands = new Collection();
 client.config = config;
 
+// Start background workers after the client is ready
+try {
+  const evolutionWorker = require('./evolutionWorker');
+  client.once('clientReady', () => {
+    try { evolutionWorker.start(client).catch(e => logger.warn('Failed starting evolution worker', { error: e && (e.stack || e) })); } catch (e) { logger.warn('Failed to invoke evolutionWorker.start', { error: e && (e.stack || e) }); }
+  });
+} catch (e) {
+  logger.warn('evolutionWorker module not available', { error: e && (e.stack || e) });
+}
+
 // Load commands (support both flat files and directory-based commands)
 const commandsPath = path.join(__dirname, 'commands');
 if (fs.existsSync(commandsPath)) {

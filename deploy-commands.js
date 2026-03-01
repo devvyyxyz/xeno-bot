@@ -7,37 +7,50 @@ const { Routes } = require('discord-api-types/v10');
 const baseLogger = require('./src/utils/logger');
 const logger = baseLogger.get('deploy-commands');
 
+// Load commands using the same loader used at runtime so directory-based
+// commands (src/commands/<name>/index.js) are discovered for registration.
 const commands = [];
 const commandsPath = path.join(__dirname, 'src', 'commands');
 const { getCommandsObject } = require('./src/utils/commandsConfig');
 const commandsConfig = getCommandsObject() || {};
 if (fs.existsSync(commandsPath)) {
-  const commandFiles = fs.readdirSync(commandsPath).filter(f => f.endsWith('.js'));
-  for (const file of commandFiles) {
-    const command = require(path.join(commandsPath, file));
-    if (command.data) commands.push(command.data);
-
-    // warn if config name differs from exported name
-    const key = path.basename(file, '.js');
-    const exportedName = command.name || (command.data && command.data.name);
-    // find config entry for this command across categories
-    let cfg = null;
-    let foundCategory = null;
-    for (const [catName, catObj] of Object.entries(commandsConfig || {})) {
-      if (catObj && Object.prototype.hasOwnProperty.call(catObj, key)) { cfg = catObj[key]; foundCategory = catName; break; }
+  try {
+    const loader = require(path.join(__dirname, 'src', 'commands', 'loader'));
+    const loaded = loader.loadCommands(commandsPath);
+    const existingKeys = new Set();
+    for (const [name, command] of loaded) {
+      existingKeys.add(name);
+      if (command && command.data) commands.push(command.data);
+      const cfgEntry = (() => {
+        for (const [catName, catObj] of Object.entries(commandsConfig || {})) {
+          if (catObj && Object.prototype.hasOwnProperty.call(catObj, name)) return { cfg: catObj[name], category: catName };
+        }
+        return null;
+      })();
+      if (cfgEntry && cfgEntry.cfg && cfgEntry.cfg.name && command && command.name && cfgEntry.cfg.name !== command.name) {
+        logger.warn(`commands.json mismatch for ${cfgEntry.category}/${name}`, { category: cfgEntry.category, key: name, configName: cfgEntry.cfg.name, exportedName: command.name });
+      }
     }
-    if (cfg && cfg.name && exportedName && cfg.name !== exportedName) {
-      logger.warn(`commands.json mismatch for ${foundCategory}/${key}`, { category: foundCategory, key, configName: cfg.name, exportedName });
-    }
-  }
 
-  // Validate commands.json entries have corresponding command modules
-  const existingKeys = new Set(commandFiles.map(f => path.basename(f, '.js')));
-  for (const [category, catObj] of Object.entries(commandsConfig || {})) {
-    if (!catObj || typeof catObj !== 'object') continue;
-    for (const cmdKey of Object.keys(catObj)) {
-      if (!existingKeys.has(cmdKey)) {
-        logger.warn(`commands.json entry missing module: ${category}/${cmdKey}`, { category, key: cmdKey });
+    // Validate commands.json entries have corresponding command modules
+    for (const [category, catObj] of Object.entries(commandsConfig || {})) {
+      if (!catObj || typeof catObj !== 'object') continue;
+      for (const cmdKey of Object.keys(catObj)) {
+        if (!existingKeys.has(cmdKey)) {
+          logger.warn(`commands.json entry missing module: ${category}/${cmdKey}`, { category, key: cmdKey });
+        }
+      }
+    }
+  } catch (e) {
+    logger.warn('Failed to load commands for deployment via loader; falling back to flat-scan', { error: e && (e.stack || e) });
+    // fallback: keep original simple flat-scan behaviour
+    const commandFiles = fs.readdirSync(commandsPath).filter(f => f.endsWith('.js'));
+    for (const file of commandFiles) {
+      try {
+        const command = require(path.join(commandsPath, file));
+        if (command.data) commands.push(command.data);
+      } catch (innerErr) {
+        logger.warn('Failed to require command during fallback deploy scan', { file, error: innerErr && (innerErr.stack || innerErr) });
       }
     }
   }

@@ -41,6 +41,88 @@
       "description": "Use or inspect items (use/info/combine)"
     }
   },
+  "Hive": {
+    "hive": {
+      "name": "hive",
+      "description": "Manage your hive and xenomorphs."
+    },
+    "hive create": {
+      "name": "hive create",
+      "description": "Start creating a hive if you meet the requirements for at least one type. Options are presented interactively."
+    },
+    "hive delete": {
+      "name": "hive delete",
+      "description": "Permanently delete your hive and all its data. This is irreversible."
+    },
+    "hive type info": {
+      "name": "hive type info",
+      "description": "Show information about different hive types and their requirements."
+    },
+    "hive events": {
+      "name": "hive events",
+      "description": "Show recent events in your hive (battles, evolutions, etc)."
+    },
+    "hive defend": {
+      "name": "hive defend",
+      "description": "Defend against an ongoing attack on your hive."
+    },
+    "hive modules": {
+      "name": "hive modules",
+      "description": "View all modules and their levels. "
+    },
+    "hive module upgrade": {
+      "name": "hive module upgrade",
+      "description": "Upgrade a hive module to improve your hive's stats."
+    },
+    "hive queen-status": {
+      "name": "hive queen-status",
+      "description": "Check the status of your hive queen (health, energy, etc)."
+    },
+    "hive queen-upgrade": {
+      "name": "hive queen-upgrade",
+      "description": "Upgrade your hive queen to increase your hive's potential."
+    }
+  },
+  "eggs": {
+    "egg info": {
+      "name": "egg info",
+      "description": "Show detailed information about an egg you own."
+    },
+    "egg destroy": {
+      "name": "egg destroy",
+      "description": "Permanently destroy an egg in your inventory. This is irreversible."
+    },
+    "eggs list": {
+      "name": "eggs list",
+      "description": "List all eggs in your inventory."
+    },
+    "eggs hatch": {
+      "name": "eggs hatch",
+      "description": "Hatch an egg to get a xenomorph. Requires an available hive slot."
+    },
+    "eggs sell": {
+      "name": "eggs sell",
+      "description": "Sell an egg from your inventory for credits."
+    }
+  },
+  "evolution": {
+    "evolve start": {
+      "name": "evolve start",
+      "description": "Start an evolution for one of your xenomorphs to evolve into a new form. Requires selecting a target role and consuming resources."
+    },
+    "evolve list": {
+      "name": "evolve list",
+      "description": "List all your xenomorphs and their current evolution status."
+    },
+    "evolve info": {
+      "name": "evolve info",
+      "description": "Show detailed information about an ongoing evolution or the requirements for a potential evolution."
+    },
+    "evolve cancel": {
+      "name": "evolve cancel",
+      "description": "Cancel an ongoing evolution. Some resources may be refunded depending on how far along the evolution is."
+    }
+  },
   "General": {
     "ping": {
       "name": "ping",
@@ -165,11 +247,6 @@
     "trade-log": {
       "name": "trade-log",
       "description": "View your past trades."
-    },
-    "showcase": {
-      "name": "showcase",
-      "description": "Show off your hive or collection to others."
-      
     },
     "gift": {
       "name": "gift",

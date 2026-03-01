@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
-const logger = require('../utils/logger').get('command:previewjoin');
+const logger = require('../../utils/logger').get('command:previewjoin');
 const { EmbedBuilder } = require('discord.js');
-const links = require('../../config/links.json');
-const guildCreateHandler = require('../events/guildCreate');
+const links = require('../../../config/links.json');
+const guildCreateHandler = require('../../events/guildCreate');
 
 module.exports = {
   name: 'previewjoin',
@@ -15,7 +15,7 @@ module.exports = {
       // Allow only the configured bot owner (from profile file) or fallback to env DEV_OWNER
       let ownerId = process.env.DEV_OWNER;
       try {
-        const cfgPath = process.env.BOT_CONFIG_PATH || path.join(__dirname, '..', '..', 'config', `bot.dev.json`);
+        const cfgPath = process.env.BOT_CONFIG_PATH || path.join(__dirname, '..', '..', '..', 'config', `bot.dev.json`);
         if (cfgPath && fs.existsSync(cfgPath)) {
           const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
           if (cfg && cfg.owner) ownerId = String(cfg.owner);

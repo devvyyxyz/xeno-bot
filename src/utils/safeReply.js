@@ -21,8 +21,24 @@ async function safeReply(interaction, payload = {}, opts = {}) {
     // If caller requested suppression of news reminder, skip. Otherwise prepend reminder to content if present on interaction.
     try {
       if (interaction && interaction._newsReminder && !payload.__suppressNewsReminder) {
-        const title = interaction._newsTitle ? ` — ${interaction._newsTitle}` : '';
-        const notice = `📢 New article posted${title}! Read it with /news\n\n`;
+        // Don't reveal the article title; just notify there's a new article.
+        // Prefer a linked mention to the `/news` application command when available.
+        let mention = '/news';
+        try {
+          let appCommands = null;
+          if (interaction.guild) {
+            appCommands = await interaction.guild.commands.fetch();
+          }
+          if (!appCommands && interaction.client && interaction.client.application) {
+            appCommands = await interaction.client.application.commands.fetch();
+          }
+          if (appCommands) {
+            const found = appCommands.find(c => c.name === 'news');
+            if (found && found.id) mention = `</news:${found.id}>`;
+          }
+        } catch (e) { /* ignore fetch failures, fall back to plain text /news */ }
+
+        const notice = `📢 New article posted! Read it with ${mention}\n\n`;
         if (payload.content) payload.content = notice + payload.content;
         else payload.content = notice;
       }

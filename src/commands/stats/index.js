@@ -1,7 +1,8 @@
-const { getCommandConfig } = require('../utils/commandsConfig');
-const userModel = require('../models/user');
+const { getCommandConfig } = require('../../utils/commandsConfig');
+const userModel = require('../../models/user');
 const { EmbedBuilder } = require('discord.js');
-const fallbackLogger = require('../utils/fallbackLogger');
+const fallbackLogger = require('../../utils/fallbackLogger');
+const db = require('../../db');
 
 const cmd = getCommandConfig('stats') || {
   name: 'stats',
@@ -34,12 +35,12 @@ module.exports = {
     try {
       await interaction.deferReply({ ephemeral: false });
       const target = interaction.options.getUser('user') || interaction.user;
-      const baseLogger = require('../utils/logger');
+      const baseLogger = require('../../utils/logger');
       if (baseLogger && baseLogger.sentry) {
         try {
           baseLogger.sentry.addBreadcrumb({ message: 'db.getUser.start', category: 'db', data: { userId: target.id } });
         } catch (e) {
-          try { require('../utils/logger').get('command:stats').warn('Failed to add sentry breadcrumb (db.getUser.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging stat breadcrumb error (db.getUser.start)', le && (le.stack || le)); } catch (ignored) {} }
+          try { require('../../utils/logger').get('command:stats').warn('Failed to add sentry breadcrumb (db.getUser.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging stat breadcrumb error (db.getUser.start)', le && (le.stack || le)); } catch (ignored) {} }
         }
       }
 
@@ -48,7 +49,7 @@ module.exports = {
         try {
           baseLogger.sentry.addBreadcrumb({ message: 'db.getUser.finish', category: 'db', data: { userId: target.id } });
         } catch (e) {
-          try { require('../utils/logger').get('command:stats').warn('Failed to add sentry breadcrumb (db.getUser.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging stat breadcrumb error (db.getUser.finish)', le && (le.stack || le)); } catch (ignored) {} }
+          try { require('../../utils/logger').get('command:stats').warn('Failed to add sentry breadcrumb (db.getUser.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging stat breadcrumb error (db.getUser.finish)', le && (le.stack || le)); } catch (ignored) {} }
         }
       }
 
@@ -98,7 +99,7 @@ module.exports = {
         const totalUsers = (totalUsersRaw && totalUsersRaw.rows && totalUsersRaw.rows[0] && totalUsersRaw.rows[0].c) || (totalUsersRaw && totalUsersRaw[0] && totalUsersRaw[0].c) || (totalUsersRaw && totalUsersRaw.length && totalUsersRaw[0].c) || 0;
         rankInfo = `${(Number(higher) + 1)}/${Number(totalUsers) || 'n'}`;
       } catch (e) {
-        try { require('../utils/logger').get('command:stats').warn('Failed computing leaderboard rank', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard rank error', le && (le.stack || le)); } catch (ignored) {} }
+        try { require('../../utils/logger').get('command:stats').warn('Failed computing leaderboard rank', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard rank error', le && (le.stack || le)); } catch (ignored) {} }
       }
 
       // Compute per-egg rates accurately using egg_catches events (server & global)
@@ -113,7 +114,7 @@ module.exports = {
         const firstRow = await db.knex('egg_catches').where({ user_id: String(target.id) }).min('caught_at as m').first();
         firstCatchAt = firstRow && (firstRow.m || firstRow['min(`caught_at`)']) ? new Date(firstRow.m || firstRow['min(`caught_at`)']) : null;
       } catch (e) {
-        try { require('../utils/logger').get('command:stats').warn('Failed fetching egg_catches for rates', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging egg_catches fetch error', le && (le.stack || le)); } catch (ignored) {} }
+        try { require('../../utils/logger').get('command:stats').warn('Failed fetching egg_catches for rates', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging egg_catches fetch error', le && (le.stack || le)); } catch (ignored) {} }
       }
       const now = Date.now();
       const daysSince = firstCatchAt ? Math.max((now - firstCatchAt.getTime()) / 86400000, 1/24) : Math.max((Date.now() - (global._softUptimeStart || Date.now())) / 86400000, 1/24);
@@ -121,7 +122,7 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setTitle(`${target.username}#${target.discriminator} — Game Stats`)
-        .setColor(require('../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
+        .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
         .setThumbnail(typeof target.displayAvatarURL === 'function' ? target.displayAvatarURL({ size: 512, extension: 'png' }) : null)
         .addFields(
           { name: 'Performance', value: `Catches: ${stats.catches || 0}\nAvg: ${msToHuman(stats.avg || null)}\nFastest: ${msToHuman(stats.fastest || null)}\nSlowest: ${msToHuman(stats.slowest || null)}\nLeaderboard: ${rankInfo}`, inline: false },
@@ -137,7 +138,7 @@ module.exports = {
       try {
         await interaction.editReply({ content: 'Failed to fetch stats or interaction expired.' });
       } catch (e) {
-        try { require('../utils/logger').get('command:stats').warn('Failed to send failure reply in stats command', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging failed-reply in stats command', le && (le.stack || le)); } catch (ignored) {} }
+        try { require('../../utils/logger').get('command:stats').warn('Failed to send failure reply in stats command', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging failed-reply in stats command', le && (le.stack || le)); } catch (ignored) {} }
       }
       throw err;
     }

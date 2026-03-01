@@ -1,8 +1,8 @@
 // EmbedBuilder not used in this command
-const { getCommandConfig } = require('../utils/commandsConfig');
-const userModel = require('../models/user');
-const hatchManager = require('../hatchManager');
-const eggTypes = require('../../config/eggTypes.json');
+const { getCommandConfig } = require('../../utils/commandsConfig');
+const userModel = require('../../models/user');
+const hatchManager = require('../../hatchManager');
+const eggTypes = require('../../../config/eggTypes.json');
 
 const cmd = getCommandConfig('eggs') || { name: 'eggs', description: 'Manage your eggs' };
 
@@ -48,10 +48,10 @@ module.exports = {
   },
   async autocomplete(interaction) {
     try {
-      const autocomplete = require('../utils/autocomplete');
+      const autocomplete = require('../../utils/autocomplete');
       const discordId = interaction.user.id;
       const guildId = interaction.guildId;
-      const logger = require('../utils/logger').get('command:eggs');
+      const logger = require('../../utils/logger').get('command:eggs');
       const u = await userModel.getUserByDiscordId(discordId);
       let inventoryEggs = [];
       if (u && u.data && u.data.guilds && u.data.guilds[guildId] && u.data.guilds[guildId].eggs) {
@@ -68,7 +68,7 @@ module.exports = {
       logger.info('Autocomplete invocation', { discordId, guildId, inventoryCount: inventoryEggs.length, itemsCount: items.length, focused: interaction.options.getFocused?.() || '' });
       return autocomplete(interaction, items, { map: it => ({ name: it.name, value: it.id }), max: 25 });
     } catch (e) {
-      const logger = require('../utils/logger').get('command:eggs');
+      const logger = require('../../utils/logger').get('command:eggs');
       logger.warn('Autocomplete failed', { error: e && (e.stack || e) });
       try { await interaction.respond([]); } catch (respErr) { logger.warn('Failed to respond empty autocomplete', { error: respErr && (respErr.stack || respErr) }); }
     }
@@ -82,14 +82,14 @@ module.exports = {
         if (sub === 'list') {
             await interaction.deferReply({ ephemeral: true });
             const rows = await hatchManager.listHatches(discordId, guildId);
-            const safeReply = require('../utils/safeReply');
+            const safeReply = require('../../utils/safeReply');
             if (!rows || rows.length === 0) {
               await safeReply(interaction, { content: 'You have no hatches.', ephemeral: true }, { loggerName: 'command:eggs' });
               return;
             }
             const { EmbedBuilder } = require('discord.js');
             const now = Date.now();
-            const embed = new EmbedBuilder().setTitle('Your Hatches').setColor(require('../utils/commandsConfig').getCommandsObject().colour || 0xbab25d).setTimestamp();
+            const embed = new EmbedBuilder().setTitle('Your Hatches').setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d).setTimestamp();
             // Build description lines with relative timestamps for pending hatches
             const lines = rows.map(r => {
               const finishes = Number(r.finishes_at) || 0;
@@ -120,10 +120,10 @@ module.exports = {
           const id = interaction.options.getInteger('id');
           try {
             await hatchManager.collectHatch(discordId, guildId, id);
-            const safeReply = require('../utils/safeReply');
+            const safeReply = require('../../utils/safeReply');
             await safeReply(interaction, { content: `Collected hatch #${id}. You received a facehugger.`, ephemeral: true }, { loggerName: 'command:eggs' });
           } catch (e) {
-            const safeReply = require('../utils/safeReply');
+            const safeReply = require('../../utils/safeReply');
             await safeReply(interaction, { content: `Failed to collect hatch: ${e.message}`, ephemeral: true }, { loggerName: 'command:eggs' });
           }
           return;
@@ -135,7 +135,7 @@ module.exports = {
         const amount = interaction.options.getInteger('amount') || 1;
         const eggConfig = eggTypes.find(e => e.id === eggId);
         if (!eggConfig) {
-          const safeReply = require('../utils/safeReply');
+          const safeReply = require('../../utils/safeReply');
           await safeReply(interaction, { content: 'Unknown egg type.', ephemeral: true }, { loggerName: 'command:eggs' });
           return;
         }
@@ -145,10 +145,10 @@ module.exports = {
           const sellPrice = Math.max(0, eggConfig.sell != null ? Number(eggConfig.sell) : Math.floor(Number(eggConfig.price || 0) / 2));
           const total = sellPrice * Number(amount);
           const newBal = await userModel.modifyCurrencyForGuild(discordId, guildId, 'royal_jelly', total);
-          const safeReply = require('../utils/safeReply');
+          const safeReply = require('../../utils/safeReply');
           await safeReply(interaction, { content: `Sold ${amount} x ${eggConfig.name} for ${total} royal jelly. New balance: ${newBal}.`, ephemeral: true }, { loggerName: 'command:eggs' });
         } catch (e) {
-          const safeReply = require('../utils/safeReply');
+          const safeReply = require('../../utils/safeReply');
           await safeReply(interaction, { content: `Failed to sell eggs: ${e.message}`, ephemeral: true }, { loggerName: 'command:eggs' });
         }
         return;
@@ -159,7 +159,7 @@ module.exports = {
         const amount = interaction.options.getInteger('amount') || 1;
         const eggConfig = eggTypes.find(e => e.id === eggId);
         if (!eggConfig) {
-          const safeReply = require('../utils/safeReply');
+          const safeReply = require('../../utils/safeReply');
           await safeReply(interaction, { content: 'Unknown egg type.', ephemeral: true }, { loggerName: 'command:eggs' });
           return;
         }
@@ -168,7 +168,7 @@ module.exports = {
           const u = await userModel.getUserByDiscordId(discordId);
           const curQty = Number((u?.data?.guilds?.[guildId]?.eggs?.[eggId]) || 0);
           if (curQty < amount) {
-            const safeReply = require('../utils/safeReply');
+            const safeReply = require('../../utils/safeReply');
             await safeReply(interaction, { content: `You only have ${curQty} x ${eggConfig.name}.`, ephemeral: true }, { loggerName: 'command:eggs' });
             return;
           }
@@ -179,18 +179,18 @@ module.exports = {
             const h = await hatchManager.startHatch(discordId, guildId, eggId, hatchSeconds * 1000);
             created.push(h.id);
           }
-          const safeReply = require('../utils/safeReply');
+          const safeReply = require('../../utils/safeReply');
           await safeReply(interaction, { content: `Started ${created.length} hatch(es) for ${eggConfig.name}. First hatch id: ${created[0]}. Each will finish in ${hatchSeconds}s.`, ephemeral: true }, { loggerName: 'command:eggs' });
         } catch (e) {
-          const safeReply = require('../utils/safeReply');
+          const safeReply = require('../../utils/safeReply');
           await safeReply(interaction, { content: `Failed to start hatch: ${e.message}`, ephemeral: true }, { loggerName: 'command:eggs' });
         }
         return;
       }
     } catch (err) {
-      const logger = require('../utils/logger').get('command:eggs');
+      const logger = require('../../utils/logger').get('command:eggs');
       logger.error('Unhandled error in eggs command', { error: err && (err.stack || err) });
-      try { const safeReply = require('../utils/safeReply'); await safeReply(interaction, { content: `Error: ${err.message}`, ephemeral: true }, { loggerName: 'command:eggs' }); } catch (replyErr) { logger.warn('Failed to send error reply in eggs command', { error: replyErr && (replyErr.stack || replyErr) }); }
+      try { const safeReply = require('../../utils/safeReply'); await safeReply(interaction, { content: `Error: ${err.message}`, ephemeral: true }, { loggerName: 'command:eggs' }); } catch (replyErr) { logger.warn('Failed to send error reply in eggs command', { error: replyErr && (replyErr.stack || replyErr) }); }
     }
   }
 };

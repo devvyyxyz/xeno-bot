@@ -1,10 +1,23 @@
 const fs = require('fs');
 const path = require('path');
-const knexLib = require('knex');
 const logger = require('../utils/logger').get('db');
 
-function createKnex() {
+async function createKnex() {
   const dbUrl = process.env.DATABASE_URL;
+  // Attempt to require knex synchronously; if the package is ESM, fall back to dynamic import
+  let knexLib;
+  try {
+    knexLib = require('knex');
+  } catch (reqErr) {
+    try {
+      // dynamic import for ESM package
+      const mod = await import('knex');
+      knexLib = mod && (mod.default || mod);
+    } catch (impErr) {
+      throw reqErr; // rethrow original error for clarity
+    }
+  }
+
   if (dbUrl) {
     // If DATABASE_URL is provided, attempt to detect the DB client (pg or mysql2).
     let client = 'pg';
@@ -44,7 +57,6 @@ function createKnex() {
     try {
       return knexLib({ client, connection, pool: { min: 0, max: 7 } });
     } catch (err) {
-      // Likely missing DB driver (e.g., mysql2). Provide actionable log then fallback later.
       logger.error('Failed creating knex for DATABASE_URL — missing or incompatible DB driver', { client, error: err && (err.stack || err) });
       throw err;
     }
@@ -58,9 +70,17 @@ function createKnex() {
   return knexLib({ client: 'sqlite3', connection: { filename }, useNullAsDefault: true });
 }
 
-let knex = createKnex();
+let knex = null;
 
-function createSqliteKnex() {
+async function createSqliteKnex() {
+  // similar dynamic require/import for knex
+  let knexLib;
+  try {
+    knexLib = require('knex');
+  } catch (reqErr) {
+    const mod = await import('knex');
+    knexLib = mod && (mod.default || mod);
+  }
   const dataDir = path.join(__dirname, '..', '..', 'data');
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
   const filename = path.join(dataDir, 'dev.sqlite');
@@ -69,6 +89,10 @@ function createSqliteKnex() {
 }
 
 async function migrate() {
+  // ensure knex is initialized lazily (avoid top-level require of knex which may be ESM)
+  if (!knex) {
+    knex = await createKnex();
+  }
   // If a DATABASE_URL is set, test the connection and fall back to SQLite on ECONNREFUSED.
   if (process.env.DATABASE_URL) {
     try {
@@ -80,7 +104,7 @@ async function migrate() {
         try {
           await knex.destroy();
         } catch (_) {}
-        knex = createSqliteKnex();
+        knex = await createSqliteKnex();
       } else {
         // non-connection error - rethrow so migrate() fails loudly
         throw e;
@@ -273,6 +297,123 @@ async function migrate() {
     }
   } catch (err) {
     logger.error('Failed ensuring hatches table', { error: err.stack || err });
+    throw err;
+  }
+  
+  // hives table: per-user hive data
+  try {
+    const hasHives = await knex.schema.hasTable('hives');
+    if (!hasHives) {
+      await knex.schema.createTable('hives', (table) => {
+        table.increments('id').primary();
+        table.string('user_id').notNullable().unique();
+        table.string('name').defaultTo('My Hive');
+        table.string('hive_type').defaultTo('default');
+        table.string('queen_xeno_id');
+        table.integer('capacity').defaultTo(5);
+        table.float('jelly_production_per_hour').defaultTo(0);
+        table.json('data');
+        table.timestamps(true, true);
+      });
+      logger.info('Created `hives` table');
+    } else {
+      logger.info('`hives` table already exists');
+    }
+  } catch (err) {
+    logger.error('Failed ensuring hives table', { error: err.stack || err });
+    throw err;
+  }
+
+  // user_resources: store per-user resource balances (royal jelly, spores, stabilizers)
+  try {
+    const hasResources = await knex.schema.hasTable('user_resources');
+    if (!hasResources) {
+      await knex.schema.createTable('user_resources', (table) => {
+        table.increments('id').primary();
+        table.string('user_id').unique().notNullable();
+        table.bigInteger('royal_jelly').defaultTo(0);
+        table.bigInteger('pathogen_spores').defaultTo(0);
+        table.bigInteger('stabilizers').defaultTo(0);
+        table.timestamps(true, true);
+      });
+      logger.info('Created `user_resources` table');
+    } else {
+      logger.info('`user_resources` table already exists');
+    }
+  } catch (err) {
+    logger.error('Failed ensuring user_resources table', { error: err.stack || err });
+    throw err;
+  }
+
+  // xenomorphs: individual creatures owned by users/hives
+  try {
+    const hasXenos = await knex.schema.hasTable('xenomorphs');
+    if (!hasXenos) {
+      await knex.schema.createTable('xenomorphs', (table) => {
+        table.increments('id').primary();
+        table.string('owner_id').notNullable();
+        table.integer('hive_id').nullable();
+        table.string('pathway').defaultTo('standard');
+        table.string('role').defaultTo('egg');
+        table.string('stage').defaultTo('egg');
+        table.integer('level').defaultTo(1);
+        table.json('stats');
+        table.json('data');
+        table.timestamps(true, true);
+      });
+      logger.info('Created `xenomorphs` table');
+    } else {
+      logger.info('`xenomorphs` table already exists');
+    }
+  } catch (err) {
+    logger.error('Failed ensuring xenomorphs table', { error: err.stack || err });
+    throw err;
+  }
+
+  // evolution_paths: optional table to store canonical evolution definitions
+  try {
+    const hasPaths = await knex.schema.hasTable('evolution_paths');
+    if (!hasPaths) {
+      await knex.schema.createTable('evolution_paths', (table) => {
+        table.increments('id').primary();
+        table.string('key').unique().notNullable();
+        table.string('name').notNullable();
+        table.json('definition');
+        table.timestamps(true, true);
+      });
+      logger.info('Created `evolution_paths` table');
+    } else {
+      logger.info('`evolution_paths` table already exists');
+    }
+  } catch (err) {
+    logger.error('Failed ensuring evolution_paths table', { error: err.stack || err });
+    throw err;
+  }
+
+  // evolution_queue: scheduled evolution jobs
+  try {
+    const hasQueue = await knex.schema.hasTable('evolution_queue');
+    if (!hasQueue) {
+      await knex.schema.createTable('evolution_queue', (table) => {
+        table.increments('id').primary();
+        table.integer('xeno_id').notNullable();
+        table.string('user_id').notNullable();
+        table.integer('hive_id').nullable();
+        table.string('target_role').notNullable();
+        table.bigInteger('started_at').nullable();
+        table.bigInteger('finishes_at').notNullable();
+        table.bigInteger('cost_jelly').defaultTo(0);
+        table.boolean('stabilizer_used').defaultTo(false);
+        table.string('status').defaultTo('queued');
+        table.string('result').nullable();
+        table.timestamps(true, true);
+      });
+      logger.info('Created `evolution_queue` table');
+    } else {
+      logger.info('`evolution_queue` table already exists');
+    }
+  } catch (err) {
+    logger.error('Failed ensuring evolution_queue table', { error: err.stack || err });
     throw err;
   }
 }
