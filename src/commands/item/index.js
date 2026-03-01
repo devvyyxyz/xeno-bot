@@ -3,6 +3,7 @@ const { EmbedBuilder } = require('discord.js');
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const shopConfig = require('../../../config/shop.json');
 const userModel = require('../../models/user');
+const safeReply = require('../../utils/safeReply');
 
 const cmdCfg = getCommandConfig('item') || { name: 'item', description: 'Manage and use items' };
 
@@ -45,6 +46,7 @@ module.exports = {
   },
 
   async executeInteraction(interaction) {
+    const respond = (payload) => safeReply(interaction, payload, { loggerName: 'command:item' });
     const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
     const subCfg = sub ? (getCommandConfig(`item ${sub}`) || getCommandConfig(`item.${sub}`)) : null;
     if (subCfg && subCfg.developerOnly) {
@@ -61,9 +63,9 @@ module.exports = {
     if (sub === 'info') {
       const itemId = interaction.options.getString('item_id');
       const item = findItem(itemId);
-      if (!item) return interaction.reply({ content: 'Item not found.', ephemeral: true });
+      if (!item) return respond({ content: 'Item not found.', ephemeral: true });
       const embed = new EmbedBuilder().setTitle(item.name).setDescription(item.description || '').addFields({ name: 'Price', value: String(item.price || '—') }, { name: 'Rarity', value: String(item.rarity || 'common') }).setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d);
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return respond({ embeds: [embed], ephemeral: true });
     }
 
     if (sub === 'use') {
@@ -71,10 +73,10 @@ module.exports = {
       const itemId = interaction.options.getString('item_id');
       const target = interaction.options.getString('target');
       const item = findItem(itemId);
-      if (!item) return interaction.editReply({ content: 'Item not found.' });
+      if (!item) return respond({ content: 'Item not found.' });
       try {
         const currentQty = await userModel.getUserByDiscordId(userId).then(u => { if (!u) return 0; const g = (u.data && u.data.guilds && u.data.guilds[guildId]) || {}; return Number((g.items && g.items[item.id]) || 0); });
-        if (!currentQty || currentQty <= 0) return interaction.editReply({ content: `You don't have any ${item.name}.` });
+        if (!currentQty || currentQty <= 0) return respond({ content: `You don't have any ${item.name}.` });
         await userModel.removeItemForGuild(userId, guildId, item.id, 1);
         const user = await userModel.getUserByDiscordId(userId);
         const data = user.data || {};
@@ -111,9 +113,9 @@ module.exports = {
             break;
         }
         await userModel.updateUserDataRawById(user.id, data);
-        return interaction.editReply({ content: `Used one ${item.name}. Effect applied.` });
+        return respond({ content: `Used one ${item.name}. Effect applied.` });
       } catch (e) {
-        return interaction.editReply({ content: `Failed to use item: ${e && e.message ? e.message : e}` });
+        return respond({ content: `Failed to use item: ${e && e.message ? e.message : e}` });
       }
     }
 
@@ -123,24 +125,24 @@ module.exports = {
       const item2 = interaction.options.getString('item2');
       const a = findItem(item1);
       const b = findItem(item2);
-      if (!a || !b) return interaction.editReply({ content: 'One or both items not found.' });
+      if (!a || !b) return respond({ content: 'One or both items not found.' });
       if (a.id === 'golden_gen' && b.id === 'golden_gen') {
         try {
           const user = await userModel.getUserByDiscordId(userId);
           const g = (user.data && user.data.guilds && user.data.guilds[guildId]) || {};
           const qtyA = Number((g.items && g.items[a.id]) || 0);
           const qtyB = Number((g.items && g.items[b.id]) || 0);
-          if (qtyA < 1 || qtyB < 1) return interaction.editReply({ content: 'Insufficient items to combine.' });
+          if (qtyA < 1 || qtyB < 1) return respond({ content: 'Insufficient items to combine.' });
           await userModel.removeItemForGuild(userId, guildId, a.id, 1);
           await userModel.removeItemForGuild(userId, guildId, b.id, 1);
           await userModel.addItemForGuild(userId, guildId, 'golden_fragment', 1);
-          return interaction.editReply({ content: 'Combined two Golden Gen into Golden Fragment.' });
+          return respond({ content: 'Combined two Golden Gen into Golden Fragment.' });
         } catch (e) {
-          return interaction.editReply({ content: `Combine failed: ${e && e.message ? e.message : e}` });
+          return respond({ content: `Combine failed: ${e && e.message ? e.message : e}` });
         }
       }
-      return interaction.editReply({ content: 'Combine recipe not implemented for those items.' });
+      return respond({ content: 'Combine recipe not implemented for those items.' });
     }
-    return interaction.reply({ content: 'Unknown subcommand.', ephemeral: true });
+    return respond({ content: 'Unknown subcommand.', ephemeral: true });
   }
 };

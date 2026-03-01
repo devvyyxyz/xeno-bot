@@ -4,6 +4,7 @@ const hostModel = require('../../models/host');
 const userModel = require('../../models/user');
 const db = require('../../db');
 const { getCommandConfig } = require('../../utils/commandsConfig');
+const safeReply = require('../../utils/safeReply');
 const cmd = { name: 'evolve', description: 'Evolve your xenomorphs' };
 
 async function hydrateLegacyFacehuggers(userId, guildId) {
@@ -67,15 +68,16 @@ module.exports = {
       }
     }
     await interaction.deferReply({ ephemeral: true });
+    const respond = (payload) => safeReply(interaction, payload, { loggerName: 'command:evolve' });
     try {
       const userId = String(interaction.user.id);
       const hydrated = await hydrateLegacyFacehuggers(userId, interaction.guildId);
       if (sub === 'list') {
         const list = await xenoModel.listByOwner(userId);
-        if (!list.length) return interaction.editReply({ content: 'You have no xenomorphs.' });
+        if (!list.length) return respond({ content: 'You have no xenomorphs.' });
         const lines = list.slice(0, 25).map(x => `#${x.id} ${x.role || x.stage} (path: ${x.pathway})`);
         const prefix = hydrated > 0 ? `Converted ${hydrated} legacy facehugger item(s) into xenomorphs.\n\n` : '';
-        return interaction.editReply({ content: `${prefix}${lines.join('\n')}` });
+        return respond({ content: `${prefix}${lines.join('\n')}` });
       }
 
       if (sub === 'start') {
@@ -83,14 +85,14 @@ module.exports = {
         const hostId = interaction.options.getInteger('host');
         const target = String(interaction.options.getString('next_stage') || '').trim().toLowerCase();
         const xeno = await xenoModel.getById(xenoId);
-        if (!xeno) return interaction.editReply({ content: 'Xenomorph not found.' });
-        if (String(xeno.owner_id) !== userId) return interaction.editReply({ content: 'You do not own this xenomorph.' });
+        if (!xeno) return respond({ content: 'Xenomorph not found.' });
+        if (String(xeno.owner_id) !== userId) return respond({ content: 'You do not own this xenomorph.' });
 
         const existingJob = await db.knex('evolution_queue')
           .where({ xeno_id: xenoId, user_id: userId, status: 'queued' })
           .first();
         if (existingJob) {
-          return interaction.editReply({ content: `This xenomorph already has a queued evolution (job #${existingJob.id}).` });
+          return respond({ content: `This xenomorph already has a queued evolution (job #${existingJob.id}).` });
         }
 
         const evol = require('../../../config/evolutions.json');
@@ -98,20 +100,20 @@ module.exports = {
         const reqByPath = (evol && evol.requirements && evol.requirements[pathwayKey]) ? evol.requirements[pathwayKey] : {};
         const fromStage = String(xeno.role || xeno.stage || '');
         const stepReq = reqByPath[fromStage] || null;
-        if (!stepReq) return interaction.editReply({ content: `No evolution step is configured for stage ${fromStage} in pathway ${pathwayKey}.` });
+        if (!stepReq) return respond({ content: `No evolution step is configured for stage ${fromStage} in pathway ${pathwayKey}.` });
         if (String(stepReq.to) !== String(target)) {
-          return interaction.editReply({ content: `Invalid target for ${fromStage} in ${pathwayKey}. Next allowed stage is ${stepReq.to}.` });
+          return respond({ content: `Invalid target for ${fromStage} in ${pathwayKey}. Next allowed stage is ${stepReq.to}.` });
         }
 
         if (Array.isArray(stepReq.requires_host_types) && stepReq.requires_host_types.length > 0) {
-          if (!hostId) return interaction.editReply({ content: `This evolution requires a host (${stepReq.requires_host_types.join(', ')}). Provide the host option.` });
+          if (!hostId) return respond({ content: `This evolution requires a host (${stepReq.requires_host_types.join(', ')}). Provide the host option.` });
           const host = await hostModel.getHostById(hostId);
-          if (!host) return interaction.editReply({ content: 'Host not found.' });
-          if (String(host.owner_id) !== userId) return interaction.editReply({ content: 'You do not own this host.' });
+          if (!host) return respond({ content: 'Host not found.' });
+          if (String(host.owner_id) !== userId) return respond({ content: 'You do not own this host.' });
           const hostType = String(host.host_type || '').toLowerCase();
           const allowedTypes = stepReq.requires_host_types.map(h => String(h).toLowerCase());
           if (!allowedTypes.includes(hostType)) {
-            return interaction.editReply({ content: `Host type ${host.host_type} is invalid for this evolution. Allowed: ${stepReq.requires_host_types.join(', ')}.` });
+            return respond({ content: `Host type ${host.host_type} is invalid for this evolution. Allowed: ${stepReq.requires_host_types.join(', ')}.` });
           }
           await hostModel.removeHostById(hostId);
         }
@@ -119,7 +121,7 @@ module.exports = {
         const defaults = { cost_jelly: Number(stepReq.cost_jelly || 0), time_ms: 1000 * 60 * 60 };
         const resRow = await db.knex('user_resources').where({ user_id: userId }).first();
         const jelly = resRow ? Number(resRow.royal_jelly || 0) : 0;
-        if (jelly < defaults.cost_jelly) return interaction.editReply({ content: `Insufficient royal jelly. Need ${defaults.cost_jelly}.` });
+        if (jelly < defaults.cost_jelly) return respond({ content: `Insufficient royal jelly. Need ${defaults.cost_jelly}.` });
         if (defaults.cost_jelly > 0) {
           await db.knex('user_resources').where({ user_id: userId }).update({ royal_jelly: Math.max(0, jelly - defaults.cost_jelly), updated_at: db.knex.fn.now() });
         }
@@ -128,13 +130,13 @@ module.exports = {
         const inserted = await db.knex('evolution_queue').insert({ xeno_id: xenoId, user_id: userId, hive_id: xeno.hive_id || null, target_role: target, started_at: now, finishes_at: finishes, cost_jelly: defaults.cost_jelly, stabilizer_used: false, status: 'queued' });
         const id = Array.isArray(inserted) ? inserted[0] : inserted;
         const hostPart = hostId ? ` Host #${hostId} consumed.` : '';
-        return interaction.editReply({ content: `Evolution started (job #${id}) for xeno #${xenoId} → ${target}. Cost: ${defaults.cost_jelly} royal jelly.${hostPart} Finishes in ~${Math.round(defaults.time_ms / 60000)} minutes.` });
+        return respond({ content: `Evolution started (job #${id}) for xeno #${xenoId} → ${target}. Cost: ${defaults.cost_jelly} royal jelly.${hostPart} Finishes in ~${Math.round(defaults.time_ms / 60000)} minutes.` });
       }
 
       if (sub === 'info') {
         const xenoId = interaction.options.getInteger('xenomorph');
         const xeno = await xenoModel.getById(xenoId);
-        if (!xeno) return interaction.editReply({ content: 'Xenomorph not found.' });
+        if (!xeno) return respond({ content: 'Xenomorph not found.' });
         // Describe evolution pathway using config/evolutions.json
         try {
           const evol = require('../../../config/evolutions.json');
@@ -163,23 +165,23 @@ module.exports = {
           } else {
             out += '\nNo pathway information available.';
           }
-          return interaction.editReply({ content: out });
+          return respond({ content: out });
         } catch (e) {
-          return interaction.editReply({ content: `#${xeno.id} ${xeno.role || xeno.stage} — pathway: ${xeno.pathway}` });
+          return respond({ content: `#${xeno.id} ${xeno.role || xeno.stage} — pathway: ${xeno.pathway}` });
         }
       }
 
       if (sub === 'cancel') {
         const jobId = interaction.options.getInteger('job_id');
         const job = await db.knex('evolution_queue').where({ id: jobId }).first();
-        if (!job) return interaction.editReply({ content: 'Job not found.' });
-        if (String(job.user_id) !== userId) return interaction.editReply({ content: 'You do not own this job.' });
-        if (job.status !== 'queued') return interaction.editReply({ content: 'Job has already started or completed and cannot be cancelled.' });
+        if (!job) return respond({ content: 'Job not found.' });
+        if (String(job.user_id) !== userId) return respond({ content: 'You do not own this job.' });
+        if (job.status !== 'queued') return respond({ content: 'Job has already started or completed and cannot be cancelled.' });
         await db.knex('evolution_queue').where({ id: jobId }).del();
-        return interaction.editReply({ content: 'Evolution cancelled. Resources are not refunded.' });
+        return respond({ content: 'Evolution cancelled. Resources are not refunded.' });
       }
     } catch (e) {
-      return interaction.editReply({ content: `Error: ${e && (e.message || e)}` });
+      return respond({ content: `Error: ${e && (e.message || e)}` });
     }
   }
   ,

@@ -6,6 +6,7 @@ let _hiveHasOwnerColumn = false;
 let _hiveHasUserIdColumn = false;
 let _hiveHasTypeColumn = false;
 let _hiveHasHiveTypeColumn = false;
+let _hiveHasGuildIdColumn = false;
 
 async function ensureHiveColumns() {
   if (_hiveColumnsChecked) return;
@@ -15,12 +16,14 @@ async function ensureHiveColumns() {
     _hiveHasUserIdColumn = await db.knex.schema.hasColumn(table, 'user_id');
     _hiveHasTypeColumn = await db.knex.schema.hasColumn(table, 'type');
     _hiveHasHiveTypeColumn = await db.knex.schema.hasColumn(table, 'hive_type');
+    _hiveHasGuildIdColumn = await db.knex.schema.hasColumn(table, 'guild_id');
   } catch (err) {
     logger.warn('Failed checking hive table columns, assuming legacy names', { error: err && (err.stack || err) });
     _hiveHasOwnerColumn = false;
     _hiveHasUserIdColumn = true;
     _hiveHasTypeColumn = false;
     _hiveHasHiveTypeColumn = true;
+    _hiveHasGuildIdColumn = false;
   }
   _hiveColumnsChecked = true;
 }
@@ -29,13 +32,13 @@ async function createHive(ownerDiscordId, guildId = null, type = 'default', init
   try {
     await ensureHiveColumns();
     const payload = {
-      guild_id: guildId,
       name: initialData.name || 'My Hive',
       queen_xeno_id: initialData.queen_xeno_id || null,
       capacity: initialData.capacity || 5,
       jelly_production_per_hour: initialData.jelly_production_per_hour || 0,
       data: initialData.data ? JSON.stringify(initialData.data) : null
     };
+    if (_hiveHasGuildIdColumn) payload.guild_id = guildId;
     if (_hiveHasUserIdColumn) payload.user_id = String(ownerDiscordId);
     if (_hiveHasOwnerColumn) payload.owner_discord_id = String(ownerDiscordId);
     if (_hiveHasHiveTypeColumn) payload.hive_type = type;
@@ -101,6 +104,8 @@ async function getHiveByOwner(ownerDiscordId) {
 
 async function getHivesByGuild(guildId) {
   try {
+    await ensureHiveColumns();
+    if (!_hiveHasGuildIdColumn) return [];
     const rows = await db.knex('hives').where({ guild_id: guildId }).select('*');
     return Promise.all(rows.map(r => (async () => {
       const parsed = r.data ? JSON.parse(r.data) : null;
@@ -127,9 +132,17 @@ async function getHivesByGuild(guildId) {
 
 async function updateHiveById(id, changes = {}) {
   try {
+    await ensureHiveColumns();
     const payload = {};
-    if ('guild_id' in changes) payload.guild_id = changes.guild_id;
-    if ('type' in changes) payload.type = changes.type;
+    if (_hiveHasGuildIdColumn && 'guild_id' in changes) payload.guild_id = changes.guild_id;
+    if ('type' in changes) {
+      if (_hiveHasTypeColumn) payload.type = changes.type;
+      if (_hiveHasHiveTypeColumn) payload.hive_type = changes.type;
+    }
+    if ('hive_type' in changes) {
+      if (_hiveHasTypeColumn) payload.type = changes.hive_type;
+      if (_hiveHasHiveTypeColumn) payload.hive_type = changes.hive_type;
+    }
     if ('name' in changes) payload.name = changes.name;
     if ('capacity' in changes) payload.capacity = changes.capacity;
     if ('queen_xeno_id' in changes) payload.queen_xeno_id = changes.queen_xeno_id;
@@ -158,7 +171,13 @@ async function deleteHiveById(id) {
 
 async function deleteHiveByOwner(ownerDiscordId) {
   try {
-    const deleted = await db.knex('hives').where({ owner_discord_id: String(ownerDiscordId) }).del();
+    await ensureHiveColumns();
+    let deleted = 0;
+    if (_hiveHasOwnerColumn) {
+      deleted = await db.knex('hives').where({ owner_discord_id: String(ownerDiscordId) }).del();
+    } else if (_hiveHasUserIdColumn) {
+      deleted = await db.knex('hives').where({ user_id: String(ownerDiscordId) }).del();
+    }
     logger.info('Deleted hive by owner', { ownerDiscordId, deleted });
     return deleted > 0;
   } catch (err) {
@@ -182,7 +201,14 @@ async function upsertHive(userId, changes = {}) {
   const existing = await db.knex('hives').where({ [whereCol]: String(userId) }).first();
   const payload = {};
   if ('name' in changes) payload.name = changes.name;
-  if ('hive_type' in changes) payload.type = changes.hive_type;
+  if ('hive_type' in changes) {
+    if (_hiveHasTypeColumn) payload.type = changes.hive_type;
+    if (_hiveHasHiveTypeColumn) payload.hive_type = changes.hive_type;
+  }
+  if ('type' in changes) {
+    if (_hiveHasTypeColumn) payload.type = changes.type;
+    if (_hiveHasHiveTypeColumn) payload.hive_type = changes.type;
+  }
   if ('capacity' in changes) payload.capacity = changes.capacity;
   if ('queen_xeno_id' in changes) payload.queen_xeno_id = changes.queen_xeno_id;
   if ('jelly_production_per_hour' in changes) payload.jelly_production_per_hour = changes.jelly_production_per_hour;

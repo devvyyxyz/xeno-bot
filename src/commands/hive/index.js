@@ -4,6 +4,7 @@ const xenomorphModel = require('../../models/xenomorph');
 const userModel = require('../../models/user');
 const userResources = require('../../models/userResources');
 const { getCommandConfig } = require('../../utils/commandsConfig');
+const { buildStatsV2Payload } = require('../../utils/componentsV2');
 const hiveTypes = require('../../../config/hiveTypes.json');
 const hiveDefaults = require('../../../config/hiveDefaults.json');
 const db = require('../../db');
@@ -59,17 +60,41 @@ module.exports = {
     // STATS
     if (sub === 'stats') {
       try {
+        const logger = require('../../utils/logger').get('command:hive');
         const targetUser = (() => { try { return interaction.options.getUser('user'); } catch (e) { return null; } })() || interaction.user;
         const hive = await hiveModel.getHiveByUser(String(targetUser.id));
         if (!hive) return safeReply(interaction, { content: `${targetUser.id === interaction.user.id ? 'You do not have a hive yet. Create one with `/hive create`.' : `${targetUser.username} does not have a hive yet.`}`, ephemeral: true });
+
+        const title = `${hive.name || `${targetUser.username}'s Hive`}`;
+        const rows = [
+          { label: 'Owner', value: `<@${targetUser.id}>` },
+          { label: 'Type', value: String(hive.type || hive.hive_type || 'default') },
+          { label: 'Capacity', value: String(hive.capacity || 0) },
+          { label: 'Jelly / hour', value: String(hive.jelly_production_per_hour || 0) },
+          { label: 'Queen Xeno', value: String(hive.queen_xeno_id || 'None') }
+        ];
+
+        try {
+          return safeReply(interaction, {
+            ...buildStatsV2Payload({
+              title,
+              rows,
+              footer: `Requested by ${interaction.user.username}`
+            }),
+            ephemeral: true
+          });
+        } catch (v2Err) {
+          logger.warn('Hive stats V2 payload failed; falling back to embed', { error: v2Err && (v2Err.stack || v2Err) });
+        }
+
         const embed = new EmbedBuilder()
-          .setTitle(`${hive.name || `${targetUser.username}'s Hive`}`)
+          .setTitle(title)
           .addFields(
-            { name: 'Owner', value: `<@${targetUser.id}>`, inline: true },
-            { name: 'Type', value: String(hive.type || hive.hive_type || 'default'), inline: true },
-            { name: 'Capacity', value: String(hive.capacity || 0), inline: true },
-            { name: 'Jelly / hour', value: String(hive.jelly_production_per_hour || 0), inline: true },
-            { name: 'Queen Xeno', value: String(hive.queen_xeno_id || 'None'), inline: true }
+            { name: 'Owner', value: rows[0].value, inline: true },
+            { name: 'Type', value: rows[1].value, inline: true },
+            { name: 'Capacity', value: rows[2].value, inline: true },
+            { name: 'Jelly / hour', value: rows[3].value, inline: true },
+            { name: 'Queen Xeno', value: rows[4].value, inline: true }
           )
           .setTimestamp();
         return safeReply(interaction, { embeds: [embed], ephemeral: true });

@@ -238,7 +238,10 @@ module.exports = {
         await interaction.editReply({ components: [new TextDisplayBuilder().setContent(`**${target.username}'s Inventory**\n${formatInventory(eggs)}`)], flags: MessageFlags.IsComponentsV2 });
         return;
       } catch (err2) {
-        try { await interaction.editReply({ content: 'Failed to render inventory.' }); } catch (e) { try { require('../../utils/logger').get('command:inventory').warn('Failed to editReply in inventory command', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging editReply error in inventory', le && (le.stack || le)); } catch (ignored) {} } }
+        try {
+          const safeReply = require('../../utils/safeReply');
+          await safeReply(interaction, { content: 'Failed to render inventory.' }, { loggerName: 'command:inventory' });
+        } catch (e) { try { require('../../utils/logger').get('command:inventory').warn('Failed to editReply in inventory command', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging editReply error in inventory', le && (le.stack || le)); } catch (ignored) {} } }
         throw err2;
       }
     }
@@ -250,7 +253,10 @@ module.exports = {
       return;
     }
     collector.on('collect', async i => {
-      if (i.user.id !== interaction.user.id) return i.reply({ content: 'Only the command user can interact with this view.', ephemeral: true });
+      if (i.user.id !== interaction.user.id) {
+        const safeReply = require('../../utils/safeReply');
+        return safeReply(i, { content: 'Only the command user can interact with this view.', ephemeral: true }, { loggerName: 'command:inventory' });
+      }
       try {
         if (i.customId === 'inventory-type') {
           currentType = i.values && i.values[0] ? i.values[0] : 'eggs';

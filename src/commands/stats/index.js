@@ -3,6 +3,7 @@ const userModel = require('../../models/user');
 const { EmbedBuilder } = require('discord.js');
 const fallbackLogger = require('../../utils/fallbackLogger');
 const db = require('../../db');
+const safeReply = require('../../utils/safeReply');
 
 const cmd = getCommandConfig('stats') || {
   name: 'stats',
@@ -139,7 +140,7 @@ module.exports = {
       await interaction.editReply({ embeds: [embed] });
     } catch (err) {
       try {
-        await interaction.editReply({ content: 'Failed to fetch stats or interaction expired.' });
+        await safeReply(interaction, { content: 'Failed to fetch stats or interaction expired.' }, { loggerName: 'command:stats' });
       } catch (e) {
         try { require('../../utils/logger').get('command:stats').warn('Failed to send failure reply in stats command', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging failed-reply in stats command', le && (le.stack || le)); } catch (ignored) {} }
       }
