@@ -3,7 +3,14 @@
   "Gameplay": {
     "shop": { "name": "shop", "description": "Open the shop to buy items.", "ephemeral": true },
     "inventory": { "name": "inventory", "description": "Show your egg inventory or another user's.", "ephemeral": false },
-    "leaderboard": { "name": "leaderboard", "description": "Check the top collectors and strongest hives." },
+    "leaderboard": {
+      "name": "leaderboard",
+      "description": "Check the top collectors and strongest hives.",
+      "subcommands": {
+        "server": { "name": "leaderboard server", "description": "Show local server leaderboard" },
+        "global": { "name": "leaderboard global", "description": "Display how the server stands compared to others globally." }
+      }
+    },
     "stats": { "name": "stats", "description": "View stats about a user." },
     "encyclopedia": { "name": "encyclopedia", "description": "Show all eggs and their stats.", "ephemeral": false },
     "collect": { "name": "collect", "description": "Collect a spawned egg from the channel." },

@@ -20,11 +20,32 @@ module.exports = {
     description: cmd.description,
     options: [
       {
-        name: 'sort',
-        description: 'Sort by',
-        type: 3, // STRING
-        required: false,
-        autocomplete: true
+        name: 'server',
+        description: 'Show local server leaderboard',
+        type: 1,
+        options: [
+          {
+            name: 'sort',
+            description: 'Sort by',
+            type: 3,
+            required: false,
+            autocomplete: true
+          }
+        ]
+      },
+      {
+        name: 'global',
+        description: 'Show global leaderboard (server rankings)',
+        type: 1,
+        options: [
+          {
+            name: 'sort',
+            description: 'Sort by',
+            type: 3,
+            required: false,
+            autocomplete: true
+          }
+        ]
       }
     ]
   },
@@ -43,7 +64,10 @@ module.exports = {
    },
 
   async executeInteraction(interaction) {
-    const sort = interaction.options.getString('sort') || 'eggs';
+    // determine subcommand (if any)
+    let sub = null;
+    try { sub = interaction.options && interaction.options.getSubcommand ? (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })() : null; } catch (e) { sub = null; }
+    const sort = (sub === 'server') ? (interaction.options.getString('sort') || 'eggs') : (interaction.options.getString('sort') || 'eggs');
     if (!(interaction.isStringSelectMenu && interaction.isStringSelectMenu())) {
       await interaction.deferReply({ ephemeral: cmd.ephemeral === true });
     }
@@ -53,7 +77,177 @@ module.exports = {
     const rows = await userModel.getAllUsers();
     if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.getAllUsers.finish', category: 'db', data: { count: rows.length } }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to add sentry breadcrumb (db.getAllUsers.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard breadcrumb (db.getAllUsers.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
     const guildId = interaction.guildId;
-    // Build leaderboard data
+
+    // If global subcommand requested, build server-level totals and show global ranking
+    if (sub === 'global') {
+      const sortOpt = interaction.options.getString('sort') || 'eggs';
+      const guildStats = {};
+      // Initialize containers: for eggs totals (per type), rarity, catchTimes
+      for (const user of rows) {
+        const data = user.data || {};
+        const g = data.guilds || {};
+        const stats = data.stats || {};
+        for (const [gid, gd] of Object.entries(g)) {
+          guildStats[gid] = guildStats[gid] || { eggsByType: {}, total: 0, catchTimes: [] };
+          try {
+            const eggsObj = (gd && gd.eggs) || {};
+            for (const [etype, count] of Object.entries(eggsObj)) {
+              const n = Number(count) || 0;
+              guildStats[gid].eggsByType[etype] = (guildStats[gid].eggsByType[etype] || 0) + n;
+              guildStats[gid].total = (guildStats[gid].total || 0) + n;
+            }
+          } catch (e) { }
+          // include user's catchTimes for this guild if user has presence here
+          try {
+            if (stats && stats.catchTimes && stats.catchTimes.length) {
+              guildStats[gid].catchTimes = guildStats[gid].catchTimes.concat(stats.catchTimes);
+            }
+          } catch (e) { }
+        }
+      }
+
+      // Build sortable entries
+      const entries = Object.entries(guildStats).map(([gid, info]) => ({ gid, info }));
+
+      // Sorting by requested option
+      if (sortOpt === 'eggs') {
+        entries.sort((a, b) => (b.info.total || 0) - (a.info.total || 0));
+      } else if (sortOpt === 'rarity') {
+        entries.forEach(e => {
+          let score = 0;
+          for (const type of eggTypes) {
+            score += (e.info.eggsByType[type.id] || 0) * (type.rarity || 1);
+          }
+          e.info.rarityScore = score;
+        });
+        entries.sort((a, b) => (b.info.rarityScore || 0) - (a.info.rarityScore || 0));
+      } else if (sortOpt.startsWith('eggtype_')) {
+        const typeId = sortOpt.replace('eggtype_', '');
+        entries.sort((a, b) => (b.info.eggsByType[typeId] || 0) - (a.info.eggsByType[typeId] || 0));
+      } else if (sortOpt === 'fastest') {
+        entries.forEach(e => { e.info.best = (e.info.catchTimes && e.info.catchTimes.length) ? Math.min(...e.info.catchTimes) : null; });
+        entries.filter(e => e.info.best !== null).sort((a, b) => a.info.best - b.info.best);
+        entries.sort((a, b) => {
+          const A = a.info.best === null ? Number.POSITIVE_INFINITY : a.info.best;
+          const B = b.info.best === null ? Number.POSITIVE_INFINITY : b.info.best;
+          return A - B;
+        });
+      } else if (sortOpt === 'slowest') {
+        entries.forEach(e => { e.info.worst = (e.info.catchTimes && e.info.catchTimes.length) ? Math.max(...e.info.catchTimes) : null; });
+        entries.sort((a, b) => {
+          const A = a.info.worst === null ? -Infinity : a.info.worst;
+          const B = b.info.worst === null ? -Infinity : b.info.worst;
+          return B - A;
+        });
+      }
+
+      const top = entries.slice(0, 10);
+      let desc = '';
+      for (let i = 0; i < top.length; i++) {
+        const entry = top[i];
+        const gid = entry.gid;
+        // Try cache first, then fetch if missing. If still missing, use stored guild config name if available.
+        let guildName = null;
+        try {
+          const cached = interaction.client && interaction.client.guilds && interaction.client.guilds.cache ? interaction.client.guilds.cache.get(gid) : null;
+          if (cached && cached.name) guildName = cached.name;
+          else if (interaction.client && interaction.client.guilds && typeof interaction.client.guilds.fetch === 'function') {
+            try {
+              const fetched = await interaction.client.guilds.fetch(gid).catch(() => null);
+              if (fetched && fetched.name) guildName = fetched.name;
+            } catch (e) { }
+          }
+          // final fallback: try guild settings cache (may have stored display name in data)
+          if (!guildName) {
+            try {
+              const guildModel = require('../../models/guild');
+              const cfg = await guildModel.getGuildConfig(gid).catch ? await guildModel.getGuildConfig(gid) : null;
+              if (cfg && cfg.data) {
+                const possible = cfg.data.name || cfg.data.guildName || cfg.data.guild_name || cfg.data.displayName || cfg.data.display_name;
+                if (possible) guildName = possible;
+              }
+            } catch (e) { }
+          }
+        } catch (e) { }
+        const displayName = guildName ? `${guildName}` : `Guild ${gid}`;
+        // Format value per sort
+        let value = '';
+        if (sortOpt === 'eggs') value = `**${entry.info.total || 0} eggs**`;
+        else if (sortOpt === 'rarity') value = `**${entry.info.rarityScore || 0} rarity**`;
+        else if (sortOpt.startsWith('eggtype_')) {
+          const t = sortOpt.replace('eggtype_', '');
+          const eggType = eggTypes.find(e => e.id === t);
+          value = eggType ? `${eggType.emoji} **${entry.info.eggsByType[t] || 0}**` : `**${entry.info.eggsByType[t] || 0}**`;
+        } else if (sortOpt === 'fastest') value = (entry.info.best !== null && typeof entry.info.best === 'number') ? `**${(entry.info.best/1000).toFixed(2)}s**` : 'No data';
+        else if (sortOpt === 'slowest') value = (entry.info.worst !== null && typeof entry.info.worst === 'number') ? `**${(entry.info.worst/1000/3600).toFixed(2)}h**` : 'No data';
+        desc += `#${i+1} ${displayName} — ${value}\n`;
+      }
+
+      const totalServers = entries.length;
+      const idx = entries.findIndex(e => e.gid === String(guildId));
+      const rank = idx >= 0 ? idx + 1 : 'Unranked';
+      const currentTotal = (guildStats[String(guildId)] && ((sortOpt === 'eggs') ? guildStats[String(guildId)].total : (sortOpt.startsWith('eggtype_') ? (guildStats[String(guildId)].eggsByType[sortOpt.replace('eggtype_', '')] || 0) : (sortOpt === 'rarity' ? (() => { let s=0; for(const t of eggTypes){ s += (guildStats[String(guildId)].eggsByType[t.id]||0)*(t.rarity||1);} return s; })() : 0)))) || 0;
+
+      const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
+      const sortChoices = [
+        { label: 'Total Eggs', value: 'eggs' },
+        { label: 'Fastest Catch', value: 'fastest' },
+        { label: 'Slowest Catch', value: 'slowest' },
+        { label: 'Egg Rarity', value: 'rarity' }
+      ];
+      const eggTypeChoices = eggTypes.map(e => ({
+        label: `${e.name} Eggs`.length > 25 ? `${e.name} Eggs`.slice(0, 22) + '...' : `${e.name} Eggs`,
+        value: `eggtype_${e.id}`.length > 25 ? `eggtype_${e.id}`.slice(0, 22) + '...' : `eggtype_${e.id}`
+      }));
+      const sortLabel = ({ eggs: 'Total Eggs', rarity: 'Egg Rarity', fastest: 'Fastest Catch', slowest: 'Slowest Catch' }[sortOpt] || (sortOpt.startsWith('eggtype_') ? `Egg Type ${sortOpt.replace('eggtype_','')}` : sortOpt));
+      const embed = new EmbedBuilder()
+        .setTitle('🌐 Global Leaderboard')
+        .setDescription(desc || 'No server data.')
+        .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
+        .setFooter({ text: `This server: #${rank} / ${totalServers} — ${currentTotal} ${sortLabel ? `(${sortLabel})` : ''}` });
+
+      const select = new StringSelectMenuBuilder()
+        .setCustomId('leaderboard-sort')
+        .setPlaceholder('Sort by...')
+        .addOptions(sortChoices.slice(0, 25).map(opt => ({ label: opt.label, value: opt.value, default: opt.value === sortOpt })));
+      const components = [new ActionRowBuilder().addComponents(select)];
+      if (sortOpt === 'eggs') {
+        const eggTypeSelect = new StringSelectMenuBuilder()
+          .setCustomId('leaderboard-eggtype')
+          .setPlaceholder('Sort by egg type...')
+          .addOptions(eggTypeChoices.slice(0, 25).map(opt => ({ label: opt.label, value: opt.value })));
+        components.push(new ActionRowBuilder().addComponents(eggTypeSelect));
+      }
+
+      if (interaction.isStringSelectMenu && interaction.isStringSelectMenu()) {
+        await interaction.update({ embeds: [embed], components });
+        return;
+      }
+
+      await interaction.editReply({ embeds: [embed], components });
+      const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [embed], components, time: 60_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 3 } });
+      if (!collector) {
+        try { require('../../utils/logger').get('command:leaderboard').warn('Failed to attach global leaderboard collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach global leaderboard collector', le && (le.stack || le)); } catch (ignored) {} }
+        return;
+      }
+      collector.on('collect', async i => {
+        if (i.customId === 'leaderboard-sort') {
+          const newSort = i.values[0];
+          i.options = { getString: () => newSort, getSubcommand: () => 'global' };
+          await module.exports.executeInteraction(i);
+        } else if (i.customId === 'leaderboard-eggtype') {
+          const newSort = i.values[0];
+          i.options = { getString: () => newSort, getSubcommand: () => 'global' };
+          await module.exports.executeInteraction(i);
+        }
+      });
+      collector.on('end', async () => {
+        try { await msg.edit({ components: [] }); } catch (e) { try { require('../../utils/logger').get('command:leaderboard').warn('Failed clearing global leaderboard components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed clearing global leaderboard components after collector end', le && (le.stack || le)); } catch (ignored) {} } }
+      });
+      return;
+    }
+
+    // Build per-user leaderboard data for the server
     let leaderboard = [];
     for (const user of rows) {
       const data = user.data || {};
