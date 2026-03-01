@@ -406,6 +406,33 @@ async function migrate() {
     } else {
       logger.info('`hosts` table already exists');
     }
+    // If there's an existing data/hosts.json file and the hosts table is empty,
+    // import the entries to the DB to preserve user data from the file-backed model.
+    try {
+      const hostsFile = path.join(__dirname, '..', '..', 'data', 'hosts.json');
+      if (fs.existsSync(hostsFile)) {
+        try {
+          const raw = fs.readFileSync(hostsFile, 'utf8');
+          const parsed = raw && raw.trim().length ? JSON.parse(raw) : [];
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const [{ cnt: currentCount } = { cnt: 0 }] = await knex('hosts').count('* as cnt');
+            if (Number(currentCount || 0) === 0) {
+              const toInsert = parsed.map(p => {
+                const owner = p.owner_discord_id || p.owner_id || p.owner || '';
+                const hostType = p.host_type || p.hostType || p.type || p.host || 'human';
+                const created = p.created_at ? Date.parse(p.created_at) : (p.found_at ? Number(p.found_at) : Date.now());
+                return { owner_id: String(owner), host_type: String(hostType), found_at: Number(created) || Date.now(), data: p.data ? JSON.stringify(p.data) : null };
+              });
+              if (toInsert.length) {
+                try { await knex('hosts').insert(toInsert); logger.info('Imported hosts from data/hosts.json into DB', { count: toInsert.length }); } catch (ie) { logger.warn('Failed importing hosts.json into DB', { error: ie && (ie.stack || ie) }); }
+              }
+            }
+          }
+        } catch (e) {
+          logger.warn('Failed parsing data/hosts.json during import', { error: e && e.message });
+        }
+      }
+    } catch (ie) { logger.warn('Hosts import check failed', { error: ie && ie.message }); }
   } catch (err) {
     logger.error('Failed ensuring hosts table', { error: err.stack || err });
     throw err;

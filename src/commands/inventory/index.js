@@ -161,6 +161,7 @@ module.exports = {
           .addOptions(
             new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(true),
             new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items'),
+            new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies'),
             new StringSelectMenuOptionBuilder().setLabel('Hosts').setValue('hosts')
           )
       ),
