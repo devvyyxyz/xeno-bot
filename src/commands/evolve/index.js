@@ -16,12 +16,12 @@ module.exports = {
     .addSubcommands(sub =>
       sub.setName('start')
         .setDescription('Start an evolution')
-        .addIntegerOptions(opt => opt.setName('xeno_id').setDescription('Xenomorph id').setRequired(true))
-        .addStringOptions(opt => opt.setName('target').setDescription('Target role').setRequired(true))
+        .addIntegerOptions(opt => opt.setName('xeno_id').setDescription('Xenomorph id').setRequired(true).setAutocomplete(true))
+        .addStringOptions(opt => opt.setName('target').setDescription('Target role').setRequired(true).setAutocomplete(true))
     )
     .addSubcommands(sub => sub.setName('list').setDescription('List your xenomorphs'))
-    .addSubcommands(sub => sub.setName('info').setDescription('Show evolution info').addIntegerOptions(opt => opt.setName('xeno_id').setDescription('Xenomorph id').setRequired(true)))
-    .addSubcommands(sub => sub.setName('cancel').setDescription('Cancel an ongoing evolution').addIntegerOptions(opt => opt.setName('job_id').setDescription('Evolution job id').setRequired(true))),
+    .addSubcommands(sub => sub.setName('info').setDescription('Show evolution info').addIntegerOptions(opt => opt.setName('xeno_id').setDescription('Xenomorph id').setRequired(true).setAutocomplete(true)))
+    .addSubcommands(sub => sub.setName('cancel').setDescription('Cancel an ongoing evolution').addIntegerOptions(opt => opt.setName('job_id').setDescription('Evolution job id').setRequired(true).setAutocomplete(true))),
 
   async executeInteraction(interaction) {
     const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
@@ -81,6 +81,52 @@ module.exports = {
       }
     } catch (e) {
       return interaction.editReply({ content: `Error: ${e && (e.message || e)}` });
+    }
+  }
+  ,
+  async autocomplete(interaction) {
+    try {
+      const autocomplete = require('../../utils/autocomplete');
+      // detect subcommand safely
+      let sub = null;
+      try { sub = interaction.options && interaction.options.getSubcommand ? (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })() : null; } catch (e) { sub = null; }
+      const userId = interaction.user.id;
+      // determine focused text and whether numeric
+      const focusedRaw = interaction.options.getFocused?.();
+      const focused = focusedRaw && typeof focusedRaw === 'object' ? String(focusedRaw.value || '') : String(focusedRaw || '');
+      const isNumeric = /^[0-9]+$/.test(focused);
+
+      // START / INFO: if numeric focused -> suggest xeno ids
+      if ((sub === 'start' || sub === 'info') && isNumeric) {
+        try {
+          const list = await xenoModel.listByOwner(String(userId));
+          if (!list || list.length === 0) return autocomplete(interaction, [], { map: it => ({ name: `${it.id} ${it.role || it.stage}`, value: it.id }), max: 25 });
+          const items = list.slice(0, 25).map(x => ({ id: String(x.id), name: `#${x.id} ${x.role || x.stage} (${x.pathway || ''})` }));
+          return autocomplete(interaction, items, { map: it => ({ name: it.name, value: Number(it.id) }), max: 25 });
+        } catch (e) { try { await interaction.respond([]); } catch (_) {} return; }
+      }
+
+      // START: target autocomplete — if non-numeric focused, suggest roles from evolutions config
+      if (sub === 'start' && !isNumeric) {
+        try {
+          const evol = require('../../../config/evolutions.json');
+          const roles = evol && evol.roles ? Object.keys(evol.roles).map(k => ({ id: k, name: `${k}${evol.roles[k].display ? ` — ${evol.roles[k].display}` : ''}` })) : [];
+          return autocomplete(interaction, roles, { map: it => ({ name: it.name, value: it.id }), max: 25 });
+        } catch (e) { try { await interaction.respond([]); } catch (_) {} return; }
+      }
+
+      // CANCEL: job_id autocomplete - list queued jobs for this user
+      if (sub === 'cancel') {
+        try {
+          const rows = await db.knex('evolution_queue').where({ user_id: String(userId), status: 'queued' }).orderBy('id', 'asc').limit(25);
+          if (!rows || rows.length === 0) return autocomplete(interaction, [], { map: it => ({ name: it.id, value: it.id }), max: 25 });
+          const items = rows.map(r => ({ id: String(r.id), name: `#${r.id} xeno:${r.xeno_id} -> ${r.target_role}` }));
+          return autocomplete(interaction, items, { map: it => ({ name: it.name, value: Number(it.id) }), max: 25 });
+        } catch (e) { try { await interaction.respond([]); } catch (_) {} return; }
+      }
+      try { await interaction.respond([]); } catch (_) {}
+    } catch (e) {
+      try { await interaction.respond([]); } catch (_) {}
     }
   }
 };
