@@ -51,6 +51,7 @@
       "description": "Manage your hive and xenomorphs.",
       "subcommands": {
         "create": { "name": "hive create", "description": "Start creating a hive if you meet requirements." },
+        "stats": { "name": "hive stats", "description": "Show hive stats (optional: view another user's hive)." },
         "delete": { "name": "hive delete", "description": "Permanently delete your hive and all its data." },
         "type_info": { "name": "hive type info", "description": "Show information about different hive types and their requirements." },
         "events": { "name": "hive events", "description": "Show recent events in your hive (battles, evolutions, etc)." },

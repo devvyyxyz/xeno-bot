@@ -1,21 +1,45 @@
 const db = require('../db');
 const logger = require('../utils/logger').get('models:hive');
 
+let _hiveColumnsChecked = false;
+let _hiveHasOwnerColumn = false;
+let _hiveHasUserIdColumn = false;
+let _hiveHasTypeColumn = false;
+let _hiveHasHiveTypeColumn = false;
+
+async function ensureHiveColumns() {
+  if (_hiveColumnsChecked) return;
+  try {
+    const table = 'hives';
+    _hiveHasOwnerColumn = await db.knex.schema.hasColumn(table, 'owner_discord_id');
+    _hiveHasUserIdColumn = await db.knex.schema.hasColumn(table, 'user_id');
+    _hiveHasTypeColumn = await db.knex.schema.hasColumn(table, 'type');
+    _hiveHasHiveTypeColumn = await db.knex.schema.hasColumn(table, 'hive_type');
+  } catch (err) {
+    logger.warn('Failed checking hive table columns, assuming legacy names', { error: err && (err.stack || err) });
+    _hiveHasOwnerColumn = false;
+    _hiveHasUserIdColumn = true;
+    _hiveHasTypeColumn = false;
+    _hiveHasHiveTypeColumn = true;
+  }
+  _hiveColumnsChecked = true;
+}
+
 async function createHive(ownerDiscordId, guildId = null, type = 'default', initialData = {}) {
   try {
+    await ensureHiveColumns();
     const payload = {
-      // support programmatic migration schema (user_id / hive_type) and newer owner_discord_id/type schema
-      user_id: String(ownerDiscordId),
-      owner_discord_id: String(ownerDiscordId),
       guild_id: guildId,
       name: initialData.name || 'My Hive',
-      hive_type: type,
-      type: type,
       queen_xeno_id: initialData.queen_xeno_id || null,
       capacity: initialData.capacity || 5,
       jelly_production_per_hour: initialData.jelly_production_per_hour || 0,
       data: initialData.data ? JSON.stringify(initialData.data) : null
     };
+    if (_hiveHasUserIdColumn) payload.user_id = String(ownerDiscordId);
+    if (_hiveHasOwnerColumn) payload.owner_discord_id = String(ownerDiscordId);
+    if (_hiveHasHiveTypeColumn) payload.hive_type = type;
+    if (_hiveHasTypeColumn) payload.type = type;
     const inserted = await db.knex('hives').insert(payload);
     const id = Array.isArray(inserted) ? inserted[0] : inserted;
     logger.info('Created hive', { ownerDiscordId, id, guildId, type });
@@ -55,9 +79,18 @@ async function getHiveById(id) {
 
 async function getHiveByOwner(ownerDiscordId) {
   try {
-    // try both possible column names created by different migration schemes
-    let row = await db.knex('hives').where({ user_id: String(ownerDiscordId) }).first();
-    if (!row) row = await db.knex('hives').where({ owner_discord_id: String(ownerDiscordId) }).first();
+    await ensureHiveColumns();
+    let row = null;
+    if (_hiveHasUserIdColumn) {
+      row = await db.knex('hives').where({ user_id: String(ownerDiscordId) }).first();
+    }
+    if (!row && _hiveHasOwnerColumn) {
+      row = await db.knex('hives').where({ owner_discord_id: String(ownerDiscordId) }).first();
+    }
+    if (!row && !_hiveHasUserIdColumn && !_hiveHasOwnerColumn) {
+      try { row = await db.knex('hives').where({ user_id: String(ownerDiscordId) }).first(); } catch (_) {}
+      if (!row) try { row = await db.knex('hives').where({ owner_discord_id: String(ownerDiscordId) }).first(); } catch (_) {}
+    }
     if (!row) return null;
     return getHiveById(row.id);
   } catch (err) {
@@ -144,7 +177,9 @@ async function getHiveByUser(userId) {
 }
 
 async function upsertHive(userId, changes = {}) {
-  const existing = await db.knex('hives').where({ owner_discord_id: String(userId) }).first();
+  await ensureHiveColumns();
+  const whereCol = _hiveHasOwnerColumn ? 'owner_discord_id' : (_hiveHasUserIdColumn ? 'user_id' : 'owner_discord_id');
+  const existing = await db.knex('hives').where({ [whereCol]: String(userId) }).first();
   const payload = {};
   if ('name' in changes) payload.name = changes.name;
   if ('hive_type' in changes) payload.type = changes.hive_type;
@@ -153,7 +188,7 @@ async function upsertHive(userId, changes = {}) {
   if ('jelly_production_per_hour' in changes) payload.jelly_production_per_hour = changes.jelly_production_per_hour;
   if ('data' in changes) payload.data = JSON.stringify(changes.data);
   if (existing) {
-    await db.knex('hives').where({ owner_discord_id: String(userId) }).update(Object.assign(payload, { updated_at: db.knex.fn.now() }));
+    await db.knex('hives').where({ [whereCol]: String(userId) }).update(Object.assign(payload, { updated_at: db.knex.fn.now() }));
     return getHiveByUser(userId);
   }
   // create new
