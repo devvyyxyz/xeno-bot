@@ -218,7 +218,15 @@ module.exports = {
         ] };
 
         const createInteractionCollector = require('../../utils/collectorHelper');
-        const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [embed], components: [row], time: 60_000, ephemeral: true, edit: false, collectorOptions: { componentType: 2 } });
+        // Send the ephemeral reply first so we have a message to attach the collector to
+        let msg = null;
+        try {
+          msg = await interaction.reply({ embeds: [embed], components: [row], ephemeral: true, fetchReply: true });
+        } catch (e) {
+          // fallback to defer+edit path handled by collector helper
+        }
+        const { collector, message: _msg } = await createInteractionCollector(interaction, { embeds: [embed], components: [row], time: 60_000, ephemeral: true, edit: true, collectorOptions: { componentType: 2 } });
+        if (!msg && _msg) msg = _msg;
         if (!collector) return safeReply(interaction, { content: 'Failed creating confirmation prompt.', ephemeral: true });
 
         let handled = false;
