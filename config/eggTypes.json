@@ -16,7 +16,7 @@
     "weight": 1,
     "rarity": 6,
     "price": 60000,
-    "sell": 30000,
+    "sell": 3000,
     "hatch": 360
   },
   {
@@ -26,7 +26,7 @@
     "weight": 0.5,
     "rarity": 7,
     "price": 70000,
-    "sell": 35000,
+    "sell": 3500,
     "hatch": 420
   },
   {
@@ -36,7 +36,7 @@
     "weight": 3,
     "rarity": 4,
     "price": 40000,
-    "sell": 20000,
+    "sell": 2000,
     "hatch": 240
   },
   {
@@ -46,7 +46,7 @@
     "weight": 0.5,
     "rarity": 6,
     "price": 60000,
-    "sell": 30000,
+    "sell": 3000,
     "hatch": 360
   },
   {
@@ -56,7 +56,7 @@
     "weight": 1,
     "rarity": 5,
     "price": 50000,
-    "sell": 25000,
+    "sell": 2500,
     "hatch": 300
   },
   {
@@ -66,7 +66,7 @@
     "weight": 0.5,
     "rarity": 8,
     "price": 80000,
-    "sell": 40000,
+    "sell": 4000,
     "hatch": 480
   },
   {
@@ -76,7 +76,7 @@
     "weight": 1,
     "rarity": 7,
     "price": 70000,
-    "sell": 35000,
+    "sell": 3500,
     "hatch": 420
   },
   {
@@ -86,7 +86,7 @@
     "weight": 0.5,
     "rarity": 8,
     "price": 80000,
-    "sell": 40000,
+    "sell": 4000,
     "hatch": 480
   },
   {
@@ -96,7 +96,7 @@
     "weight": 0.5,
     "rarity": 7,
     "price": 70000,
-    "sell": 35000,
+    "sell": 3500,
     "hatch": 420
   },
   {
@@ -106,7 +106,7 @@
     "weight": 0.5,
     "rarity": 8,
     "price": 80000,
-    "sell": 40000,
+    "sell": 4000,
     "hatch": 480
   },
   {
@@ -116,7 +116,7 @@
     "weight": 0.5,
     "rarity": 9,
     "price": 90000,
-    "sell": 45000,
+    "sell": 4500,
     "hatch": 540
   },
   {
@@ -126,7 +126,7 @@
     "weight": 0.5,
     "rarity": 7,
     "price": 70000,
-    "sell": 35000,
+    "sell": 3500,
     "hatch": 420
   },
   {
@@ -136,7 +136,7 @@
     "weight": 1,
     "rarity": 5,
     "price": 50000,
-    "sell": 25000,
+    "sell": 2500,
     "hatch": 300
   },
   {
@@ -146,7 +146,7 @@
     "weight": 1,
     "rarity": 5,
     "price": 50000,
-    "sell": 25000,
+    "sell": 2500,
     "hatch": 300
   },
   {
@@ -155,8 +155,8 @@
     "emoji": "<:egg:1476511857958457406>",
     "weight": 0.5,
     "rarity": 6,
-    "price": 60000,
-    "sell": 30000,
+    "price": 6000,
+    "sell": 300,
     "hatch": 360
   },
   {
@@ -166,7 +166,7 @@
     "weight": 1,
     "rarity": 4,
     "price": 40000,
-    "sell": 20000,
+    "sell": 2000,
     "hatch": 240
   },
   {
@@ -176,7 +176,7 @@
     "weight": 0.5,
     "rarity": 9,
     "price": 90000,
-    "sell": 45000,
+    "sell": 4500,
     "hatch": 540
   },
   {
@@ -186,7 +186,7 @@
     "weight": 0.5,
     "rarity": 9,
     "price": 90000,
-    "sell": 45000,
+    "sell": 4500,
     "hatch": 540
   },
   {
@@ -196,7 +196,7 @@
     "weight": 0.5,
     "rarity": 10,
     "price": 100000,
-    "sell": 50000,
+    "sell": 5000,
     "hatch": 600
   },
   {
@@ -206,7 +206,7 @@
     "weight": 0.5,
     "rarity": 10,
     "price": 100000,
-    "sell": 50000,
+    "sell": 5000,
     "hatch": 600
   },
   {
@@ -216,7 +216,7 @@
     "weight": 0.5,
     "rarity": 10,
     "price": 100000,
-    "sell": 50000,
+    "sell": 5000,
     "hatch": 600
   },
   {
@@ -226,7 +226,7 @@
     "weight": 1,
     "rarity": 6,
     "price": 60000,
-    "sell": 30000,
+    "sell": 3000,
     "hatch": 360
   },
   {
@@ -236,7 +236,7 @@
     "weight": 1,
     "rarity": 5,
     "price": 50000,
-    "sell": 25000,
+    "sell": 2500,
     "hatch": 300
   },
   {
@@ -246,7 +246,7 @@
     "weight": 1,
     "rarity": 5,
     "price": 50000,
-    "sell": 25000,
+    "sell": 2500,
     "hatch": 300
   },
   {
@@ -256,7 +256,7 @@
     "weight": 1,
     "rarity": 5,
     "price": 50000,
-    "sell": 25000,
+    "sell": 2500,
     "hatch": 300
   },
   {
@@ -266,7 +266,7 @@
     "weight": 1,
     "rarity": 5,
     "price": 50000,
-    "sell": 25000,
+    "sell": 2500,
     "hatch": 300
   },
   {
@@ -276,7 +276,7 @@
     "weight": 0.5,
     "rarity": 10,
     "price": 100000,
-    "sell": 50000,
+    "sell": 5000,
     "hatch": 600
   }
 ]
