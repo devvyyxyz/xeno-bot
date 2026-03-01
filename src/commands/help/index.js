@@ -1,8 +1,16 @@
-const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require('discord.js');
-const { SecondaryButtonBuilder } = require('@discordjs/builders');
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MessageFlags
+} = require('discord.js');
+const {
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  SecondaryButtonBuilder
+} = require('@discordjs/builders');
 const { getCommandConfig, getCommandsObject } = require('../../utils/commandsConfig');
 const fallbackLogger = require('../../utils/fallbackLogger');
-const createInteractionCollector = require('../../utils/collectorHelper');
+const safeReply = require('../../utils/safeReply');
 const cmd = getCommandConfig('help') || { name: 'help', description: 'Show help for available commands' };
 
 function getCategories() {
@@ -74,63 +82,61 @@ module.exports = {
   description: cmd.description,
   data: { name: cmd.name, description: cmd.description },
   async executeInteraction(interaction) {
+    const logger = require('../../utils/logger').get('command:help');
     const categories = getCategories();
     // include "All" category at the front
     if (!categories.includes('All')) categories.unshift('All');
     // Default: show first category
     const initialCategory = categories[0];
-    const commands = getCommandsByCategory(initialCategory);
-    // helper: build an embed for a category, resolving command IDs where available
-    async function buildEmbed(cat, cmds) {
-      // try to fetch guild commands first, fallback to application commands
-      let appCommands = null;
+    // try to fetch guild commands first, fallback to application commands
+    let appCommands = null;
+    try {
+      if (interaction.guild) {
+        appCommands = await interaction.guild.commands.fetch();
+      }
+    } catch (e) {
+      try { logger && logger.warn && logger.warn('Failed fetching guild commands in help command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed to fetch guild commands for help', le && (le.stack || le)); }
+    }
+    if (!appCommands) {
       try {
-        if (interaction.guild) {
-          appCommands = await interaction.guild.commands.fetch();
+        appCommands = await interaction.client.application.commands.fetch();
+      } catch (e) {
+        try { logger && logger.warn && logger.warn('Failed fetching app commands for help command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging app command fetch failure in help', le && (le.stack || le)); }
+      }
+    }
+
+    function toMention(cmdEntry) {
+      let id = null;
+      try {
+        if (appCommands) {
+          const baseName = cmdEntry.base || cmdEntry.name;
+          const found = appCommands.find(ac => ac.name === baseName);
+          if (found) id = found.id;
         }
-      } catch (e) { try { logger && logger.warn && logger.warn('Failed fetching application commands in help command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed to fetch app commands for help', le && (le.stack || le)); } }
-      if (!appCommands) {
-        try { appCommands = await interaction.client.application.commands.fetch(); } catch (e) { try { logger && logger.warn && logger.warn('Failed fetching app commands for help view', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging app commands fetch failure', le && (le.stack || le)); } }
+      } catch (e) {
+        try { logger && logger.warn && logger.warn('Failed resolving command mention in help', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging mention resolve failure in help', le && (le.stack || le)); }
       }
 
-      const lines = await Promise.all(cmds.map(async c => {
-        // c may be a base command or a subcommand object (with c.base and c.sub)
-        let id = null;
-        try {
-          if (appCommands) {
-            const baseName = c.base || c.name;
-            const found = appCommands.find(ac => ac.name === baseName);
-            if (found) id = found.id;
-          }
-        } catch (e) { try { logger && logger.warn && logger.warn('Failed updating help view state', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging help view update failure', le && (le.stack || le)); } }
+      if (cmdEntry.base && cmdEntry.sub) {
+        if (id) return `</${cmdEntry.base} ${cmdEntry.sub}:${id}>`;
+        return `/${cmdEntry.base} ${cmdEntry.sub}`;
+      }
 
-        let mention = null;
-        if (c.base && c.sub) {
-          // subcommand mention format: </base sub:ID>
-          if (id) mention = `</${c.base} ${c.sub}:${id}>`;
-          else mention = `/${c.base} ${c.sub}`;
-        } else {
-          const name = c.name || c.base;
-          if (id) mention = `</${name}:${id}>`;
-          else mention = `/${name}`;
-        }
-        return { mention, description: c.description || '' };
-      }));
+      const baseName = cmdEntry.name || cmdEntry.base;
+      if (id) return `</${baseName}:${id}>`;
+      return `/${baseName}`;
+    }
 
-      // build pages of fields (inline) - show up to 12 entries per page
+    function buildPagesForCategory(cat) {
+      const cmds = getCommandsByCategory(cat);
+      const lines = cmds.map(c => ({ mention: toMention(c), description: c.description || '' }));
       const PAGE_SIZE = 12;
       const pages = [];
       for (let i = 0; i < lines.length; i += PAGE_SIZE) pages.push(lines.slice(i, i + PAGE_SIZE));
-      const pageIdx = 0;
-      const pageEntries = pages[pageIdx] || [];
+      return pages.length ? pages : [[]];
+    }
 
-      const embed = new EmbedBuilder()
-        .setTitle('📖 Bot Commands')
-        .setColor(getCommandsObject().colour || 0xbab25d)
-        .setFooter({ text: `Category: ${cat} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}` });
-
-      // Intro: about and quick setup instructions
-      // Build clickable mentions for setup subcommands when application command IDs are available
+    function setupIntroText() {
       let setupIntro = 'Configure the bot with `/setup` — subcommands: `/setup channel`, `/setup spawn-rate`, `/setup egg-limit`, `/setup avatar`, `/setup details`. Use `/setup reset` to reset a user or server (admin/owner only).';
       try {
         if (appCommands) {
@@ -143,97 +149,143 @@ module.exports = {
             setupIntro = `Configure the bot with ${root} — subcommands: ${mentions.slice(0, 5).join(', ')}. Use ${mentions[5]} to reset a user or server (admin/owner only).`;
           }
         }
-      } catch (e) { /* ignore */ }
-      embed.addFields(
-        { name: 'About', value: 'Xeno Bot manages egg spawns, collections, and in-server economies. Use commands below to interact with bot features.', inline: false },
-        { name: 'Setup (Server Admins)', value: setupIntro, inline: false }
-      );
-
-      for (const e of pageEntries) {
-        const title = `${e.mention}`;
-        const value = e.description ? `${e.description}` : '\u200B';
-        embed.addFields({ name: title, value, inline: true });
-      }
-      return { embed, pages };
+      } catch (_) {}
+      return setupIntro;
     }
-
-    const built = await buildEmbed(initialCategory, commands);
 
     const commandsCfg = getCommandsObject();
     const catEmojis = (commandsCfg && commandsCfg.categoryEmojis) || {};
-    const select = new StringSelectMenuBuilder()
-      .setCustomId('help-category')
-      .setPlaceholder('Select a command category')
-      .addOptions(categories.slice(0, 25).map(cat => {
-        const opt = { label: cat, value: cat };
-        const raw = catEmojis[cat];
-        if (raw && typeof raw === 'string') {
-          // parse custom emoji like <:name:id>
-          const m = raw.match(/^<:([^:>]+):([0-9]+)>$/);
-          if (m) opt.emoji = { name: m[1], id: m[2] };
-          else opt.emoji = raw; // fallback (unicode)
-        }
-        return opt;
-      }));
 
-    const row = new ActionRowBuilder().addComponents(select);
-    const navRow = new ActionRowBuilder().addComponents(
-      new SecondaryButtonBuilder().setCustomId('help-prev').setLabel('Previous').setDisabled(true),
-      new SecondaryButtonBuilder().setCustomId('help-next').setLabel('Next').setDisabled((built.pages || []).length <= 1)
-    );
+    function buildHelpComponents(cat, pages, pageIndex, expired = false) {
+      const page = pages[pageIndex] || [];
+      const container = new ContainerBuilder();
 
-    await interaction.reply({ embeds: [built.embed], components: [row, navRow], ephemeral: cmd.ephemeral === true });
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('## 📖 Bot Commands'),
+        new TextDisplayBuilder().setContent('Xeno Bot manages egg spawns, collections, and in-server economies. Use commands below to interact with bot features.'),
+        new TextDisplayBuilder().setContent(`**Setup (Server Admins)**\n${setupIntroText()}`)
+      );
 
-    const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [built.embed], components: [row, navRow], time: 120_000, ephemeral: cmd.ephemeral === true, edit: true });
-    if (!collector) {
-      try { const l = require('../../utils/logger').get('command:help'); l && l.warn && l.warn('Failed to attach help collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach help collector', le && (le.stack || le)); } catch (ignored) {} }
+      if (!page.length) {
+        container.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent('_No visible commands in this category._')
+        );
+      } else {
+        const body = page
+          .map(e => `**${e.mention}**${e.description ? `\n${e.description}` : ''}`)
+          .join('\n\n');
+        container.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(body)
+        );
+      }
+
+      if (!expired) {
+        const options = categories.slice(0, 25).map(category => {
+          const opt = {
+            label: category,
+            value: category,
+            default: category === cat
+          };
+          const raw = catEmojis[category];
+          if (raw && typeof raw === 'string') {
+            const m = raw.match(/^<:([^:>]+):([0-9]+)>$/);
+            if (m) opt.emoji = { name: m[1], id: m[2] };
+            else opt.emoji = raw;
+          }
+          return opt;
+        });
+
+        container.addActionRowComponents(
+          new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+              .setCustomId('help-category')
+              .setPlaceholder('Select a command category')
+              .addOptions(...options)
+          )
+        );
+
+        container.addActionRowComponents(
+          new ActionRowBuilder().addComponents(
+            new SecondaryButtonBuilder().setCustomId('help-prev').setLabel('Previous').setDisabled(pageIndex === 0),
+            new SecondaryButtonBuilder().setCustomId('help-next').setLabel('Next').setDisabled(pageIndex >= pages.length - 1)
+          )
+        );
+      }
+
+      const footer = expired
+        ? `_Category: ${cat} • Page ${pageIndex + 1} of ${Math.max(1, pages.length)} • Help view expired_`
+        : `_Category: ${cat} • Page ${pageIndex + 1} of ${Math.max(1, pages.length)}_`;
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(footer));
+
+      return [container];
+    }
+
+    let currentCategory = initialCategory;
+    let pages = buildPagesForCategory(initialCategory);
+    let page = 0;
+
+    try {
+      await interaction.reply({
+        components: buildHelpComponents(currentCategory, pages, page, false),
+        flags: MessageFlags.IsComponentsV2,
+        ephemeral: cmd.ephemeral === true
+      });
+    } catch (e) {
+      try {
+        logger.warn('Help V2 payload failed, using plain text fallback', { error: e && (e.stack || e) });
+      } catch (_) {}
+      await safeReply(interaction, {
+        content: 'Help UI failed to render with components. Please try again.'
+      }, { loggerName: 'command:help' });
       return;
     }
-    let currentCategory = initialCategory;
-    let pages = built.pages || [[]];
-    let page = 0;
+
+    let msg = null;
+    try { msg = await interaction.fetchReply(); } catch (_) {}
+    if (!msg || typeof msg.createMessageComponentCollector !== 'function') {
+      try { logger.warn('Failed to attach help collector (no message)'); } catch (le) { try { fallbackLogger.warn('Failed to attach help collector', le && (le.stack || le)); } catch (ignored) {} }
+      return;
+    }
+
+    const collector = msg.createMessageComponentCollector({
+      filter: i => ['help-category', 'help-prev', 'help-next'].includes(i.customId),
+      time: 120_000
+    });
 
     collector.on('collect', async i => {
       try {
+        if (i.user.id !== interaction.user.id) {
+          await safeReply(i, { content: 'Only the command user can interact with this view.', ephemeral: true }, { loggerName: 'command:help' });
+          return;
+        }
+
         if (i.customId === 'help-category') {
           const cat = i.values[0];
           currentCategory = cat;
-          const cmds = getCommandsByCategory(cat);
-          const b = await buildEmbed(cat, cmds);
-          pages = b.pages || [[]];
+          pages = buildPagesForCategory(cat);
           page = 0;
-          const e = b.embed;
-          // update nav buttons
-          const newNav = new ActionRowBuilder().addComponents(
-            new SecondaryButtonBuilder().setCustomId('help-prev').setLabel('Previous').setDisabled(page === 0),
-            new SecondaryButtonBuilder().setCustomId('help-next').setLabel('Next').setDisabled(page >= pages.length - 1)
-          );
-          await i.update({ embeds: [e], components: [row, newNav] });
+          await i.update({ components: buildHelpComponents(currentCategory, pages, page, false) });
           return;
         }
+
         if (i.customId === 'help-prev' || i.customId === 'help-next') {
           if (i.customId === 'help-next' && page < pages.length - 1) page++;
           if (i.customId === 'help-prev' && page > 0) page--;
-          const pageEntries = pages[page] || [];
-          const embed = new EmbedBuilder()
-            .setTitle('📖 Bot Commands')
-            .setColor(getCommandsObject().colour || 0xbab25d)
-            .setDescription(currentCategory === 'All' ? 'All commands' : `Category: ${currentCategory}`)
-            .setFooter({ text: `Page ${page + 1} of ${Math.max(1, pages.length)}` });
-          for (const e of pageEntries) embed.addFields({ name: `${e.mention} — ${e.usage || `/${e.mention}`}`, value: e.description || '\u200B', inline: true });
-          const newNav = new ActionRowBuilder().addComponents(
-            new SecondaryButtonBuilder().setCustomId('help-prev').setLabel('Previous').setDisabled(page === 0),
-            new SecondaryButtonBuilder().setCustomId('help-next').setLabel('Next').setDisabled(page >= pages.length - 1)
-          );
-          await i.update({ embeds: [embed], components: [row, newNav] });
+          await i.update({ components: buildHelpComponents(currentCategory, pages, page, false) });
           return;
         }
       } catch (err) {
-        try { const safeReply = require('../../utils/safeReply'); await safeReply(i, { content: 'Failed to update help view.', ephemeral: true }, { loggerName: 'command:help' }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to send failure safeReply in help command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging safeReply failure in help', le && (le.stack || le)); } }
+        try { await safeReply(i, { content: 'Failed to update help view.', ephemeral: true }, { loggerName: 'command:help' }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to send failure safeReply in help command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging safeReply failure in help', le && (le.stack || le)); } }
       }
     });
+
     collector.on('end', async () => {
-      try { await msg.edit({ components: [] }); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing help components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging help component clear failure', le && (le.stack || le)); } catch (ignored) {} } }
+      try {
+        await interaction.editReply({
+          components: buildHelpComponents(currentCategory, pages, page, true),
+          flags: MessageFlags.IsComponentsV2
+        });
+      } catch (e) { try { logger && logger.warn && logger.warn('Failed finalizing help view after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging help finalization failure', le && (le.stack || le)); } catch (ignored) {} } }
     });
   },
   // text-mode handler removed; use slash command
