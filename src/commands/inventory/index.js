@@ -13,6 +13,7 @@ const { DiscordAPIError } = require('discord.js');
 const eggTypes = require('../../../config/eggTypes.json');
 const userModel = require('../../models/user');
 const hostModel = require('../../models/host');
+const xenoModel = require('../../models/xenomorph');
 
 const cmd = getCommandConfig('inventory') || { name: 'inventory', description: 'Show your egg inventory or another user\'s.' };
 const shopConfig = require('../../../config/shop.json');
@@ -38,7 +39,8 @@ function makeEmbed(target, type, pageIdx, pages, balances = {}) {
       eggs: 'You have no eggs in this server.',
       items: 'You have no items in this server.',
       currencies: 'You have no currencies in this server.',
-      hosts: 'You have no hosts in this server.'
+      hosts: 'You have no hosts in this server.',
+      xenos: 'You have no xenomorphs in this server.'
     };
     const emptyMsg = emptyMessages[type] || 'You have no items in this server.';
     embed.addFields({ name: 'Inventory empty', value: emptyMsg, inline: false });
@@ -47,7 +49,7 @@ function makeEmbed(target, type, pageIdx, pages, balances = {}) {
   }
   const royal = Number(balances.royal_jelly || 0);
   const credits = Number(balances.credits || 0);
-  const typeLabel = type === 'eggs' ? 'Eggs' : type === 'items' ? 'Items' : type === 'hosts' ? 'Hosts' : 'Currencies';
+  const typeLabel = type === 'eggs' ? 'Eggs' : type === 'items' ? 'Items' : type === 'hosts' ? 'Hosts' : type === 'xenos' ? 'Xenos' : 'Currencies';
   embed.setFooter({ text: `Royal Jelly: ${royal} • Credits: ${credits} • ${typeLabel} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}` });
   return embed;
 }
@@ -129,6 +131,19 @@ module.exports = {
         return out;
       }
 
+      if (viewType === 'xenos') {
+        try {
+          const rows = await xenoModel.getXenosByOwner(target.id);
+          for (const x of rows) {
+            const label = `#${x.id} ${x.role || x.stage}`;
+            out.push({ name: label, value: `Pathway: ${x.pathway || 'standard'} • Created: ${new Date(Number(x.created_at || x.started_at || Date.now())).toLocaleString()}`, inline: false });
+          }
+        } catch (e) {
+          // ignore
+        }
+        return out;
+      }
+
       // items view
       const itemEntries = Object.entries(items || {}).filter(([, qty]) => qty > 0);
       if (itemEntries.length === 0) return out; // no items -> keep fields empty so embed shows "Inventory empty"
@@ -170,7 +185,8 @@ module.exports = {
             new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(true),
             new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items'),
             new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies'),
-            new StringSelectMenuOptionBuilder().setLabel('Hosts').setValue('hosts')
+            new StringSelectMenuOptionBuilder().setLabel('Hosts').setValue('hosts'),
+            new StringSelectMenuOptionBuilder().setLabel('Xenos').setValue('xenos')
           )
       ),
       new ActionRowBuilder().addComponents(
@@ -217,7 +233,7 @@ module.exports = {
             new SecondaryButtonBuilder().setLabel('Previous').setCustomId('inventory-prev').setDisabled(page === 0),
             new SecondaryButtonBuilder().setLabel('Next').setCustomId('inventory-next').setDisabled(pages.length <= 1)
           );
-          await i.update({ embeds: [e], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('inventory-type').setPlaceholder('Type').addOptions(new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(currentType==='eggs'), new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items').setDefault(currentType==='items'), new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies').setDefault(currentType==='currencies'), new StringSelectMenuOptionBuilder().setLabel('Hosts').setValue('hosts').setDefault(currentType==='hosts'))), newNav] });
+          await i.update({ embeds: [e], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('inventory-type').setPlaceholder('Type').addOptions(new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(currentType==='eggs'), new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items').setDefault(currentType==='items'), new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies').setDefault(currentType==='currencies'), new StringSelectMenuOptionBuilder().setLabel('Hosts').setValue('hosts').setDefault(currentType==='hosts'), new StringSelectMenuOptionBuilder().setLabel('Xenos').setValue('xenos').setDefault(currentType==='xenos'))), newNav] });
           return;
         }
         if (i.customId === 'inventory-prev' || i.customId === 'inventory-next') {
@@ -232,7 +248,7 @@ module.exports = {
             new SecondaryButtonBuilder().setLabel('Previous').setCustomId('inventory-prev').setDisabled(page === 0),
             new SecondaryButtonBuilder().setLabel('Next').setCustomId('inventory-next').setDisabled(page >= pages.length - 1)
           );
-          await i.update({ embeds: [e], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('inventory-type').setPlaceholder('Type').addOptions(new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(currentType==='eggs'), new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items').setDefault(currentType==='items'), new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies').setDefault(currentType==='currencies'), new StringSelectMenuOptionBuilder().setLabel('Hosts').setValue('hosts').setDefault(currentType==='hosts'))), newNav] });
+          await i.update({ embeds: [e], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('inventory-type').setPlaceholder('Type').addOptions(new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(currentType==='eggs'), new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items').setDefault(currentType==='items'), new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies').setDefault(currentType==='currencies'), new StringSelectMenuOptionBuilder().setLabel('Hosts').setValue('hosts').setDefault(currentType==='hosts'), new StringSelectMenuOptionBuilder().setLabel('Xenos').setValue('xenos').setDefault(currentType==='xenos'))), newNav] });
           return;
         }
       } catch (err) {

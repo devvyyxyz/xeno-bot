@@ -67,7 +67,38 @@ module.exports = {
         const xenoId = interaction.options.getInteger('xeno_id');
         const xeno = await xenoModel.getById(xenoId);
         if (!xeno) return interaction.editReply({ content: 'Xenomorph not found.' });
-        return interaction.editReply({ content: `#${xeno.id} ${xeno.role || xeno.stage} — pathway: ${xeno.pathway}` });
+        // Describe evolution pathway using config/evolutions.json
+        try {
+          const evol = require('../../../config/evolutions.json');
+          const pathwayKey = xeno.pathway || 'standard';
+          const pathway = (evol && evol.pathways && evol.pathways[pathwayKey]) ? evol.pathways[pathwayKey] : (evol && evol.pathways && evol.pathways.standard) ? evol.pathways.standard : null;
+          const roleMap = (evol && evol.roles) ? evol.roles : {};
+          let out = `#${xeno.id} ${xeno.role || xeno.stage} — pathway: ${pathwayKey}\n`;
+          if (pathway && Array.isArray(pathway.stages)) {
+            const stages = pathway.stages.map(s => ({ id: s, label: (roleMap[s] && roleMap[s].display) ? roleMap[s].display : s }));
+            const currentStageId = xeno.role || xeno.stage || null;
+            out += '\nPathway stages:\n';
+            for (let i = 0; i < stages.length; i++) {
+              const s = stages[i];
+              const marker = (currentStageId && String(s.id) === String(currentStageId)) ? '◉' : '○';
+              out += `${marker} ${s.label}${i === stages.length - 1 ? ' (final)' : ''}\n`;
+            }
+            // show next stage if available
+            const idx = stages.findIndex(s => String(s.id) === String(currentStageId));
+            if (idx >= 0 && idx < stages.length - 1) {
+              out += `\nNext stage: ${stages[idx + 1].label}`;
+            } else if (idx === -1) {
+              out += `\nCurrent stage not found in pathway.`;
+            } else {
+              out += `\nThis xenomorph is at the final stage.`;
+            }
+          } else {
+            out += '\nNo pathway information available.';
+          }
+          return interaction.editReply({ content: out });
+        } catch (e) {
+          return interaction.editReply({ content: `#${xeno.id} ${xeno.role || xeno.stage} — pathway: ${xeno.pathway}` });
+        }
       }
 
       if (sub === 'cancel') {

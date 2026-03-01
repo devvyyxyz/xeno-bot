@@ -3,6 +3,7 @@ const logger = require('./utils/logger').get('hatch');
 const fallbackLogger = require('./utils/fallbackLogger');
 const userModel = require('./models/user');
 const eggTypes = require('../config/eggTypes.json');
+const xenoModel = require('./models/xenomorph');
 
 let timers = new Map(); // hatchId -> timeout
 let client = null;
@@ -102,8 +103,14 @@ async function collectHatch(discordId, guildId, hatchId) {
   if (!row) throw new Error('Hatch not found');
   const now = Date.now();
   if (Number(row.finishes_at) > now) throw new Error('Hatch is not ready yet');
-  // grant facehugger item
-  await userModel.addItemForGuild(discordId, guildId, 'facehugger', 1);
+  // grant a new xenomorph record (facehugger/chestburster/xeno depending on egg)
+  try {
+    const roleName = row.egg_type || 'facehugger';
+    await xenoModel.createXeno(discordId, { pathway: 'standard', role: roleName, stage: roleName, data: { fromEgg: row.egg_type } });
+  } catch (e) {
+    // fallback to adding as an item if xeno creation fails
+    try { await userModel.addItemForGuild(discordId, guildId, 'facehugger', 1); } catch (_) {}
+  }
   await db.knex('hatches').where({ id: hatchId }).update({ collected: true });
   logger.info('Hatch collected', { hatchId, discordId, guildId });
   return true;
