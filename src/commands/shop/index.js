@@ -15,6 +15,7 @@ const {
 } = require('@discordjs/builders');
 const userModel = require('../../models/user');
 const safeReply = require('../../utils/safeReply');
+const { buildNoticeV2Payload } = require('../../utils/componentsV2');
 
 const logger = require('../../utils/logger').get('command:shop');
 const fallbackLogger = require('../../utils/fallbackLogger');
@@ -221,7 +222,13 @@ module.exports = {
           try {
             const balance = await userModel.getCurrencyForGuild(String(i.user.id), interaction.guildId, 'royal_jelly');
             if (balance < price) {
-              await safeReply(i, { content: `Insufficient royal_jelly. Need ${price}, you have ${balance}.`, ephemeral: true }, { loggerName: 'command:shop' });
+              await safeReply(i, {
+                ...buildNoticeV2Payload({
+                  message: `Insufficient royal_jelly. Need ${price}, you have ${balance}.`,
+                  tone: 'error'
+                }),
+                ephemeral: true
+              }, { loggerName: 'command:shop' });
               return;
             }
 

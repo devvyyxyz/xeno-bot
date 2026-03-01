@@ -199,7 +199,7 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     const last = lastSpawnAt.get(guildId) || 0;
     const since = Date.now() - last;
     const thresholdMs = 5000; // 5s
-      if (since >= 0 && since < thresholdMs) {
+      if (!isForced && since >= 0 && since < thresholdMs) {
         logger.warn('doSpawn suppressed: recent spawn within threshold', { guildId, sinceMs: since, thresholdMs });
         inProgress.delete(guildId);
         return false;
@@ -227,7 +227,7 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
 
     // Only one spawn event at a time, but spawn up to egg_limit eggs in this event
     const guildMap = activeEggs.get(guildId);
-    if (guildMap && guildMap.size > 0) {
+    if (!isForced && guildMap && guildMap.size > 0) {
       logger.info('Spawn event already active; skipping', { guildId });
       return scheduleNext(guildId);
     }
@@ -468,6 +468,33 @@ async function forceSpawn(guildId, forcedEggTypeId) {
     try { const knex = db.knex; await knex('guild_settings').where({ guild_id: guildId }).update({ next_spawn_at: null }); } catch (e) { try { logger.warn('Failed clearing next_spawn_at at forceSpawn start', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging next_spawn_at clear error at forceSpawn start', le && (le.stack || le)); } catch (ignored) {} } }
   } catch (e) {
     try { logger.warn('Error clearing timer in forceSpawn', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging error clearing timer in forceSpawn', le && (le.stack || le)); } catch (ignored) {} }
+  }
+  // If an active spawn exists, clear it so force spawn always restarts the event.
+  try {
+    const activeMap = activeEggs.get(guildId);
+    if (activeMap && activeMap.size > 0) {
+      for (const [, eggEvent] of activeMap.entries()) {
+        try {
+          const channel = await client.channels.fetch(eggEvent.channelId).catch(() => null);
+          if (channel && eggEvent.messageId) {
+            try {
+              const msg = await channel.messages.fetch(eggEvent.messageId).catch(() => null);
+              if (msg) await msg.delete().catch(() => null);
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+      activeEggs.delete(guildId);
+      try {
+        const knex = db.knex;
+        await knex('active_spawns').where({ guild_id: guildId }).del();
+      } catch (e) {
+        try { logger.warn('Failed clearing active_spawns rows during force spawn restart', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging active_spawns clear error in forceSpawn', le && (le.stack || le)); } catch (ignored) {} }
+      }
+      logger.info('Cleared active spawn event before force spawn restart', { guildId });
+    }
+  } catch (e) {
+    try { logger.warn('Failed clearing active spawn event before force spawn', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging active spawn clear failure before force spawn', le && (le.stack || le)); } catch (ignored) {} }
   }
   try {
     // Clear timers so the forced spawn runs without racing scheduled timers.
