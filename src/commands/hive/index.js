@@ -1,5 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const hiveModel = require('../../models/hive');
+const xenomorphModel = require('../../models/xenomorph');
 const userModel = require('../../models/user');
 const userResources = require('../../models/userResources');
 const { getCommandConfig } = require('../../utils/commandsConfig');
@@ -40,6 +41,12 @@ module.exports = {
     // CREATE
     if (sub === 'create') {
       try {
+        // Require the user to have at least one xenomorph evolved beyond egg stage
+        let xenos = [];
+        try { xenos = await xenomorphModel.getXenosByOwner(userId); } catch (e) { xenos = []; }
+        const hasEvolved = Array.isArray(xenos) && xenos.some(x => (x.role && x.role !== 'egg') || (x.stage && x.stage !== 'egg'));
+        if (!hasEvolved) return safeReply(interaction, { content: 'You need at least one xenomorph evolved beyond the egg stage to create a hive. Use `/hunt` to find hosts and `/evolve` to progress your xenomorphs.', ephemeral: true });
+
         const existing = await hiveModel.getHiveByUser(userId);
         if (existing) return safeReply(interaction, { content: 'You already have a hive.', ephemeral: true });
         const hive = await hiveModel.createHiveForUser(userId, { type: 'default', name: `${interaction.user.username}'s Hive` });

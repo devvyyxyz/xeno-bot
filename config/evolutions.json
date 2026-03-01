@@ -1,0 +1,17 @@
+{
+  "pathways": {
+    "standard": {
+      "stages": ["egg", "drone", "warrior", "praetorian", "queen"],
+      "description": "Standard human/dog-derived evolution pathway"
+    }
+  },
+  "minStageToCreateHive": "drone",
+  "notes": "This file is a minimal evolutions config. Expand pathways and requirements here.",
+  "roles": {
+    "egg": { "display": "Egg" },
+    "drone": { "display": "Drone" },
+    "warrior": { "display": "Warrior" },
+    "praetorian": { "display": "Praetorian" },
+    "queen": { "display": "Queen" }
+  }
+}
