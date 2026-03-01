@@ -4,7 +4,13 @@ const {
   ActionRowBuilder,
   SecondaryButtonBuilder
 } = require('@discordjs/builders');
-const { EmbedBuilder } = require('discord.js');
+const {
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MessageFlags
+} = require('discord.js');
 const fallbackLogger = require('../../utils/fallbackLogger');
 const createInteractionCollector = require('../../utils/collectorHelper');
 
@@ -25,15 +31,19 @@ function chunkPages(fields) {
   return pages;
 }
 
-function makeEmbed(target, type, pageIdx, pages, balances = {}) {
-  const embed = new EmbedBuilder().setTitle(`${target.username}'s Inventory`).setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d);
-  try {
-    const avatarUrl = target && typeof target.displayAvatarURL === 'function' ? target.displayAvatarURL({ size: 512, extension: 'png' }) : null;
-    if (avatarUrl) embed.setThumbnail(avatarUrl);
-  } catch (e) {
-    try { require('../../utils/logger').get('command:inventory').warn('Failed computing avatar URL in inventory makeEmbed', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging inventory avatar URL error', le && (le.stack || le)); } catch (ignored) {} }
-  }
+function makeInventoryComponents(target, type, pageIdx, pages, balances = {}, opts = {}) {
+  const {
+    showControls = true,
+    disablePrev = false,
+    disableNext = false
+  } = opts;
+  const container = new ContainerBuilder();
   const page = pages[pageIdx] || [];
+  const typeLabel = type === 'eggs' ? 'Eggs' : type === 'items' ? 'Items' : type === 'hosts' ? 'Hosts' : type === 'xenos' ? 'Xenos' : 'Currencies';
+
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`## ${target.username}'s Inventory`)
+  );
   if (!page || page.length === 0) {
     const emptyMessages = {
       eggs: 'You have no eggs in this server.',
@@ -43,15 +53,51 @@ function makeEmbed(target, type, pageIdx, pages, balances = {}) {
       xenos: 'You have no xenomorphs in this server.'
     };
     const emptyMsg = emptyMessages[type] || 'You have no items in this server.';
-    embed.addFields({ name: 'Inventory empty', value: emptyMsg, inline: false });
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Inventory empty**\n${emptyMsg}`));
   } else {
-    embed.addFields(page);
+    const rows = page.map((entry) => `**${entry.name}**: ${entry.value}`).join('\n');
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(rows));
   }
+  if (showControls) {
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+    );
+
+    container.addActionRowComponents(
+      new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId('inventory-type')
+          .setPlaceholder(typeLabel)
+          .addOptions(
+            new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(type === 'eggs'),
+            new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items').setDefault(type === 'items'),
+            new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies').setDefault(type === 'currencies'),
+            new StringSelectMenuOptionBuilder().setLabel('Hosts').setValue('hosts').setDefault(type === 'hosts'),
+            new StringSelectMenuOptionBuilder().setLabel('Xenos').setValue('xenos').setDefault(type === 'xenos')
+          )
+      )
+    );
+
+    container.addActionRowComponents(
+      new ActionRowBuilder().addComponents(
+        new SecondaryButtonBuilder()
+          .setLabel('Previous')
+          .setCustomId('inventory-prev')
+          .setDisabled(!!disablePrev),
+        new SecondaryButtonBuilder()
+          .setLabel('Next')
+          .setCustomId('inventory-next')
+          .setDisabled(!!disableNext)
+      )
+    );
+  }
+
   const royal = Number(balances.royal_jelly || 0);
   const credits = Number(balances.credits || 0);
-  const typeLabel = type === 'eggs' ? 'Eggs' : type === 'items' ? 'Items' : type === 'hosts' ? 'Hosts' : type === 'xenos' ? 'Xenos' : 'Currencies';
-  embed.setFooter({ text: `Royal Jelly: ${royal} • Credits: ${credits} • ${typeLabel} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}` });
-  return embed;
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`_Royal Jelly: ${royal} • Credits: ${credits} • ${typeLabel} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}_`)
+  );
+  return [container];
 }
 
 function formatInventory(eggs) {
@@ -174,35 +220,22 @@ module.exports = {
       userModel.getCurrencyForGuild(String(target.id), guildId, 'credits')
     ]);
 
-    const embed = makeEmbed(target, currentType, page, pages, { royal_jelly: royalJellyBalance, credits: creditsBalance });
-
-    const components = [
-      new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId('inventory-type')
-          .setPlaceholder('Type')
-          .addOptions(
-            new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(true),
-            new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items'),
-            new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies'),
-            new StringSelectMenuOptionBuilder().setLabel('Hosts').setValue('hosts'),
-            new StringSelectMenuOptionBuilder().setLabel('Xenos').setValue('xenos')
-          )
-      ),
-      new ActionRowBuilder().addComponents(
-        new SecondaryButtonBuilder().setLabel('Previous').setCustomId('inventory-prev'),
-        new SecondaryButtonBuilder().setLabel('Next').setCustomId('inventory-next')
-      )
-    ];
+    const messageComponents = makeInventoryComponents(
+      target,
+      currentType,
+      page,
+      pages,
+      { royal_jelly: royalJellyBalance, credits: creditsBalance },
+      { showControls: true, disablePrev: page === 0, disableNext: page >= pages.length - 1 }
+    );
 
     try {
-      await interaction.editReply({ embeds: [embed], components });
+      await interaction.editReply({ components: messageComponents, flags: MessageFlags.IsComponentsV2 });
     } catch (err) {
       const logger = require('../../utils/logger').get('command:inventory');
-      logger.warn('Embed components rejected, falling back to text payload', { error: err && (err.stack || err) });
+      logger.warn('Inventory V2 components rejected, using minimal V2 fallback', { error: err && (err.stack || err) });
       try {
-        const content = `**${target.username}'s Inventory**\n` + formatInventory(eggs);
-        await interaction.editReply({ content, components });
+        await interaction.editReply({ components: [new TextDisplayBuilder().setContent(`**${target.username}'s Inventory**\n${formatInventory(eggs)}`)], flags: MessageFlags.IsComponentsV2 });
         return;
       } catch (err2) {
         try { await interaction.editReply({ content: 'Failed to render inventory.' }); } catch (e) { try { require('../../utils/logger').get('command:inventory').warn('Failed to editReply in inventory command', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging editReply error in inventory', le && (le.stack || le)); } catch (ignored) {} } }
@@ -211,7 +244,7 @@ module.exports = {
     }
 
     // Collector to handle select + navigation
-    const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [embed], components, time: 120_000, ephemeral: cmd.ephemeral === true, edit: true });
+    const { collector, message: msg } = await createInteractionCollector(interaction, { components: messageComponents, time: 120_000, ephemeral: cmd.ephemeral === true, edit: true });
     if (!collector) {
       try { require('../../utils/logger').get('command:inventory').warn('Failed to attach inventory collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach inventory collector'); } catch (ignored) {} }
       return;
@@ -228,12 +261,15 @@ module.exports = {
             userModel.getCurrencyForGuild(String(target.id), guildId, 'royal_jelly'),
             userModel.getCurrencyForGuild(String(target.id), guildId, 'credits')
           ]);
-          const e = makeEmbed(target, currentType, page, pages, { royal_jelly: balRoyal, credits: balCredits });
-          const newNav = new ActionRowBuilder().addComponents(
-            new SecondaryButtonBuilder().setLabel('Previous').setCustomId('inventory-prev').setDisabled(page === 0),
-            new SecondaryButtonBuilder().setLabel('Next').setCustomId('inventory-next').setDisabled(pages.length <= 1)
+          const v2Blocks = makeInventoryComponents(
+            target,
+            currentType,
+            page,
+            pages,
+            { royal_jelly: balRoyal, credits: balCredits },
+            { showControls: true, disablePrev: page === 0, disableNext: pages.length <= 1 }
           );
-          await i.update({ embeds: [e], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('inventory-type').setPlaceholder('Type').addOptions(new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(currentType==='eggs'), new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items').setDefault(currentType==='items'), new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies').setDefault(currentType==='currencies'), new StringSelectMenuOptionBuilder().setLabel('Hosts').setValue('hosts').setDefault(currentType==='hosts'), new StringSelectMenuOptionBuilder().setLabel('Xenos').setValue('xenos').setDefault(currentType==='xenos'))), newNav] });
+          await i.update({ components: v2Blocks });
           return;
         }
         if (i.customId === 'inventory-prev' || i.customId === 'inventory-next') {
@@ -243,19 +279,40 @@ module.exports = {
             userModel.getCurrencyForGuild(String(target.id), guildId, 'royal_jelly'),
             userModel.getCurrencyForGuild(String(target.id), guildId, 'credits')
           ]);
-          const e = makeEmbed(target, currentType, page, pages, { royal_jelly: bal2Royal, credits: bal2Credits });
-          const newNav = new ActionRowBuilder().addComponents(
-            new SecondaryButtonBuilder().setLabel('Previous').setCustomId('inventory-prev').setDisabled(page === 0),
-            new SecondaryButtonBuilder().setLabel('Next').setCustomId('inventory-next').setDisabled(page >= pages.length - 1)
+          const v2Blocks = makeInventoryComponents(
+            target,
+            currentType,
+            page,
+            pages,
+            { royal_jelly: bal2Royal, credits: bal2Credits },
+            { showControls: true, disablePrev: page === 0, disableNext: page >= pages.length - 1 }
           );
-          await i.update({ embeds: [e], components: [new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('inventory-type').setPlaceholder('Type').addOptions(new StringSelectMenuOptionBuilder().setLabel('Eggs').setValue('eggs').setDefault(currentType==='eggs'), new StringSelectMenuOptionBuilder().setLabel('Items').setValue('items').setDefault(currentType==='items'), new StringSelectMenuOptionBuilder().setLabel('Currencies').setValue('currencies').setDefault(currentType==='currencies'), new StringSelectMenuOptionBuilder().setLabel('Hosts').setValue('hosts').setDefault(currentType==='hosts'), new StringSelectMenuOptionBuilder().setLabel('Xenos').setValue('xenos').setDefault(currentType==='xenos'))), newNav] });
+          await i.update({ components: v2Blocks });
           return;
         }
       } catch (err) {
         try { await i.reply({ content: 'Error handling interaction.', ephemeral: true }); } catch (e) { try { require('../../utils/logger').get('command:inventory').warn('Failed sending interaction error reply in inventory', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging interaction error reply failure in inventory', le && (le.stack || le)); } catch (ignored) {} } }
       }
     });
-    collector.on('end', async () => { try { await interaction.editReply({ components: [] }); } catch (e) { try { require('../../utils/logger').get('command:inventory').warn('Failed clearing components after inventory collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging clearing components error in inventory collector end', le && (le.stack || le)); } catch (ignored) {} } } });
+    collector.on('end', async () => {
+      try {
+        const [balRoyal, balCredits] = await Promise.all([
+          userModel.getCurrencyForGuild(String(target.id), guildId, 'royal_jelly'),
+          userModel.getCurrencyForGuild(String(target.id), guildId, 'credits')
+        ]);
+        const finalBlocks = makeInventoryComponents(
+          target,
+          currentType,
+          page,
+          pages,
+          { royal_jelly: balRoyal, credits: balCredits },
+          { showControls: false }
+        );
+        await interaction.editReply({ components: finalBlocks, flags: MessageFlags.IsComponentsV2 });
+      } catch (e) {
+        try { require('../../utils/logger').get('command:inventory').warn('Failed finalizing inventory view after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging inventory finalization error', le && (le.stack || le)); } catch (ignored) {} }
+      }
+    });
   },
   // Text-mode handlers removed: use slash commands (`executeInteraction`) instead.
 };
