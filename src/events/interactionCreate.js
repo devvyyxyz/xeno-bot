@@ -127,7 +127,26 @@ module.exports = {
           logger.warn('Interaction too old to reply to, skipping error reply', { ageMs, ...meta });
           return;
         }
-        await safeReply(interaction, { content: 'There was an error while executing this command!', ephemeral: true }, { loggerName: 'interactionCreate' });
+        
+        const links = require('../../config/links.json');
+        const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+        const components = [];
+        
+        if (links?.community?.support) {
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setLabel('Join Support Server')
+              .setStyle(ButtonStyle.Link)
+              .setURL(links.community.support)
+          );
+          components.push(row);
+        }
+        
+        await safeReply(interaction, { 
+          content: '❌ Error\nThere was an error while executing this command!', 
+          components, 
+          ephemeral: true 
+        }, { loggerName: 'interactionCreate' });
       } catch (replyErr) {
         logger.error('Failed to send error reply for interaction', { error: replyErr.stack || replyErr, ageMs: Date.now() - (interaction?.createdTimestamp || Date.now()), ...meta });
       }
