@@ -46,6 +46,10 @@ let inProgress = new Set();
 let lastSpawnAt = new Map();
 // failureTracker: guildId -> { count, lastFailTime } to implement exponential backoff
 const failureTracker = new Map();
+// guildSendMode: guildId -> 'v2' | 'legacy' to avoid repeated V2 failures on unsupported channels
+const guildSendMode = new Map();
+// warnCooldowns: key -> last log timestamp, to reduce repeated warning spam
+const warnCooldowns = new Map();
 const maxConcurrentSpawns = Math.max(1, Number(process.env.SPAWN_MAX_CONCURRENT) || 3);
 const maxSpawnQueueDepth = Number(process.env.SPAWN_QUEUE_MAX_DEPTH) || 100; // safety limit to prevent memory accumulation
 const spawnQueue = [];
@@ -59,6 +63,14 @@ function chunkArray(values, size) {
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function warnWithCooldown(key, message, meta = {}, cooldownMs = 15 * 60 * 1000) {
+  const now = Date.now();
+  const last = warnCooldowns.get(key) || 0;
+  if (now - last < cooldownMs) return;
+  warnCooldowns.set(key, now);
+  logger.warn(message, meta);
 }
 
 function getSpawnBackoffDelay(guildId) {
@@ -425,6 +437,17 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       logger.warn(`Configured channel not found (${guildName})`, { guildId, channel_id: cfg.channel_id });
       return scheduleNext(guildId);
     }
+    const channelPerms = channel.permissionsFor && client && client.user
+      ? channel.permissionsFor(client.user)
+      : null;
+    const canSendMessages = channelPerms
+      ? channelPerms.has(PermissionsBitField.Flags.ViewChannel) && channelPerms.has(PermissionsBitField.Flags.SendMessages)
+      : true;
+    if (!canSendMessages) {
+      const permErr = new Error('Missing ViewChannel/SendMessages permission in spawn channel');
+      permErr.code = 403;
+      throw permErr;
+    }
     // Randomly determine how many eggs to spawn (1 to limit, higher limit increases chance of more)
     let numEggs = 1;
     if (limit > 1) {
@@ -454,8 +477,8 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     const imgPath = path.join(__dirname, '../assets/images/egg_spawn.png');
     const hasImage = fs.existsSync(imgPath);
     // Check attach permissions and file size limits before attempting to attach
-    const canAttachFiles = channel.permissionsFor && client && client.user
-      ? channel.permissionsFor(client.user)?.has(PermissionsBitField.Flags.AttachFiles)
+    const canAttachFiles = channelPerms
+      ? channelPerms.has(PermissionsBitField.Flags.AttachFiles)
       : false;
     let attachment = null;
     if (hasImage && canAttachFiles) {
@@ -479,7 +502,7 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
         logger.warn('Failed to stat spawn image; skipping attach', { guildId, error: statErr && (statErr.stack || statErr) });
       }
     } else if (hasImage && !canAttachFiles) {
-      logger.warn('Bot lacks AttachFiles permission in channel; skipping image attach', { guildId, channel: channel.id });
+      warnWithCooldown(`attach:${guildId}`, 'Bot lacks AttachFiles permission in channel; skipping image attach', { guildId, channel: channel.id });
     }
     const message = `${eggWord} spawned! Type \`egg\` to catch ${numEggs === 1 ? 'it' : 'them'}!`;
     const buildSpawnV2Payload = (files = null) => {
@@ -499,20 +522,26 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       return payload;
     };
     let sent;
+    const preferLegacy = guildSendMode.get(guildId) === 'legacy';
     try {
-      if (attachment) {
+      if (preferLegacy) {
+        sent = await channel.send({ content: `${eggEmoji} ${message}` });
+        if (attachment) {
+          try { await channel.send({ files: [attachment] }); } catch (_) {}
+        }
+      } else if (attachment) {
         // Prefer sending text+image together
         try {
           sent = await channel.send(buildSpawnV2Payload([attachment]));
         } catch (firstErr) {
           // Attempt fallback: read file into buffer and resend in one message
-          logger.warn('Combined V2 text+image initial send failed; retrying with buffer', { guildId, error: firstErr && (firstErr.stack || firstErr) });
+          warnWithCooldown(`v2-combined:${guildId}`, 'Combined V2 text+image initial send failed; retrying with buffer', { guildId, error: firstErr && (firstErr.stack || firstErr) }, 5 * 60 * 1000);
           try {
             const buf = fs.readFileSync(imgPath);
             sent = await channel.send(buildSpawnV2Payload([{ attachment: buf, name: 'egg_spawn.png' }]));
           } catch (bufErr) {
             // If buffer fallback also fails, rethrow to outer catch to handle V2-only-then-legacy strategy
-            logger.warn('Buffer fallback for combined V2 text+image failed', { guildId, error: bufErr && (bufErr.stack || bufErr) });
+            warnWithCooldown(`v2-buffer:${guildId}`, 'Buffer fallback for combined V2 text+image failed', { guildId, error: bufErr && (bufErr.stack || bufErr) }, 5 * 60 * 1000);
             throw bufErr;
           }
         }
@@ -522,7 +551,8 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     } catch (e) {
       // If V2 send ultimately fails, try legacy content and then image separately.
       const guildName = getGuildName(guildId);
-      logger.warn(`V2 spawn send failed; falling back to legacy text/image strategy (${guildName})`, { guildId, error: e && (e.stack || e) });
+      warnWithCooldown(`v2-fallback:${guildId}`, `V2 spawn send failed; falling back to legacy text/image strategy (${guildName})`, { guildId, error: e && (e.stack || e) }, 5 * 60 * 1000);
+      guildSendMode.set(guildId, 'legacy');
       try {
         sent = await channel.send({ content: `${eggEmoji} ${message}` });
       } catch (textErr) {
@@ -571,8 +601,12 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     const isRateLimit = isRateLimitError(err);
     const isPermission = isPermissionError(err);
     const errorType = isRateLimit ? 'rate-limit' : isPermission ? 'permission' : 'other';
-    
-    logger.error(`Error during doSpawn (${guildName})`, { guildId, error: err.stack || err, errorType, code: err.code, status: err.status });
+
+    if (isPermission) {
+      warnWithCooldown(`spawn-perm:${guildId}`, `Error during doSpawn (${guildName})`, { guildId, error: err.stack || err, errorType, code: err.code, status: err.status }, 5 * 60 * 1000);
+    } else {
+      logger.error(`Error during doSpawn (${guildName})`, { guildId, error: err.stack || err, errorType, code: err.code, status: err.status });
+    }
     
     recordSpawnFailure(guildId);
     
@@ -583,6 +617,14 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
         // Double the failure count for rate limits to increase backoff aggressively
         tracker.count = Math.min(20, tracker.count + 1);
         logger.warn(`Aggressive backoff applied to ${guildName} due to rate limit`, { guildId, newCount: tracker.count });
+      }
+    }
+
+    if (isPermission) {
+      const tracker = failureTracker.get(guildId);
+      if (tracker) {
+        tracker.count = Math.min(20, tracker.count + 2);
+        logger.warn(`Aggressive backoff applied to ${guildName} due to permissions`, { guildId, newCount: tracker.count });
       }
     }
     
@@ -745,6 +787,8 @@ async function shutdown() {
     pendingReschedule.clear();
     inProgress.clear();
     failureTracker.clear();
+    guildSendMode.clear();
+    warnCooldowns.clear();
     while (spawnQueue.length > 0) {
       const task = spawnQueue.shift();
       if (task && typeof task.reject === 'function') {

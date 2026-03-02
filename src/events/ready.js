@@ -4,6 +4,7 @@ const cache = require('../utils/cache');
 
 // Store interval reference to clean up on reconnect
 let statusCyclingInterval = null;
+let statusFailureStreak = 0;
 
 module.exports = {
   name: 'clientReady',
@@ -161,12 +162,20 @@ module.exports = {
             const activities = generateActivities();
             if (activities.length > 0) {
               const activity = activities[idx % activities.length];
-              const status = statusCycling?.status || 'online';
+              const rawStatus = String(statusCycling?.status || 'online').toLowerCase();
+              const status = ['online', 'idle', 'dnd', 'invisible'].includes(rawStatus) ? rawStatus : 'online';
               await client.user.setPresence({ activities: [activity], status });
               idx++;
+              statusFailureStreak = 0;
             }
           } catch (e) {
-            logger.warn('Failed to set presence', { error: e && (e.stack || e) });
+            statusFailureStreak += 1;
+            logger.warn('Failed to set presence', { error: e && (e.stack || e), streak: statusFailureStreak });
+            if (statusFailureStreak >= 3 && statusCyclingInterval) {
+              clearInterval(statusCyclingInterval);
+              statusCyclingInterval = null;
+              logger.warn('Status cycling disabled after repeated failures; bot will keep default presence until restart');
+            }
           }
         };
         
@@ -178,6 +187,7 @@ module.exports = {
           clearInterval(statusCyclingInterval);
           logger.debug('Cleared previous status cycling interval');
         }
+        statusFailureStreak = 0;
         statusCyclingInterval = setInterval(setPresence, intervalMs);
         logger.info('Status cycling started', { 
           intervalSeconds: statusCycling?.intervalSeconds || 30,
