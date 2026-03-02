@@ -106,10 +106,8 @@ const childProcess = require('child_process');
 
 async function startup() {
   try {
-    if (process.env.NODE_ENV !== 'production') {
-      await db.migrate();
-      baseLogger.info('DB migrate complete');
-    }
+    await db.migrate();
+    baseLogger.info('DB migrate complete');
   } catch (err) {
     baseLogger.error('DB migrate failed', { error: err.stack || err });
     // Continue — migrate() already falls back to SQLite on connection refusal
