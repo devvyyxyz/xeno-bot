@@ -264,8 +264,9 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       eggType = pickEggType();
     }
     const eggWord = numEggs === 1
-      ? `${eggType.emoji} ${eggType.name} has`
-      : `${numEggs} ${eggType.emoji} ${eggType.name}s have`;
+      ? `${eggType.name} has`
+      : `${numEggs} ${eggType.name}s have`;
+    const eggEmoji = eggType.emoji;
     // Attempt to attach the spawn image if available. Ensure the text is always sent.
     const imgPath = path.join(__dirname, '../assets/images/egg_spawn.png');
     const hasImage = fs.existsSync(imgPath);
@@ -297,11 +298,15 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     } else if (hasImage && !canAttachFiles) {
       logger.warn('Bot lacks AttachFiles permission in channel; skipping image attach', { guildId, channel: channel.id });
     }
-    const content = `${eggWord} spawned! Type \`egg\` to catch ${numEggs === 1 ? 'it' : 'them'}!`;
+    const message = `${eggWord} spawned! Type \`egg\` to catch ${numEggs === 1 ? 'it' : 'them'}!`;
     const buildSpawnV2Payload = (files = null) => {
       const container = new ContainerBuilder();
+      // Display emoji as a prominent element on the container (separate from text)
       container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(content)
+        new TextDisplayBuilder().setContent(`# ${eggEmoji}`)
+      );
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(message)
       );
       const payload = {
         components: [container],
@@ -335,7 +340,7 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       // If V2 send ultimately fails, try legacy content and then image separately.
       logger.warn('V2 spawn send failed; falling back to legacy text/image strategy', { guildId, error: e && (e.stack || e) });
       try {
-        sent = await channel.send({ content });
+        sent = await channel.send({ content: `${eggEmoji} ${message}` });
       } catch (textErr) {
         logger.error('Failed sending spawn text', { guildId, error: textErr && (textErr.stack || textErr) });
         throw textErr;
