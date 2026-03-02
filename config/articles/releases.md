@@ -211,3 +211,57 @@ Date: 2026-03-02
 - All V2 component patterns now follow discord.js v15 best practices
 - Bot remains stable during development workflows with proper file watching
 
+## v1.6.0 — Eggs List Overhaul & Rarity System
+
+Date: 2026-03-02
+
+### Major Features
+
+- **Complete Eggs List Redesign**: Transformed `/eggs list` into a fully interactive command matching hunt-list functionality:
+  - Paginated display (4 hatches per page)
+  - Direct collection from list with disabled button states
+  - Shows collected eggs with "Collected: ✅" status and disabled buttons
+  - Added Statistics page showing total hatches, ready count, most common type, and unique types
+  - Added interactive "Hatch Egg" button with dropdown selection menu
+  - Navigation between list, stats, and hatch screens
+  - Improved timestamp display: "Hatched: \<time\>" / "Hatching: \<time\>" / "Collected: ✅"
+
+- **Configurable Rarity System**: Created centralized rarity configuration:
+  - New `config/rarities.json` defining rarity tiers (Common 1-3, Rare 4-5, Very Rare 6+)
+  - Added custom rarity emojis: `<:common:...>`, `<:rare:...>`, `<:very_rare:...>`
+  - Updated both eggs list and hunt-list to display emoji-only rarity badges
+  - Unified display format: `🥚 Egg Name • :very_rare:` instead of `🥚 Egg Name • 🟪 Very Rare`
+
+- **Enhanced Egg Hatching UX**:
+  - Removed `/eggs collect` subcommand (collection now happens directly from list)
+  - Added select menu for hatching with dropdown showing available eggs, quantities, and hatch times
+  - Added "View List" button to all result pages (sell/hatch) with full interactive navigation
+  - Result pages now have complete collector support for seamless workflow
+
+### Display Improvements
+
+- **Unified format across eggs and hunt-list**:
+  - Three-line display: Name/Type • Rarity, ID: ###, Status/Timestamp
+  - Consistent emoji usage and rarity badge placement
+  - Bot avatar thumbnails on all list pages
+
+### Bug Fixes
+
+- Fixed egg list showing all hatches including collected ones inappropriately
+- Fixed button states not properly disabling when eggs aren't ready to collect
+- Fixed navigation between different screens losing context
+- Improved collector lifecycle management for sell/hatch commands
+
+### Configuration Changes
+
+- Added `config/rarities.json` with rarity tier definitions
+- Added rarity emojis to `config/emojis.json`
+- Removed `eggs.collect` subcommand from `config/commands.json`
+
+### Internal
+
+- Version bumped to `1.6.0`
+- Refactored rarity badge generation to use centralized config
+- Enhanced eggs command with multiple screen types (list, stats, hatch, result)
+- Improved code maintainability with modular page builders
+
