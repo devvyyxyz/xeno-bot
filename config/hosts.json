@@ -2,7 +2,7 @@
   "findChance": 0.75,
   "hosts": {
     "human": { "display": "Human", "emoji": "civilian_male", "rarity": "common", "weight": 90, "description": "A standard human host useful for basic evolutions." },
-    "dog": { "display": "Dog", "rarity": "common", "weight": 40, "description": "A canine host useful for certain pathways." },
+    "dog": { "display": "Dog", "emoji": "dog", "rarity": "common", "weight": 40, "description": "A canine host useful for certain pathways." },
     "engineer": { "display": "Engineer", "emoji": "scientist", "rarity": "rare", "weight": 0.5, "description": "An engineer host with chance for advanced mutations." },
     "predator": { "display": "Predator", "emoji": "predator", "rarity": "very_rare", "weight": 0.5, "description": "A rare Predator host used for elite hybrid pathways." },
     "neomorph_candidate": { "display": "Neomorph Candidate", "emoji": "xenomorph_queen_sprite", "rarity": "rare", "weight": 0.5, "description": "A rare host that can lead to Neomorph evolutions." },

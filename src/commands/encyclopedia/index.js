@@ -87,7 +87,8 @@ module.exports = {
       for (let i = 0; i < hostKeys.length; i += eggsPerPage) {
         const fields = hostKeys.slice(i, i + eggsPerPage).map(k => {
           const h = hostsCfg.hosts[k] || {};
-          const name = `**${h.display || k}**`;
+          const hostEmoji = h.emoji ? emojis.get(h.emoji) : '';
+          const name = `${hostEmoji} **${h.display || k}**`;
           const valParts = [];
           if (h.rarity) valParts.push(`Rarity: ${h.rarity}`);
           if (counts[k] !== undefined) valParts.push(`Found: ${counts[k]}`);

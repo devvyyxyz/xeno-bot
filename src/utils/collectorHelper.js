@@ -12,7 +12,8 @@ module.exports = async function createInteractionCollector(interaction, opts = {
     time = 1000 * 60 * 10,
     ephemeral = false,
     filter = (i) => i.user.id === (interaction && interaction.user && interaction.user.id),
-    edit = true
+    edit = true,
+    flags = undefined
   } = opts;
   // Optional collectorOptions will be merged into the options used when
   // creating the MessageComponentCollector (allows passing componentType, etc.)
@@ -25,10 +26,25 @@ module.exports = async function createInteractionCollector(interaction, opts = {
     }
 
     // Send or edit the reply content
-    if (edit) {
-      await interaction.editReply({ embeds, components });
-    } else {
-      try { await interaction.reply({ embeds, components, fetchReply: true }); } catch (e) { /* ignore */ }
+    const replyOpts = {};
+    // Only include embeds if it's defined and not an empty array
+    if (embeds !== undefined && !(Array.isArray(embeds) && embeds.length === 0)) {
+      replyOpts.embeds = embeds;
+    }
+    // Only include components if it's defined and not an empty array
+    if (components !== undefined && !(Array.isArray(components) && components.length === 0)) {
+      replyOpts.components = components;
+    }
+    if (flags !== undefined) replyOpts.flags = flags;
+    
+    // Only send/edit if there's actual content
+    const hasContent = Object.keys(replyOpts).length > 0;
+    if (hasContent) {
+      if (edit) {
+        await interaction.editReply(replyOpts);
+      } else {
+        try { await interaction.reply({ ...replyOpts, fetchReply: true }); } catch (e) { /* ignore */ }
+      }
     }
 
     // Fetch the message to attach collector
