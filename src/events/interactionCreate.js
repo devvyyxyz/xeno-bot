@@ -129,24 +129,28 @@ module.exports = {
         }
         
         const links = require('../../config/links.json');
-        const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-        const components = [];
+        
+        const replyOptions = { 
+          content: '❌ Error\nThere was an error while executing this command!', 
+          ephemeral: true 
+        };
         
         if (links?.community?.support) {
-          const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setLabel('Join Support Server')
-              .setStyle(ButtonStyle.Link)
-              .setURL(links.community.support)
-          );
-          components.push(row);
+          const row = {
+            type: 1,
+            components: [
+              {
+                type: 2,
+                style: 5,
+                label: 'Join Support Server',
+                url: links.community.support
+              }
+            ]
+          };
+          replyOptions.components = [row];
         }
         
-        await safeReply(interaction, { 
-          content: '❌ Error\nThere was an error while executing this command!', 
-          components, 
-          ephemeral: true 
-        }, { loggerName: 'interactionCreate' });
+        await safeReply(interaction, replyOptions, { loggerName: 'interactionCreate' });
       } catch (replyErr) {
         logger.error('Failed to send error reply for interaction', { error: replyErr.stack || replyErr, ageMs: Date.now() - (interaction?.createdTimestamp || Date.now()), ...meta });
       }

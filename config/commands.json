@@ -66,6 +66,20 @@
       "ephemeral": true,
       "examples": ["/pathway - Browse all evolution pathways and their requirements"]
     },
+    "invite": {
+      "name": "invite",
+      "description": "Get the bot invite link.",
+      "group": "Information",
+      "ephemeral": false,
+      "examples": ["/invite - Get a link to add this bot to your server"]
+    },
+    "support-server": {
+      "name": "support-server",
+      "description": "Get the support server invite link.",
+      "group": "Information",
+      "ephemeral": false,
+      "examples": ["/support-server - Join the support server for help"]
+    },
     "collect": {
       "name": "collect",
       "description": "Collect a spawned egg from the channel.",
