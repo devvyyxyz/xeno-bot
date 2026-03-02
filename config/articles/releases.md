@@ -179,3 +179,35 @@ Date: 2026-03-02
 
 - Version bumped to `1.4.0`.
 
+## v1.5.0 — V2 Components stabilization and nodemon improvements
+
+Date: 2026-03-02
+
+### Key Features
+
+- **V2 Components Migration**: Completed migration of `/news` command to discord.js V2 components using ContainerBuilder, TextDisplayBuilder, and SeparatorBuilder for modern UI rendering.
+- **Improved Collector Helper**: Enhanced `createInteractionCollector` to properly handle V2 component updates and avoid sending empty messages:
+  - Now intelligently filters out empty arrays for components and embeds
+  - Prevents Discord API errors (50006: Cannot send an empty message)
+  - Properly passes MessageFlags.IsComponentsV2 for V2 component rendering
+
+### Bug Fixes
+
+- Fixed ButtonBuilder import errors by using style-specific builders (PrimaryButtonBuilder, SecondaryButtonBuilder) compatible with discord.js v15
+- Fixed V2 component update pattern: changed from `message.edit()` to `btn.editReply()` for proper interaction-based updates
+- Fixed collectorHelper passing undefined properties to Discord API, which now filters to only include defined and non-empty values
+- Fixed news command home view to skip loading latest article preview when none exist
+- Fixed nodemon auto-restart on gitignored files (logs, .env, data)
+
+### Developer Experience
+
+- Added comprehensive `nodemon.json` configuration that ignores log files, data, and editor files
+- Updated `npm run dev` to use nodemon config instead of inline flags
+- Prevents unnecessary bot restarts when logging systems write to disk
+
+### Internal
+
+- Version bumped to `1.5.0`.
+- All V2 component patterns now follow discord.js v15 best practices
+- Bot remains stable during development workflows with proper file watching
+
