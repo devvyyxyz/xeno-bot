@@ -6,7 +6,9 @@ const {
   ContainerBuilder,
   SectionBuilder,
   TextDisplayBuilder,
-  MessageFlags
+  MessageFlags,
+  SeparatorBuilder,
+  SeparatorSpacingSize
 } = require('discord.js');
 const {
   ActionRowBuilder,
@@ -79,6 +81,10 @@ function makeShopComponents({
   }
 
   if (!expired) {
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+    );
+
     const categoryOptions = categories.slice(0, 25).map(c => ({ label: c.name, value: c.id, default: c.id === currentCategory }));
 
     container.addActionRowComponents(

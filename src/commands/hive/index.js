@@ -1,4 +1,4 @@
-const { ContainerBuilder, TextDisplayBuilder, MessageFlags } = require('discord.js');
+const { ContainerBuilder, TextDisplayBuilder, MessageFlags, SeparatorBuilder, SeparatorSpacingSize } = require('discord.js');
 const { ActionRowBuilder, SecondaryButtonBuilder, PrimaryButtonBuilder, DangerButtonBuilder } = require('@discordjs/builders');
 const hiveModel = require('../../models/hive');
 const xenomorphModel = require('../../models/xenomorph');
@@ -157,6 +157,9 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
   if (!expired) {
     const moduleCandidate = getQuickModuleCandidate(rows.modules || []);
     container.addActionRowComponents(buildQuickActionsRow({ disabled: false, canAct, queenCost: 50, moduleCandidate }));
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+    );
     container.addActionRowComponents(buildNavigationRow({ screen, disabled: false }));
   } else {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('_Hive view expired_'));

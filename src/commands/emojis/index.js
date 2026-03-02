@@ -7,7 +7,9 @@ const {
 const {
   ContainerBuilder,
   TextDisplayBuilder,
-  MessageFlags
+  MessageFlags,
+  SeparatorBuilder,
+  SeparatorSpacingSize
 } = require('discord.js');
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
@@ -43,6 +45,10 @@ function buildEmojiPage({ pageIdx = 0, expired = false, client = null }) {
   }
 
   if (!expired) {
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+    );
+
     const navRow = new ActionRowBuilder().addComponents(
       new SecondaryButtonBuilder()
         .setCustomId('emoji-prev-page')
@@ -126,7 +132,9 @@ module.exports = {
 
       collector.on('end', async () => {
         try {
-          await safeReply(interaction, { components: buildEmojiPage({ pageIdx: currentPage, expired: true, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true }, { loggerName: 'command:emojis' });
+          if (msg) {
+            await msg.edit({ components: buildEmojiPage({ pageIdx: currentPage, expired: true, client: interaction.client }) });
+          }
         } catch (_) {}
       });
 

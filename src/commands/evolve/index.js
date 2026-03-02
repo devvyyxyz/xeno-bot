@@ -7,7 +7,9 @@ const {
 const {
   ContainerBuilder,
   TextDisplayBuilder,
-  MessageFlags
+  MessageFlags,
+  SeparatorBuilder,
+  SeparatorSpacingSize
 } = require('discord.js');
 const xenoModel = require('../../models/xenomorph');
 const hostModel = require('../../models/host');
@@ -166,6 +168,9 @@ function buildEvolveView({
   }
 
   if (!expired) {
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+    );
     container.addActionRowComponents(buildNavigationRow({ screen, disabled: false }));
   } else {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('_Evolve view expired_'));

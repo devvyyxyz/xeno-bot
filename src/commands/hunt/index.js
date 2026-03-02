@@ -182,6 +182,11 @@ function buildStatsPage({ userId, allHosts, cfgHosts, client = null }) {
   ];
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(stats.join('\n')));
 
+  // Separator
+  container.addSeparatorComponents(
+    new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+  );
+
   const backRow = new ActionRowBuilder().addComponents(
     new SecondaryButtonBuilder().setCustomId('hunt-back-to-list').setLabel('Back to Hosts')
   );
@@ -461,7 +466,9 @@ module.exports = {
 
         collector.on('end', async () => {
           try {
-            await safeReply(interaction, { components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, expired: true, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true }, { loggerName: 'command:hunt' });
+            if (msg) {
+              await msg.edit({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, expired: true, client: interaction.client }) });
+            }
           } catch (_) {}
         });
 

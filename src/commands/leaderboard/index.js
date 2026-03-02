@@ -1,5 +1,5 @@
 const { getCommandConfig } = require('../../utils/commandsConfig');
-const { ContainerBuilder, TextDisplayBuilder, MessageFlags } = require('discord.js');
+const { ContainerBuilder, TextDisplayBuilder, MessageFlags, SeparatorBuilder, SeparatorSpacingSize } = require('discord.js');
 const { ActionRowBuilder, StringSelectMenuBuilder } = require('@discordjs/builders');
 const userModel = require('../../models/user');
 const eggTypes = require('../../../config/eggTypes.json');
@@ -29,6 +29,10 @@ function buildLeaderboardV2Components({
   );
 
   if (!expired) {
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+    );
+
     const sortOptions = (sortChoices || []).slice(0, 25).map(opt => ({
       label: String(opt.label),
       value: String(opt.value),
