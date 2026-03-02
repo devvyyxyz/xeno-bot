@@ -307,6 +307,7 @@ async function migrate() {
       await knex.schema.createTable('hives', (table) => {
         table.increments('id').primary();
         table.string('user_id').notNullable().unique();
+        table.string('guild_id').nullable(); // Per-guild hive support
         table.string('name').defaultTo('My Hive');
         table.string('hive_type').defaultTo('default');
         table.string('queen_xeno_id');
@@ -318,6 +319,14 @@ async function migrate() {
       logger.info('Created `hives` table');
     } else {
       logger.info('`hives` table already exists');
+      // Add guild_id column if it doesn't exist
+      const hasGuildColumn = await knex.schema.hasColumn('hives', 'guild_id');
+      if (!hasGuildColumn) {
+        await knex.schema.alterTable('hives', (table) => {
+          table.string('guild_id').nullable();
+        });
+        logger.info('Added `guild_id` column to `hives` table');
+      }
     }
   } catch (err) {
     logger.error('Failed ensuring hives table', { error: err.stack || err });

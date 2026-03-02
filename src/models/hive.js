@@ -80,24 +80,35 @@ async function getHiveById(id) {
   }
 }
 
-async function getHiveByOwner(ownerDiscordId) {
+async function getHiveByOwner(ownerDiscordId, guildId = null) {
   try {
     await ensureHiveColumns();
     let row = null;
+    const whereClause = {};
+    if (_hiveHasGuildIdColumn && guildId) whereClause.guild_id = guildId;
+    
     if (_hiveHasUserIdColumn) {
-      row = await db.knex('hives').where({ user_id: String(ownerDiscordId) }).first();
+      whereClause.user_id = String(ownerDiscordId);
+      row = await db.knex('hives').where(whereClause).first();
     }
     if (!row && _hiveHasOwnerColumn) {
-      row = await db.knex('hives').where({ owner_discord_id: String(ownerDiscordId) }).first();
+      delete whereClause.user_id;
+      whereClause.owner_discord_id = String(ownerDiscordId);
+      row = await db.knex('hives').where(whereClause).first();
     }
     if (!row && !_hiveHasUserIdColumn && !_hiveHasOwnerColumn) {
-      try { row = await db.knex('hives').where({ user_id: String(ownerDiscordId) }).first(); } catch (_) {}
-      if (!row) try { row = await db.knex('hives').where({ owner_discord_id: String(ownerDiscordId) }).first(); } catch (_) {}
+      whereClause.user_id = String(ownerDiscordId);
+      try { row = await db.knex('hives').where(whereClause).first(); } catch (_) {}
+      if (!row) {
+        delete whereClause.user_id;
+        whereClause.owner_discord_id = String(ownerDiscordId);
+        try { row = await db.knex('hives').where(whereClause).first(); } catch (_) {}
+      }
     }
     if (!row) return null;
     return getHiveById(row.id);
   } catch (err) {
-    logger.error('Failed fetching hive by owner', { ownerDiscordId, error: err && (err.stack || err) });
+    logger.error('Failed fetching hive by owner', { ownerDiscordId, guildId, error: err && (err.stack || err) });
     throw err;
   }
 }
@@ -187,18 +198,20 @@ async function deleteHiveByOwner(ownerDiscordId) {
 }
 
 // Backwards-compatible helpers used elsewhere in the codebase
-async function createHiveForUser(userId, opts = {}) {
-  return createHive(String(userId), null, opts.hive_type || opts.type || 'default', opts);
+async function createHiveForUser(userId, guildId, opts = {}) {
+  return createHive(String(userId), guildId, opts.hive_type || opts.type || 'default', opts);
 }
 
-async function getHiveByUser(userId) {
-  return getHiveByOwner(String(userId));
+async function getHiveByUser(userId, guildId = null) {
+  return getHiveByOwner(String(userId), guildId);
 }
 
-async function upsertHive(userId, changes = {}) {
+async function upsertHive(userId, guildId, changes = {}) {
   await ensureHiveColumns();
   const whereCol = _hiveHasOwnerColumn ? 'owner_discord_id' : (_hiveHasUserIdColumn ? 'user_id' : 'owner_discord_id');
-  const existing = await db.knex('hives').where({ [whereCol]: String(userId) }).first();
+  const whereClause = { [whereCol]: String(userId) };
+  if (_hiveHasGuildIdColumn && guildId) whereClause.guild_id = guildId;
+  const existing = await db.knex('hives').where(whereClause).first();
   const payload = {};
   if ('name' in changes) payload.name = changes.name;
   if ('hive_type' in changes) {
@@ -214,11 +227,11 @@ async function upsertHive(userId, changes = {}) {
   if ('jelly_production_per_hour' in changes) payload.jelly_production_per_hour = changes.jelly_production_per_hour;
   if ('data' in changes) payload.data = JSON.stringify(changes.data);
   if (existing) {
-    await db.knex('hives').where({ [whereCol]: String(userId) }).update(Object.assign(payload, { updated_at: db.knex.fn.now() }));
-    return getHiveByUser(userId);
+    await db.knex('hives').where(whereClause).update(Object.assign(payload, { updated_at: db.knex.fn.now() }));
+    return getHiveByUser(userId, guildId);
   }
   // create new
-  return createHiveForUser(userId, changes);
+  return createHiveForUser(userId, guildId, changes);
 }
 
 module.exports = {

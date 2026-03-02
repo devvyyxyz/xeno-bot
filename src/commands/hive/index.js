@@ -261,6 +261,7 @@ module.exports = {
     const safeReply = require('../../utils/safeReply');
     const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
     const userId = interaction.user.id;
+    const guildId = interaction.guildId;
 
     // CREATE
     if (sub === 'create') {
@@ -270,9 +271,9 @@ module.exports = {
         const hasEvolved = Array.isArray(xenos) && xenos.some(x => (x.role && x.role !== 'egg') || (x.stage && x.stage !== 'egg'));
         if (!hasEvolved) return safeReply(interaction, { content: 'You need at least one xenomorph evolved beyond the egg stage to create a hive. Use `/hunt` to find hosts and `/evolve` to progress your xenomorphs.', ephemeral: true });
 
-        const existing = await hiveModel.getHiveByUser(userId);
-        if (existing) return safeReply(interaction, { content: 'You already have a hive.', ephemeral: true });
-        const hive = await hiveModel.createHiveForUser(userId, { type: 'default', name: `${interaction.user.username}'s Hive` });
+        const existing = await hiveModel.getHiveByUser(userId, guildId);
+        if (existing) return safeReply(interaction, { content: 'You already have a hive in this server.', ephemeral: true });
+        const hive = await hiveModel.createHiveForUser(userId, guildId, { type: 'default', name: `${interaction.user.username}'s Hive` });
         return safeReply(interaction, { content: `✅ Hive created (ID: ${hive.id}).`, ephemeral: true });
       } catch (e) {
         return safeReply(interaction, { content: `Failed creating hive: ${e && (e.message || e)}`, ephemeral: true });
@@ -280,7 +281,7 @@ module.exports = {
     }
 
     try {
-      const hive = await hiveModel.getHiveByUser(userId);
+      const hive = await hiveModel.getHiveByUser(userId, guildId);
       
       // Commands that require a hive
       const requiresHive = ['modules', 'upgrade-module', 'milestones', 'queen-status', 'upgrade-queen', 'type-info', 'delete'];
@@ -321,12 +322,12 @@ module.exports = {
               return;
             }
 
-            const existing = await hiveModel.getHiveByUser(userId);
+            const existing = await hiveModel.getHiveByUser(userId, guildId);
             if (existing) {
               const container = new ContainerBuilder();
               container.addTextDisplayComponents(
                 new TextDisplayBuilder().setContent('## Hive Already Exists'),
-                new TextDisplayBuilder().setContent('✅ You already have a hive.')
+                new TextDisplayBuilder().setContent('✅ You already have a hive in this server.')
               );
               container.addActionRowComponents(
                 new ActionRowBuilder().addComponents(
@@ -337,7 +338,7 @@ module.exports = {
               return;
             }
 
-            const newHive = await hiveModel.createHiveForUser(userId, { type: 'default', name: `${interaction.user.username}'s Hive` });
+            const newHive = await hiveModel.createHiveForUser(userId, guildId, { type: 'default', name: `${interaction.user.username}'s Hive` });
             const container = new ContainerBuilder();
             container.addTextDisplayComponents(
               new TextDisplayBuilder().setContent('## Hive Created'),
@@ -370,7 +371,7 @@ module.exports = {
       // Handle view-based subcommands (stats, modules, milestones, queen-status, type-info, and old direct view from 'stats')
       if (sub === 'stats' || sub === 'modules' || sub === 'milestones' || sub === 'queen-status') {
         const targetUser = (sub === 'stats' && (() => { try { return interaction.options.getUser('user'); } catch (e) { return null; } })()) || interaction.user;
-        let viewHive = (sub === 'stats') ? await hiveModel.getHiveByUser(String(targetUser.id)) : hive;
+        let viewHive = (sub === 'stats') ? await hiveModel.getHiveByUser(String(targetUser.id), guildId) : hive;
         const canAct = targetUser.id === userId;
         
         if (!viewHive) {
@@ -411,23 +412,23 @@ module.exports = {
                   return;
                 }
 
-                const existing = await hiveModel.getHiveByUser(userId);
+                const existing = await hiveModel.getHiveByUser(userId, guildId);
                 if (existing) {
                   const container = new ContainerBuilder();
                   container.addTextDisplayComponents(
                     new TextDisplayBuilder().setContent('## Hive Already Exists'),
-                    new TextDisplayBuilder().setContent('✅ You already have a hive.')
+                    new TextDisplayBuilder().setContent('✅ You already have a hive in this server.')
                   );
                   container.addActionRowComponents(
                     new ActionRowBuilder().addComponents(
                       new PrimaryButtonBuilder().setLabel('Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
                     )
                   );
-                  await i.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
+                  await interact.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
                   return;
                 }
 
-                const newHive = await hiveModel.createHiveForUser(userId, { type: 'default', name: `${interaction.user.username}'s Hive` });
+                const newHive = await hiveModel.createHiveForUser(userId, guildId, { type: 'default', name: `${interaction.user.username}'s Hive` });
                 const container = new ContainerBuilder();
                 container.addTextDisplayComponents(
                   new TextDisplayBuilder().setContent('## Hive Created'),
@@ -494,7 +495,7 @@ module.exports = {
         collector.on('collect', async i => {
           try {
             if (i.customId === HIVE_ACTION_REFRESH_ID) {
-              const refreshedHive = await hiveModel.getHiveByUser(String(targetUser.id));
+              const refreshedHive = await hiveModel.getHiveByUser(String(targetUser.id), guildId);
               if (refreshedHive) viewHive = refreshedHive;
               modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => modules);
               milestones = await db.knex('hive_milestones').where({ hive_id: viewHive.id }).select('*').catch(() => milestones);
@@ -615,7 +616,7 @@ module.exports = {
         collector.on('collect', async i => {
           try {
             if (i.customId === HIVE_ACTION_REFRESH_ID) {
-              const refreshedHive = await hiveModel.getHiveByUser(userId);
+              const refreshedHive = await hiveModel.getHiveByUser(userId, guildId);
               if (refreshedHive) viewHive = refreshedHive;
               modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => modules);
               milestones = await db.knex('hive_milestones').where({ hive_id: viewHive.id }).select('*').catch(() => milestones);
