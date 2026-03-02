@@ -78,6 +78,30 @@ function buildPathwayDetailView({ pathwayId, client = null }) {
     new TextDisplayBuilder().setContent(`### Evolution Stages\n${stagesDisplay}`)
   );
 
+  // Starting eggs section
+  const eggTypes = require('../../../config/eggTypes.json');
+  const startingEggs = eggTypes.filter(egg => {
+    const eggPathway = evolutions.eggPathways[egg.id];
+    return eggPathway === pathwayId;
+  });
+
+  if (startingEggs.length > 0) {
+    const eggStartLines = startingEggs.map(egg => {
+      const emoji = egg.emoji || '';
+      const firstStage = pathway.stages[0];
+      const firstRole = evolutions.roles[firstStage] || {};
+      const firstEmoji = emojis[firstRole.emoji || firstStage] || '';
+      return `${emoji} **${egg.name}** → ${firstEmoji} ${firstRole.display || firstStage}`;
+    }).join('\n');
+
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+    );
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(`### How to Start\nHatch these eggs to begin:\n${eggStartLines}`)
+    );
+  }
+
   // Requirements section
   const requirements = evolutions.requirements[pathwayId];
   if (requirements) {
@@ -115,28 +139,6 @@ function buildPathwayDetailView({ pathwayId, client = null }) {
         new TextDisplayBuilder().setContent(`### Requirements\n${reqLines.join('\n\n')}`)
       );
     }
-  }
-
-  // Eggs using this pathway
-  const eggIds = Object.entries(evolutions.eggPathways)
-    .filter(([, pathway]) => pathway === pathwayId)
-    .map(([eggId]) => eggId);
-  
-  if (eggIds.length > 0) {
-    const eggTypes = require('../../../config/eggTypes.json');
-    const eggNames = eggIds.map(id => {
-      const eggMeta = eggTypes.find(e => e.id === id);
-      const emoji = eggMeta?.emoji || '';
-      const name = eggMeta?.name || id;
-      return `${emoji} ${name}`;
-    }).join(', ');
-    
-    container.addSeparatorComponents(
-      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
-    );
-    container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent(`### Eggs Using This Pathway\n${eggNames}`)
-    );
   }
 
   // Back button
