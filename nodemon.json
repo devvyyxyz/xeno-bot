@@ -1,0 +1,21 @@
+{
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "watch": ["src", "config"],
+  "ignore": [
+    "logs/**",
+    "*.log",
+    "data/**",
+    ".env",
+    "node_modules/**",
+    ".git/**",
+    ".vscode/**",
+    ".idea/**",
+    "coverage/**",
+    ".DS_Store"
+  ],
+  "ext": "js,json",
+  "exec": "node src/index.js",
+  "delay": 1000
+}
