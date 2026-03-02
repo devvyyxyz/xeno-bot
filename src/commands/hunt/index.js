@@ -14,6 +14,7 @@ const {
 } = require('discord.js');
 const hostModel = require('../../models/host');
 const userModel = require('../../models/user');
+const guildModel = require('../../models/guild');
 const hiveModel = require('../../models/hive');
 const xenomorphModel = require('../../models/xenomorph');
 const db = require('../../db');
@@ -21,6 +22,7 @@ const { getCommandConfig } = require('../../utils/commandsConfig');
 const hostsCfg = require('../../../config/hosts.json');
 const emojisCfg = require('../../../config/emojis.json');
 const huntFlavorsCfg = require('../../../config/huntFlavors.json');
+const guildDefaultsCfg = require('../../../config/guildDefaults.json');
 const { addV2TitleWithBotThumbnail, addV2TitleWithImageThumbnail } = require('../../utils/componentsV2');
 const safeReply = require('../../utils/safeReply');
 const logger = require('../../utils/logger').get('command:hunt');
@@ -234,10 +236,55 @@ const cmd = getCommandConfig('hunt') || { name: 'hunt', description: 'Hunt for h
 
 async function performHunt(interaction, client) {
   const userId = interaction.user.id;
+  const guildId = interaction.guildId;
   const cfgHosts = (hostsCfg && hostsCfg.hosts) || {};
   const hostKeys = Object.keys(cfgHosts || {});
 
   try {
+    const defaultCooldownSeconds = Math.max(0, Number(guildDefaultsCfg?.data?.hunt_cooldown_seconds || 0));
+    let cooldownSeconds = defaultCooldownSeconds;
+    try {
+      const guildCfg = await guildModel.getGuildConfig(guildId);
+      const configured = Number(guildCfg?.data?.hunt_cooldown_seconds);
+      if (Number.isFinite(configured)) cooldownSeconds = Math.max(0, configured);
+    } catch (e) {
+      logger.warn('Failed to read guild hunt cooldown config, using defaults', { guildId, error: e && e.message });
+    }
+
+    const nowMs = Date.now();
+    const user = await userModel.findOrCreate(userId);
+    const userData = user.data || {};
+    userData.guilds = userData.guilds || {};
+    userData.guilds[guildId] = userData.guilds[guildId] || {};
+    userData.guilds[guildId].hunt = userData.guilds[guildId].hunt || {};
+
+    const lastHuntAt = Number(userData.guilds[guildId].hunt.last_hunt_at || 0);
+    const cooldownMs = Math.max(0, cooldownSeconds * 1000);
+
+    if (cooldownMs > 0 && lastHuntAt > 0) {
+      const elapsed = nowMs - lastHuntAt;
+      if (elapsed < cooldownMs) {
+        const remainingMs = cooldownMs - elapsed;
+        const remainingSeconds = Math.ceil(remainingMs / 1000);
+        const readyAtUnix = Math.floor((nowMs + remainingMs) / 1000);
+        const container = new ContainerBuilder();
+        addV2TitleWithBotThumbnail({ container, title: 'Hunt Cooldown', client });
+        container.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`You need to wait **${remainingSeconds}s** before hunting again.`),
+          new TextDisplayBuilder().setContent(`Ready: <t:${readyAtUnix}:R>`) 
+        );
+        const payload = { components: [container], flags: MessageFlags.IsComponentsV2, ephemeral: true };
+        return safeReply(interaction, payload, { loggerName: 'command:hunt' });
+      }
+    }
+
+    userData.guilds[guildId].hunt.last_hunt_at = nowMs;
+    try {
+      await userModel.updateUserDataRawById(user.id, userData);
+    } catch (e) {
+      logger.warn('Failed to persist hunt cooldown timestamp', { userId, guildId, error: e && e.message });
+    }
+
     const findChance = Number((hostsCfg && hostsCfg.findChance) || 0.75);
     const found = Math.random() < findChance;
 

@@ -10,6 +10,19 @@ const { buildNoticeV2Payload, buildStatsV2Payload } = require('../../utils/compo
 const cmd = getCommandConfig('setup') || { name: 'setup', description: 'Manage bot settings for this server' };
 const logger = require('../../utils/logger').get('command:setup');
 const fallbackLogger = require('../../utils/fallbackLogger');
+const guildDefaults = require('../../../config/guildDefaults.json');
+
+function formatDurationShort(totalSeconds) {
+  const safeSeconds = Math.max(0, Number(totalSeconds || 0));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
+  const parts = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+  return parts.join(' ');
+}
 
 function resolveOwnerId() {
   try {
@@ -65,6 +78,17 @@ module.exports = {
             .setDescription('Units for the provided min/max values')
             .addChoices({ name: 'seconds', value: 'seconds' }, { name: 'minutes', value: 'minutes' })
             .setRequired(false)
+        )
+    )
+    .addSubcommands((sub) =>
+      sub.setName('hunt-cooldown')
+        .setDescription('Set cooldown between /hunt uses in seconds')
+        .addIntegerOptions(opt =>
+          opt.setName('seconds')
+            .setDescription('Cooldown in seconds (0 disables cooldown)')
+            .setRequired(true)
+            .setMinValue(0)
+            .setMaxValue(86400)
         )
     )
     .addSubcommands((sub) =>
@@ -248,6 +272,21 @@ module.exports = {
         if (spawnManager && typeof spawnManager.requestReschedule === 'function') spawnManager.requestReschedule(interaction.guildId);
       } catch (e) { try { require('../../utils/logger').get('command:setup').warn('Failed to request spawn reschedule', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging requestReschedule error in setup', le && (le.stack || le)); } catch (ignored) {} } }
       await sendSetupNotice(interaction, `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Spawn rate set: min ${min}s, max ${max}s. (interpreted as ${units})`, 'info');
+    } else if (sub === 'hunt-cooldown') {
+      const seconds = interaction.options.getInteger('seconds');
+      try {
+        const existing = await guildModel.getGuildConfig(interaction.guildId) || {};
+        const data = existing.data || {};
+        data.hunt_cooldown_seconds = Number(seconds || 0);
+        await guildModel.upsertGuildConfig(interaction.guildId, { data });
+        if (Number(seconds || 0) <= 0) {
+          await sendSetupNotice(interaction, 'Hunt cooldown is now disabled for this server.', 'info');
+        } else {
+          await sendSetupNotice(interaction, `Hunt cooldown is now set to ${seconds}s for this server.`, 'info');
+        }
+      } catch (e) {
+        await sendSetupNotice(interaction, `Failed to update hunt cooldown: ${e && (e.message || e)}`, 'error');
+      }
     } else if (sub === 'egg-limit') {
       const num = interaction.options.getInteger('number');
       await guildModel.upsertGuildConfig(interaction.guildId, { egg_limit: num });
@@ -261,13 +300,19 @@ module.exports = {
         try {
           const guildId = interaction.guildId;
           const cfg = await guildModel.getGuildConfig(guildId) || {};
+          const defaultHuntCooldown = Number(guildDefaults?.data?.hunt_cooldown_seconds || 0);
+          const configuredHuntCooldown = Number(cfg?.data?.hunt_cooldown_seconds);
+          const huntCooldownSeconds = Number.isFinite(configuredHuntCooldown)
+            ? Math.max(0, configuredHuntCooldown)
+            : Math.max(0, defaultHuntCooldown);
           let nextSpawn = null;
           try { const row = await require('../../db').knex('guild_settings').where({ guild_id: guildId }).first('next_spawn_at'); nextSpawn = row && row.next_spawn_at ? Number(row.next_spawn_at) : null; } catch (e) {}
 
           const rows = [
             { label: 'Spawn Channel', value: cfg.channel_id ? `<#${cfg.channel_id}>` : 'Not set' },
             { label: 'Egg Limit', value: String(cfg.egg_limit ?? '1') },
-            { label: 'Spawn Min / Max (s)', value: `${cfg.spawn_min_seconds ?? '60'} / ${cfg.spawn_max_seconds ?? '3600'}` }
+            { label: 'Spawn Min / Max (s)', value: `${cfg.spawn_min_seconds ?? '60'} / ${cfg.spawn_max_seconds ?? '3600'}` },
+            { label: 'Hunt Cooldown (s)', value: `${huntCooldownSeconds} (${formatDurationShort(huntCooldownSeconds)})` }
           ];
           if (nextSpawn) rows.push({ label: 'Next scheduled spawn', value: `<t:${Math.floor(nextSpawn / 1000)}:f>` });
           if (cfg && cfg.data && cfg.data.botAvatar) rows.push({ label: 'Avatar URL', value: String(cfg.data.botAvatar) });

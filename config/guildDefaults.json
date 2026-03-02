@@ -4,6 +4,7 @@
   "spawn_max_seconds": 300,
   "egg_limit": 3,
   "data": {
-    "delete_spawn_message": true
+    "delete_spawn_message": true,
+    "hunt_cooldown_seconds": 1800
   }
 }

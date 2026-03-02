@@ -250,6 +250,7 @@
         "channel": { "name": "setup channel", "description": "Set the channel where eggs will spawn." },
         "reset": { "name": "setup reset", "description": "Reset server settings or a user to defaults." },
         "spawn-rate": { "name": "setup spawn-rate", "description": "Set spawn rate bounds in seconds (min/max)." },
+        "hunt-cooldown": { "name": "setup hunt-cooldown", "description": "Set the hunt cooldown in seconds." },
         "egg-limit": { "name": "setup egg-limit", "description": "Set maximum eggs that can spawn at once." },
         "avatar": { "name": "setup avatar", "description": "Set a server-specific bot avatar (attachment or URL)." },
         "details": { "name": "setup details", "description": "Show this server's setup values." },
