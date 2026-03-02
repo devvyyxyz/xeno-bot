@@ -1,4 +1,4 @@
-const { getCommandConfig } = require('../../utils/commandsConfig');
+const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
 const fallbackLogger = require('../../utils/fallbackLogger');
 const cmd = getCommandConfig('health') || { name: 'health', description: 'Show bot health (DB and telemetry)' };
 const logger = require('../../utils/logger').get('command:health');
@@ -19,34 +19,10 @@ module.exports = {
   data: {
     name: cmd.name,
     description: cmd.description,
-    options: [
-      {
-        name: 'show',
-        description: 'Show health information',
-        type: 1,
-        options: [
-          {
-            name: 'detail',
-            description: 'Level of detail: summary, full, db, env, metrics',
-            type: 3,
-            required: false,
-            choices: [
-              { name: 'summary', value: 'summary' },
-              { name: 'full', value: 'full' },
-              { name: 'db', value: 'db' },
-              { name: 'env', value: 'env' },
-              { name: 'metrics', value: 'metrics' }
-            ]
-          }
-        ]
-      },
-      {
-        name: 'lastlogs',
-        description: 'Tail recent application logs (owner only)',
-        type: 1,
-        options: [ { name: 'lines', description: 'Number of lines to show', type: 4, required: false } ]
-      }
-    ]
+    options: buildSubcommandOptions('health', [
+      {name: 'show', description: 'Show health information (placeholder)', type: 1, options: [{name: 'detail', description: 'Level of detail: summary, full, db, env, metrics', type: 3, required: false, choices: [{name: 'summary', value: 'summary'}, {name: 'full', value: 'full'}, {name: 'db', value: 'db'}, {name: 'env', value: 'env'}, {name: 'metrics', value: 'metrics'}]}]},
+      {name: 'lastlogs', description: 'Tail recent application logs (placeholder)', type: 1, options: [{name: 'lines', description: 'Number of lines to show', type: 4, required: false}]}
+    ])
   },
   async executeInteraction(interaction) {
     const { EmbedBuilder } = require('discord.js');

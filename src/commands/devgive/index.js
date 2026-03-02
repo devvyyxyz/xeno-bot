@@ -1,5 +1,7 @@
-const { getCommandsObject } = require('../../utils/commandsConfig');
+const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
 const eggTypes = require('../../../config/eggTypes.json');
+
+const cmd = getCommandConfig('devgive') || {name: 'devgive', description: 'Developer-only: give credits or eggs to a user (owner only)', developerOnly: true};
 
 function resolveOwnerId() {
   try {
@@ -11,33 +13,16 @@ function resolveOwnerId() {
 }
 
 module.exports = {
-  name: 'devgive',
-  description: 'Developer-only: give credits or eggs to a user (owner only)',
+  name: cmd.name,
+  description: cmd.description,
   developerOnly: true,
   data: {
-    name: 'devgive',
-    description: 'Developer-only: give credits or eggs to a user (owner only)',
-    options: [
-      {
-        type: 1,
-        name: 'credits',
-        description: 'Give credits to a user',
-        options: [
-          { name: 'user', description: 'User to receive credits', type: 6, required: true },
-          { name: 'amount', description: 'Credits amount (can be negative)', type: 10, required: true }
-        ]
-      },
-      {
-        type: 1,
-        name: 'egg',
-        description: 'Give eggs to a user',
-        options: [
-          { name: 'user', description: 'User to receive eggs', type: 6, required: true },
-          { name: 'egg_type', description: 'Egg type id', type: 3, required: true, autocomplete: true },
-          { name: 'amount', description: 'Egg amount', type: 4, required: false }
-        ]
-      }
-    ]
+    name: cmd.name,
+    description: cmd.description,
+    options: buildSubcommandOptions('devgive', [
+      {type: 1, name: 'credits', description: 'Give credits (placeholder)', options: [{name: 'user', description: 'User to receive credits', type: 6, required: true}, {name: 'amount', description: 'Credits amount (can be negative)', type: 10, required: true}]},
+      {type: 1, name: 'egg', description: 'Give eggs (placeholder)', options: [{name: 'user', description: 'User to receive eggs', type: 6, required: true}, {name: 'egg_type', description: 'Egg type id', type: 3, required: true, autocomplete: true}, {name: 'amount', description: 'Egg amount', type: 4, required: false}]}
+    ])
   },
   async autocomplete(interaction) {
     try {

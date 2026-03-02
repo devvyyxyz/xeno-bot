@@ -15,7 +15,7 @@ const xenoModel = require('../../models/xenomorph');
 const hostModel = require('../../models/host');
 const userModel = require('../../models/user');
 const db = require('../../db');
-const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');", "oldString": "const { getCommandConfig } = require('../../utils/commandsConfig');", "newString": "const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
+const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
 const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const safeReply = require('../../utils/safeReply');
 const hostsCfg = require('../../../config/hosts.json');

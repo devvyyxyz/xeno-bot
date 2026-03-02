@@ -152,4 +152,6 @@ function buildSubcommandOptions(commandName, fallbackOptions = []) {
   }
 
   return merged;
+}
+
 module.exports = { getCommandConfig, getCommandsObject, buildSubcommandOptions };

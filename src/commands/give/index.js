@@ -1,4 +1,4 @@
-const { getCommandConfig } = require('../../utils/commandsConfig');
+const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
 const eggTypes = require('../../../config/eggTypes.json');
 const userModel = require('../../models/user');
 const fallbackLogger = require('../../utils/fallbackLogger');
@@ -17,34 +17,9 @@ module.exports = {
   data: {
     name: cmd.name,
     description: cmd.description,
-    options: [
-      {
-        type: 1,
-        name: 'egg',
-        description: 'Give a user any type of egg',
-        options: [
-          {
-            name: 'user',
-            description: 'User to give the egg to',
-            type: 6,
-            required: true
-          },
-          {
-            name: 'egg_type',
-            description: 'Type of egg to give',
-            type: 3,
-            required: true,
-            autocomplete: true
-          },
-          {
-            name: 'amount',
-            description: 'Number of eggs to give',
-            type: 4,
-            required: false
-          }
-        ]
-      }
-    ]
+    options: buildSubcommandOptions('give', [
+      {type: 1, name: 'egg', description: 'Give eggs (placeholder)', options: [{name: 'user', description: 'User to give the egg to', type: 6, required: true}, {name: 'egg_type', description: 'Type of egg to give', type: 3, required: true, autocomplete: true}, {name: 'amount', description: 'Number of eggs to give', type: 4, required: false}]}
+    ])
   },
   async autocomplete(interaction) {
     const autocomplete = require('../../utils/autocomplete');
