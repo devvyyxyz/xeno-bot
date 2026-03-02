@@ -33,7 +33,7 @@ manager.on('shardCreate', shard => {
   logger.info('Shard created', { shardId: shard.id });
   
   shard.on('ready', () => {
-    logger.info('Shard ready', { shardId: shard.id, guilds: shard.guilds.cache.size });
+    logger.info('Shard ready', { shardId: shard.id });
   });
   
   shard.on('error', error => {
