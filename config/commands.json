@@ -102,13 +102,6 @@
             { "name": "egg", "description": "The egg type to sell", "type": 3, "required": true, "autocomplete": true },
             { "name": "amount", "description": "How many to sell", "type": 4, "required": false }
           ]
-        },
-        "collect": { 
-          "name": "eggs collect", 
-          "description": "Collect a finished hatch (uses autocomplete to pick ready hatches).",
-          "options": [
-            { "name": "ready_hatch", "description": "Select a ready hatch to collect", "type": 3, "required": true, "autocomplete": true }
-          ]
         }
       }
     },

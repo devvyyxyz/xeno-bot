@@ -1,0 +1,23 @@
+[
+  {
+    "id": "common",
+    "name": "Common",
+    "minRarity": 1,
+    "maxRarity": 3,
+    "emoji": "common"
+  },
+  {
+    "id": "rare",
+    "name": "Rare",
+    "minRarity": 4,
+    "maxRarity": 5,
+    "emoji": "rare"
+  },
+  {
+    "id": "very_rare",
+    "name": "Very Rare",
+    "minRarity": 6,
+    "maxRarity": 999,
+    "emoji": "very_rare"
+  }
+]

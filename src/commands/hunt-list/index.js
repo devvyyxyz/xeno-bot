@@ -18,6 +18,7 @@ const db = require('../../db');
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const hostsCfg = require('../../../config/hosts.json');
 const emojisCfg = require('../../../config/emojis.json');
+const rarities = require('../../../config/rarities.json');
 const huntFlavorsCfg = require('../../../config/huntFlavors.json');
 const { addV2TitleWithBotThumbnail, addV2TitleWithImageThumbnail } = require('../../utils/componentsV2');
 const safeReply = require('../../utils/safeReply');
@@ -34,12 +35,18 @@ function getHostDisplay(hostType, cfgHosts, emojis) {
 }
 
 function getRarityBadge(rarity) {
-  const badges = {
-    'common': '⬜ Common',
-    'rare': '🟦 Rare',
-    'very_rare': '🟪 Very Rare'
-  };
-  return badges[rarity] || rarity;
+  // Try to find by string rarity name first (common, rare, very_rare)
+  let rarityConfig = rarities.find(r => r.id === rarity);
+  
+  // If not found and rarity is a number, find by numeric range
+  if (!rarityConfig && !isNaN(rarity)) {
+    const numRarity = Number(rarity);
+    rarityConfig = rarities.find(r => numRarity >= r.minRarity && numRarity <= r.maxRarity);
+  }
+  
+  if (!rarityConfig) return '';
+  const emojiKey = rarityConfig.emoji;
+  return emojisCfg[emojiKey] || '';
 }
 
 function getRandomFlavor(hostType, flavors) {
