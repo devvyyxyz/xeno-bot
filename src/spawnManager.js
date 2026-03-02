@@ -57,6 +57,10 @@ function chunkArray(values, size) {
   return out;
 }
 
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 function getSpawnBackoffDelay(guildId) {
   const tracker = failureTracker.get(guildId);
   if (!tracker) return 0; // No failures, no backoff
