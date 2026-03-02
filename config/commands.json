@@ -378,9 +378,15 @@
     },
     "gift": {
       "name": "gift",
-      "description": "Gift an egg or xenomorph to another player.",
+      "description": "Gift eggs, items, hosts, or xenomorphs to another player.",
       "group": "Player Trading",
-      "examples": ["/gift egg @user egg:1234 - Give an egg to a friend"]
+      "ephemeral": false,
+      "examples": [
+        "/gift egg @user egg_type:runner amount:5 - Give eggs to a friend",
+        "/gift item @user item_id:pathogen_spores amount:2 - Give items to a friend",
+        "/gift host @user host_id:123 - Transfer a host to another player",
+        "/gift xenomorph @user xeno_id:456 - Transfer a xenomorph to another player"
+      ]
     }
   }
 }
