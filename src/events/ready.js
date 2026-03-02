@@ -24,7 +24,7 @@ module.exports = {
         let rows = [];
         try {
           rows = await db.knex('guild_settings')
-            .select('id', 'guild_id', 'channel_id', 'spawn_min_seconds', 'spawn_max_seconds', 'spawn_rate_minutes', 'egg_limit', 'data', 'created_at', 'updated_at')
+            .select('id', 'guild_id', 'channel_id', 'spawn_min_seconds', 'spawn_max_seconds', 'egg_limit', 'data', 'created_at', 'updated_at')
             .whereIn('guild_id', chunk.map(String));
         } catch (chunkErr) {
           // Some DB/driver setups can be strict about whereIn parameter handling.
@@ -32,7 +32,7 @@ module.exports = {
           logger.warn('Chunked guild settings warm-up failed, using per-guild fallback', { error: chunkErr && (chunkErr.stack || chunkErr), chunkSize: chunk.length });
           for (const guildId of chunk) {
             const row = await db.knex('guild_settings')
-              .select('id', 'guild_id', 'channel_id', 'spawn_min_seconds', 'spawn_max_seconds', 'spawn_rate_minutes', 'egg_limit', 'data', 'created_at', 'updated_at')
+              .select('id', 'guild_id', 'channel_id', 'spawn_min_seconds', 'spawn_max_seconds', 'egg_limit', 'data', 'created_at', 'updated_at')
               .where({ guild_id: String(guildId) })
               .first();
             if (row) rows.push(row);

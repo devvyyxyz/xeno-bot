@@ -140,6 +140,30 @@ function createStartupProgress(totalSteps) {
   };
 }
 
+function startMemoryWatchdog() {
+  const enabled = process.env.MEMORY_WATCHDOG_ENABLED !== 'false';
+  if (!enabled) return;
+  const intervalMs = Number(process.env.MEMORY_WATCHDOG_INTERVAL_MS) || 60000;
+  const warnHeapMb = Number(process.env.MEMORY_WATCHDOG_HEAP_MB) || 700;
+  const warnRssMb = Number(process.env.MEMORY_WATCHDOG_RSS_MB) || 900;
+
+  const timer = setInterval(() => {
+    try {
+      const m = process.memoryUsage();
+      const heapUsedMb = Math.round((m.heapUsed / 1024 / 1024) * 10) / 10;
+      const heapTotalMb = Math.round((m.heapTotal / 1024 / 1024) * 10) / 10;
+      const rssMb = Math.round((m.rss / 1024 / 1024) * 10) / 10;
+
+      if (heapUsedMb >= warnHeapMb || rssMb >= warnRssMb) {
+        baseLogger.warn('Memory watchdog threshold exceeded', { heapUsedMb, heapTotalMb, rssMb, warnHeapMb, warnRssMb });
+      }
+    } catch (err) {
+      baseLogger.warn('Memory watchdog failed', { error: err && (err.stack || err) });
+    }
+  }, intervalMs);
+  if (typeof timer.unref === 'function') timer.unref();
+}
+
 async function startup() {
   const startupProgress = createStartupProgress(4);
 
@@ -178,9 +202,7 @@ async function startup() {
           lifecycle === 'start:dev' || lifecycle === 'dev' || lifecycle === 'start' && process.argv.slice(2).some(a => /(^|\W)(dev|development)(\W|$)/i.test(String(a))) || process.env.DEV_AUTO_DEPLOY === 'true'
         );
 
-        const shouldAutoDeployPublic = isPublicProfile && (
-          lifecycle === 'start' || process.env.AUTO_DEPLOY_PUBLIC === 'true'
-        );
+        const shouldAutoDeployPublic = isPublicProfile && process.env.AUTO_DEPLOY_PUBLIC === 'true';
 
         const guildToUse = process.env.GUILD_ID || (process.env.BOT_CONFIG_PATH ? (() => {
           try { const pc = require(process.env.BOT_CONFIG_PATH); return pc && pc.guildId; } catch (_) { return null; }
@@ -216,27 +238,6 @@ async function startup() {
         baseLogger.warn('Auto-deploy check failed', { error: e && (e.stack || e) });
       }
 
-      // Optionally auto-deploy public/global commands on the host when explicitly enabled.
-      try {
-        const autoPublic = process.env.AUTO_DEPLOY_PUBLIC === 'true';
-        const isPublic = process.env.BOT_PROFILE === 'public' || profile === 'public';
-        if (autoPublic && isPublic) {
-          baseLogger.info('AUTO_DEPLOY_PUBLIC enabled — running deploy-commands for public profile (global)', { profile });
-          try {
-            const node = process.execPath || 'node';
-            const deployPath = path.join(__dirname, '..', 'deploy-commands.js');
-            const env = Object.assign({}, process.env, { BOT_PROFILE: 'public', ALLOW_GLOBAL_REGISTRATION: 'true' });
-            const res = childProcess.spawnSync(node, [deployPath], { env, stdio: 'inherit' });
-            if (res.error) baseLogger.warn('Auto-deploy-public child process failed to start', { error: String(res.error) });
-            else if (res.status !== 0) baseLogger.warn('Auto-deploy-public child process exited non-zero', { status: res.status });
-            else baseLogger.info('Auto-deploy-public completed successfully');
-          } catch (e) {
-            baseLogger.warn('Auto-deploy-public failed', { error: e && (e.stack || e) });
-          }
-        }
-      } catch (e) {
-        baseLogger.warn('AUTO_DEPLOY_PUBLIC check failed', { error: e && (e.stack || e) });
-      }
     });
 
     await startupProgress.runStep('Discord login', async () => {
@@ -256,6 +257,8 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
   partials: [Partials.Channel]
 });
+
+startMemoryWatchdog();
 
 client.commands = new Collection();
 client.config = config;

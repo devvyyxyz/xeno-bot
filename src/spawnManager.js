@@ -44,6 +44,9 @@ let nextSpawnAt = new Map();
 let inProgress = new Set();
 // lastSpawnAt: guildId -> timestamp of last completed spawn, used to suppress near-duplicate spawns
 let lastSpawnAt = new Map();
+const maxConcurrentSpawns = Math.max(1, Number(process.env.SPAWN_MAX_CONCURRENT) || 3);
+const spawnQueue = [];
+let activeSpawnWorkers = 0;
 
 function chunkArray(values, size) {
   const out = [];
@@ -53,6 +56,27 @@ function chunkArray(values, size) {
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function enqueueSpawn(guildId, forcedEggTypeId, isForced = false) {
+  return new Promise((resolve, reject) => {
+    spawnQueue.push({ guildId, forcedEggTypeId, isForced, resolve, reject });
+    processSpawnQueue();
+  });
+}
+
+function processSpawnQueue() {
+  while (activeSpawnWorkers < maxConcurrentSpawns && spawnQueue.length > 0) {
+    const task = spawnQueue.shift();
+    activeSpawnWorkers += 1;
+    doSpawn(task.guildId, task.forcedEggTypeId, task.isForced)
+      .then((result) => task.resolve(result))
+      .catch((err) => task.reject(err))
+      .finally(() => {
+        activeSpawnWorkers -= 1;
+        if (spawnQueue.length > 0) processSpawnQueue();
+      });
+  }
 }
 
 async function init(botClient) {
@@ -136,7 +160,7 @@ async function init(botClient) {
         const ts = Number(row.next_spawn_at);
         const remaining = Math.max(0, ts - Date.now());
         if (remaining > 0) {
-          const t = setTimeout(() => doSpawn(row.guild_id).catch(err => logger.error('Spawn error', { guildId: row.guild_id, error: err.stack || err })), remaining);
+          const t = setTimeout(() => enqueueSpawn(row.guild_id).catch(err => logger.error('Spawn error', { guildId: row.guild_id, error: err.stack || err })), remaining);
           timers.set(row.guild_id, t);
           nextSpawnAt.set(row.guild_id, ts);
           logger.debug('Restored scheduled spawn from DB', { guildId: row.guild_id, scheduled_at: ts, in_ms: remaining });
@@ -145,7 +169,7 @@ async function init(botClient) {
       }
       scheduleNext(row.guild_id);
     }
-    logger.info('Spawn manager initialized', { shardGuilds: shardGuildIds.length, configuredGuilds: rows.length, chunkSize: inChunkSize });
+    logger.info('Spawn manager initialized', { shardGuilds: shardGuildIds.length, configuredGuilds: rows.length, chunkSize: inChunkSize, maxConcurrentSpawns });
   } catch (err) {
     logger.error('Failed initializing spawn manager', { error: err.stack || err });
   }
@@ -175,7 +199,7 @@ function scheduleNext(guildId) {
     } catch (e) {
       logger.debug('About to schedule next spawn', { guildId, min, max, delay, scheduledAt });
     }
-    const t = setTimeout(() => doSpawn(guildId).catch(err => {
+    const t = setTimeout(() => enqueueSpawn(guildId).catch(err => {
       const guildName = getGuildName(guildId);
       logger.error(`Spawn error (${guildName})`, { guildId, error: err.stack || err });
     }), delay);
@@ -563,7 +587,7 @@ async function forceSpawn(guildId, forcedEggTypeId) {
   try {
     // Clear timers so the forced spawn runs without racing scheduled timers.
     // Do not set lastSpawnAt preemptively; let doSpawn set it if a spawn actually happens.
-    const spawned = await doSpawn(guildId, forcedEggTypeId, true);
+    const spawned = await enqueueSpawn(guildId, forcedEggTypeId, true);
     return spawned;
   } finally {
     // After forced spawn, schedule the next spawn normally
@@ -582,6 +606,12 @@ async function shutdown() {
     timers.clear();
     pendingReschedule.clear();
     inProgress.clear();
+    while (spawnQueue.length > 0) {
+      const task = spawnQueue.shift();
+      if (task && typeof task.reject === 'function') {
+        task.reject(new Error('spawnManager shutdown: cancelled pending spawn task'));
+      }
+    }
     logger.info('spawnManager shutdown: cleared timers and pending state');
   } catch (e) {
     logger.warn('spawnManager shutdown error', { error: e && (e.stack || e) });

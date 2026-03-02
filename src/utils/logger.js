@@ -134,8 +134,11 @@ const fileTransportFormat = forceColor
   ? combine(forceColorFormat(), timestamp({ format: shortTimestamp }), fileFormat)
   : combine(timestamp({ format: shortTimestamp }), fileFormat);
 
+const defaultLogLevel = process.env.NODE_ENV === 'production' ? 'warn' : 'info';
+const resolvedLogLevel = process.env.LOG_LEVEL || defaultLogLevel;
+
 const logger = createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  level: resolvedLogLevel,
   format: combine(errors({ stack: true }), splat(), timestamp({ format: shortTimestamp })),
   transports: [
     // Rotating application log
