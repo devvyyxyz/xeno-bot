@@ -71,12 +71,45 @@
       "group": "Items & Eggs",
       "examples": ["/eggs list - View all eggs you own"],
       "subcommands": {
-        "info": { "name": "eggs info", "description": "Show detailed information about an egg you own." },
-        "destroy": { "name": "eggs destroy", "description": "Permanently destroy an egg in your inventory." },
+        "info": { 
+          "name": "eggs info", 
+          "description": "Show detailed information about an egg you own.",
+          "options": [
+            { "name": "egg", "description": "The egg type to view", "type": 3, "required": true, "autocomplete": true }
+          ]
+        },
+        "destroy": { 
+          "name": "eggs destroy", 
+          "description": "Permanently destroy an egg in your inventory.",
+          "options": [
+            { "name": "egg", "description": "The egg type to destroy", "type": 3, "required": true, "autocomplete": true },
+            { "name": "amount", "description": "How many to destroy", "type": 4, "required": false }
+          ]
+        },
         "list": { "name": "eggs list", "description": "List all eggs in your inventory." },
-        "hatch": { "name": "eggs hatch", "description": "Hatch an egg to get a xenomorph. Requires an available hive slot." },
-        "sell": { "name": "eggs sell", "description": "Sell an egg from your inventory for credits." },
-        "collect": { "name": "eggs collect", "description": "Collect a finished hatch (uses autocomplete to pick ready hatches)." }
+        "hatch": { 
+          "name": "eggs hatch", 
+          "description": "Hatch an egg to get a xenomorph. Requires an available hive slot.",
+          "options": [
+            { "name": "egg", "description": "The egg type to hatch", "type": 3, "required": true, "autocomplete": true },
+            { "name": "amount", "description": "How many eggs to hatch", "type": 4, "required": false }
+          ]
+        },
+        "sell": { 
+          "name": "eggs sell", 
+          "description": "Sell an egg from your inventory for credits.",
+          "options": [
+            { "name": "egg", "description": "The egg type to sell", "type": 3, "required": true, "autocomplete": true },
+            { "name": "amount", "description": "How many to sell", "type": 4, "required": false }
+          ]
+        },
+        "collect": { 
+          "name": "eggs collect", 
+          "description": "Collect a finished hatch (uses autocomplete to pick ready hatches).",
+          "options": [
+            { "name": "ready_hatch", "description": "Select a ready hatch to collect", "type": 3, "required": true, "autocomplete": true }
+          ]
+        }
       }
     },
     "nextspawn": {
@@ -232,13 +265,13 @@
     }
   },
   "Developer": {
-    "devcommands": {
-      "name": "devcommands",
-      "description": "List all developer/admin commands (owner only).",
+    "devmenu": {
+      "name": "devmenu",
+      "description": "Interactive developer menu with admin tools and diagnostics (owner only).",
       "group": "Owner Tools",
       "developerOnly": true,
       "hidden": true,
-      "examples": ["/devcommands - See all admin commands"]
+      "examples": ["xen!devmenu - Open interactive admin menu"]
     },
     "devreload": {
       "name": "devreload",

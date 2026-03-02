@@ -9,6 +9,30 @@ const fs = require('fs');
 const { AttachmentBuilder, PermissionsBitField, ContainerBuilder, TextDisplayBuilder, MessageFlags } = require('discord.js');
 const db = require('./db');
 
+// Helper: Get guild name for logging
+function getGuildName(guildId) {
+  try {
+    if (!client) {
+      logger.debug && logger.debug('getGuildName: client is null', { guildId });
+      return `Guild-${guildId}`;
+    }
+    const guild = client.guilds.cache.get(guildId);
+    if (guild && guild.name) {
+      return guild.name;
+    }
+    // Try converting to string if it's not found
+    const guildById = client.guilds.cache.get(String(guildId));
+    if (guildById && guildById.name) {
+      return guildById.name;
+    }
+    logger.debug && logger.debug('getGuildName: guild not in cache', { guildId, cacheSize: client.guilds.cache.size });
+    return `Guild-${guildId}`;
+  } catch (e) {
+    logger.warn && logger.warn('getGuildName error', { guildId, error: e.message });
+    return `Guild-${guildId}`;
+  }
+}
+
 let client = null;
 // activeEggs: guildId -> Map(messageId -> { messageId, channelId, value, spawnedAt })
 let activeEggs = new Map();
@@ -127,7 +151,10 @@ function scheduleNext(guildId) {
     } catch (e) {
       logger.debug('About to schedule next spawn', { guildId, min, max, delay, scheduledAt });
     }
-    const t = setTimeout(() => doSpawn(guildId).catch(err => logger.error('Spawn error', { guildId, error: err.stack || err })), delay);
+    const t = setTimeout(() => doSpawn(guildId).catch(err => {
+      const guildName = getGuildName(guildId);
+      logger.error(`Spawn error (${guildName})`, { guildId, error: err.stack || err });
+    }), delay);
     timers.set(guildId, t);
     nextSpawnAt.set(guildId, scheduledAt);
     // persist scheduled time to DB so it survives restarts
@@ -151,7 +178,8 @@ function requestReschedule(guildId) {
   const activeMap = activeEggs.get(guildId);
   if (activeMap && activeMap.size > 0) {
     pendingReschedule.add(guildId);
-    logger.info('Reschedule requested; will apply after active eggs cleared', { guildId });
+    const guildName = getGuildName(guildId);
+    logger.info(`Reschedule requested; will apply after active eggs cleared (${guildName})`, { guildId });
     return;
   }
   // schedule immediately
@@ -182,25 +210,21 @@ function pickEggType() {
 }
 
 async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
+  const guildName = getGuildName(guildId);
   // prevent concurrent spawns for the same guild
   if (inProgress.has(guildId)) {
-    logger.info('doSpawn already in progress; skipping', { guildId });
+    logger.info(`doSpawn already in progress; skipping (${guildName})`, { guildId });
     return;
   }
   inProgress.add(guildId);
-  try {
-    const guildName = client ? (client.guilds.cache.get(guildId)?.name || null) : null;
-    logger.info('doSpawn entered', { guildId, guildName, forcedEggTypeId, timersHas: timers.has(guildId), nextSpawnPersisted: nextSpawnAt.get(guildId) });
-  } catch (e) {
-    logger.info('doSpawn entered', { guildId, forcedEggTypeId, timersHas: timers.has(guildId), nextSpawnPersisted: nextSpawnAt.get(guildId) });
-  }
+  logger.info(`doSpawn entered (${guildName})`, { guildId, forcedEggTypeId, timersHas: timers.has(guildId), nextSpawnPersisted: nextSpawnAt.get(guildId) });
   // suppress near-duplicate spawns (e.g., timer firing while a force spawn also triggered)
   try {
     const last = lastSpawnAt.get(guildId) || 0;
     const since = Date.now() - last;
     const thresholdMs = 5000; // 5s
       if (!isForced && since >= 0 && since < thresholdMs) {
-        logger.warn('doSpawn suppressed: recent spawn within threshold', { guildId, sinceMs: since, thresholdMs });
+        logger.warn(`doSpawn suppressed: recent spawn within threshold (${guildName})`, { guildId, sinceMs: since, thresholdMs });
         inProgress.delete(guildId);
         return false;
       }
@@ -221,25 +245,20 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     }
     const cfg = await guildModel.getGuildConfig(guildId);
     if (!cfg || !cfg.channel_id) {
-      logger.info('No spawn channel configured; skipping', { guildId });
+      logger.info(`No spawn channel configured; skipping (${guildName})`, { guildId });
       return scheduleNext(guildId);
     }
 
     // Only one spawn event at a time, but spawn up to egg_limit eggs in this event
     const guildMap = activeEggs.get(guildId);
     if (!isForced && guildMap && guildMap.size > 0) {
-      logger.info('Spawn event already active; skipping', { guildId });
+      logger.info(`Spawn event already active; skipping (${guildName})`, { guildId });
       return scheduleNext(guildId);
     }
     const limit = (cfg && cfg.egg_limit) || 1;
     const channel = await client.channels.fetch(cfg.channel_id).catch(() => null);
     if (!channel) {
-      try {
-        const guildName = client ? (client.guilds.cache.get(guildId)?.name || null) : null;
-        logger.warn('Configured channel not found', { guildId, guildName, channel_id: cfg.channel_id });
-      } catch (e) {
-        logger.warn('Configured channel not found', { guildId, channel_id: cfg.channel_id });
-      }
+      logger.warn(`Configured channel not found (${guildName})`, { guildId, channel_id: cfg.channel_id });
       return scheduleNext(guildId);
     }
     // Randomly determine how many eggs to spawn (1 to limit, higher limit increases chance of more)
@@ -338,11 +357,13 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       }
     } catch (e) {
       // If V2 send ultimately fails, try legacy content and then image separately.
-      logger.warn('V2 spawn send failed; falling back to legacy text/image strategy', { guildId, error: e && (e.stack || e) });
+      const guildName = getGuildName(guildId);
+      logger.warn(`V2 spawn send failed; falling back to legacy text/image strategy (${guildName})`, { guildId, error: e && (e.stack || e) });
       try {
         sent = await channel.send({ content: `${eggEmoji} ${message}` });
       } catch (textErr) {
-        logger.error('Failed sending spawn text', { guildId, error: textErr && (textErr.stack || textErr) });
+        const guildName = getGuildName(guildId);
+        logger.error(`Failed sending spawn text (${guildName})`, { guildId, error: textErr && (textErr.stack || textErr) });
         throw textErr;
       }
       if (attachment) {
@@ -371,13 +392,14 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     }
     // clear persisted next_spawn_at since this spawn has now occurred
     try { const knex = db.knex; await knex('guild_settings').where({ guild_id: guildId }).update({ next_spawn_at: null }); } catch (e) { try { logger.warn('Failed clearing next_spawn_at after spawn', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging next_spawn_at clear error after spawn', le && (le.stack || le)); } catch (ignored) {} } }
-    logger.info('Egg(s) spawned', { guildId, channel: channel.id, messageId: sent.id, numEggs, eggType: eggType.id });
-    logger.info('doSpawn leaving', { guildId, messageId: sent.id, spawnedAt });
+    logger.info(`Egg(s) spawned (${guildName})`, { guildId, channel: channel.id, messageId: sent.id, numEggs, eggType: eggType.id });
+    logger.info(`doSpawn leaving (${guildName})`, { guildId, messageId: sent.id, spawnedAt });
     try { lastSpawnAt.set(guildId, Date.now()); } catch (e) { try { logger && logger.warn && logger.warn('Failed setting lastSpawnAt', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging lastSpawnAt set error', le && (le.stack || le)); } catch (ignored) {} } }
     // schedule next spawn after this event is cleared
     return true;
   } catch (err) {
-    logger.error('Error during doSpawn', { guildId, error: err.stack || err });
+    const guildName = getGuildName(guildId);
+    logger.error(`Error during doSpawn (${guildName})`, { guildId, error: err.stack || err });
     scheduleNext(guildId);
     return false;
   }
@@ -508,7 +530,8 @@ async function forceSpawn(guildId, forcedEggTypeId) {
       } catch (e) {
         try { logger.warn('Failed clearing active_spawns rows during force spawn restart', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging active_spawns clear error in forceSpawn', le && (le.stack || le)); } catch (ignored) {} }
       }
-      logger.info('Cleared active spawn event before force spawn restart', { guildId });
+      const guildName = getGuildName(guildId);
+      logger.info(`Cleared active spawn event before force spawn restart (${guildName})`, { guildId });
     }
   } catch (e) {
     try { logger.warn('Failed clearing active spawn event before force spawn', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging active spawn clear failure before force spawn', le && (le.stack || le)); } catch (ignored) {} }

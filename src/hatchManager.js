@@ -5,6 +5,30 @@ const userModel = require('./models/user');
 const eggTypes = require('../config/eggTypes.json');
 const xenoModel = require('./models/xenomorph');
 
+// Helper: Get guild name for logging
+function getGuildName(guildId) {
+  try {
+    if (!client) {
+      logger.debug && logger.debug('getGuildName: client is null', { guildId });
+      return `Guild-${guildId}`;
+    }
+    const guild = client.guilds.cache.get(guildId);
+    if (guild && guild.name) {
+      return guild.name;
+    }
+    // Try converting to string if it's not found
+    const guildById = client.guilds.cache.get(String(guildId));
+    if (guildById && guildById.name) {
+      return guildById.name;
+    }
+    logger.debug && logger.debug('getGuildName: guild not in cache', { guildId, cacheSize: client.guilds.cache.size });
+    return `Guild-${guildId}`;
+  } catch (e) {
+    logger.warn && logger.warn('getGuildName error', { guildId, error: e.message });
+    return `Guild-${guildId}`;
+  }
+}
+
 let timers = new Map(); // hatchId -> timeout
 let client = null;
 
@@ -21,12 +45,8 @@ async function init(botClient) {
       }
       const delay = finishes - now;
       scheduleTimer(r.id, delay);
-      try {
-        const guildName = client ? (client.guilds.cache.get(r.guild_id)?.name || await (async () => { try { const g = await client.guilds.fetch(r.guild_id); return g && g.name; } catch (_) { return null; } })()) : null;
-        logger.debug('Restored hatch timer', { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, guildName, in_ms: delay });
-      } catch (e) {
-        logger.debug('Restored hatch timer', { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, in_ms: delay });
-      }
+      const guildName = getGuildName(r.guild_id);
+      logger.debug(`Restored hatch timer (${guildName})`, { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, in_ms: delay });
     }
   } catch (e) {
     logger.error('Failed initializing hatch manager', { error: e && (e.stack || e) });
@@ -63,7 +83,8 @@ async function startHatch(discordId, guildId, eggTypeId, durationMs) {
   const finishesAt = startedAt + Number(durationMs || 60 * 1000);
   const insert = await db.knex('hatches').insert({ discord_id: discordId, guild_id: guildId, egg_type: eggTypeId, started_at: startedAt, finishes_at: finishesAt });
   const id = Array.isArray(insert) ? insert[0] : insert;
-  logger.info('Created hatch', { id, discordId, guildId, eggTypeId, finishesAt });
+  const guildName = getGuildName(guildId);
+  logger.info(`Created hatch (${guildName})`, { id, discordId, guildId, eggTypeId, finishesAt });
   scheduleTimer(id, finishesAt - Date.now());
   return { id, discord_id: discordId, guild_id: guildId, egg_type: eggTypeId, started_at: startedAt, finishes_at: finishesAt };
 }
@@ -87,7 +108,8 @@ async function skipHatch(discordId, guildId, hatchId, costRoyalJelly = 5) {
     clearTimeout(timers.get(hatchId));
     timers.delete(hatchId);
   }
-  logger.info('Hatch skipped', { hatchId, discordId, guildId, cost: costRoyalJelly });
+  const guildName = getGuildName(guildId);
+  logger.info(`Hatch skipped (${guildName})`, { hatchId, discordId, guildId, cost: costRoyalJelly });
   return true;
 }
 
@@ -119,7 +141,8 @@ async function collectHatch(discordId, guildId, hatchId) {
     try { await userModel.addItemForGuild(discordId, guildId, 'facehugger', 1); } catch (_) {}
   }
   await db.knex('hatches').where({ id: hatchId }).update({ collected: true });
-  logger.info('Hatch collected', { hatchId, discordId, guildId });
+  const guildName = getGuildName(guildId);
+  logger.info(`Hatch collected (${guildName})`, { hatchId, discordId, guildId });
   return true;
 }
 
