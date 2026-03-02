@@ -44,7 +44,10 @@ let nextSpawnAt = new Map();
 let inProgress = new Set();
 // lastSpawnAt: guildId -> timestamp of last completed spawn, used to suppress near-duplicate spawns
 let lastSpawnAt = new Map();
+// failureTracker: guildId -> { count, lastFailTime } to implement exponential backoff
+const failureTracker = new Map();
 const maxConcurrentSpawns = Math.max(1, Number(process.env.SPAWN_MAX_CONCURRENT) || 3);
+const maxSpawnQueueDepth = Number(process.env.SPAWN_QUEUE_MAX_DEPTH) || 100; // safety limit to prevent memory accumulation
 const spawnQueue = [];
 let activeSpawnWorkers = 0;
 
@@ -54,11 +57,41 @@ function chunkArray(values, size) {
   return out;
 }
 
-function randomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+function getSpawnBackoffDelay(guildId) {
+  const tracker = failureTracker.get(guildId);
+  if (!tracker) return 0; // No failures, no backoff
+  
+  const now = Date.now();
+  const timeSinceLastFailure = now - (tracker.lastFailTime || 0);
+  const failureCount = tracker.count || 0;
+  
+  // Reset failure count if last failure was >5 minutes ago
+  if (timeSinceLastFailure > 5 * 60 * 1000) {
+    failureTracker.delete(guildId);
+    return 0;
+  }
+  
+  // Cap failure count at 10 to prevent exponential explosion
+  const cappedCount = Math.min(failureCount, 10);
+  
+  // Exponential backoff: 2s, 4s, 8s, 16s, 32s, 64s, 128s, 256s, 512s, 1024s (max ~17 min)
+  const backoffMs = Math.pow(2, cappedCount + 1) * 1000;
+  return backoffMs;
+}
+
+function recordSpawnFailure(guildId) {
+  const tracker = failureTracker.get(guildId) || { count: 0, lastFailTime: Date.now() };
+  tracker.count += 1;
+  tracker.lastFailTime = Date.now();
+  failureTracker.set(guildId, tracker);
 }
 
 function enqueueSpawn(guildId, forcedEggTypeId, isForced = false) {
+  // Prevent queue from growing unbounded during failure cascades
+  if (spawnQueue.length >= maxSpawnQueueDepth) {
+    logger.warn('Spawn queue depth limit reached; dropping new spawn request', { guildId, queueDepth: spawnQueue.length, maxDepth: maxSpawnQueueDepth });
+    return Promise.reject(new Error('Spawn queue full'));
+  }
   return new Promise((resolve, reject) => {
     spawnQueue.push({ guildId, forcedEggTypeId, isForced, resolve, reject });
     processSpawnQueue();
@@ -191,7 +224,15 @@ function scheduleNext(guildId) {
     const cfg = await guildModel.getGuildConfig(guildId);
     const min = (cfg && cfg.spawn_min_seconds) || 60;
     const max = (cfg && cfg.spawn_max_seconds) || 3600;
-    const delay = randomInt(min, max) * 1000;
+    let delay = randomInt(min, max) * 1000;
+    
+    // Apply exponential backoff for repeated failures
+    const backoffDelay = getSpawnBackoffDelay(guildId);
+    if (backoffDelay > 0) {
+      delay = Math.max(delay, backoffDelay);
+      logger.info('Applied exponential backoff to spawn schedule', { guildId, backoffMs: backoffDelay, totalDelayMs: delay });
+    }
+    
     const scheduledAt = Date.now() + delay;
     try {
       const guildName = client ? (client.guilds.cache.get(guildId)?.name || null) : null;
@@ -443,11 +484,17 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     logger.info(`Egg(s) spawned (${guildName})`, { guildId, channel: channel.id, messageId: sent.id, numEggs, eggType: eggType.id });
     logger.info(`doSpawn leaving (${guildName})`, { guildId, messageId: sent.id, spawnedAt });
     try { lastSpawnAt.set(guildId, Date.now()); } catch (e) { try { logger && logger.warn && logger.warn('Failed setting lastSpawnAt', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging lastSpawnAt set error', le && (le.stack || le)); } catch (ignored) {} } }
+    // Clear failure tracker on successful spawn
+    if (failureTracker.has(guildId)) {
+      failureTracker.delete(guildId);
+      logger.debug('Cleared spawn failure tracker for guild', { guildId });
+    }
     // schedule next spawn after this event is cleared
     return true;
   } catch (err) {
     const guildName = getGuildName(guildId);
     logger.error(`Error during doSpawn (${guildName})`, { guildId, error: err.stack || err });
+    recordSpawnFailure(guildId);
     scheduleNext(guildId);
     return false;
   }
@@ -606,6 +653,7 @@ async function shutdown() {
     timers.clear();
     pendingReschedule.clear();
     inProgress.clear();
+    failureTracker.clear();
     while (spawnQueue.length > 0) {
       const task = spawnQueue.shift();
       if (task && typeof task.reject === 'function') {
