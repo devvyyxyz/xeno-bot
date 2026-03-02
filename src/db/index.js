@@ -55,7 +55,15 @@ async function createKnex() {
     }
 
     try {
-      return knexLib({ client, connection, pool: { min: 0, max: 7 } });
+      // Optimized pool settings for high concurrency
+      const pool = {
+        min: 2,  // Maintain minimum connections to reduce latency
+        max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 20,  // Handle more concurrent requests
+        acquireTimeoutMillis: 60000,  // 60s timeout for acquiring connection
+        idleTimeoutMillis: 30000,  // Close idle connections after 30s
+        propagateCreateError: false  // Don't crash on connection pool errors
+      };
+      return knexLib({ client, connection, pool });
     } catch (err) {
       logger.error('Failed creating knex for DATABASE_URL — missing or incompatible DB driver', { client, error: err && (err.stack || err) });
       throw err;
