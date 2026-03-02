@@ -23,6 +23,15 @@ const logger = require('../../utils/logger').get('command:hunt');
 
 const HOSTS_PER_PAGE = 10;
 
+function isValidEmoji(emoji) {
+  if (!emoji || typeof emoji !== 'string') return false;
+  // Match discord custom emoji format <:name:id> or <a:name:id> for animated
+  if (/^<a?:\w{2,32}:\d{17,20}>$/.test(emoji)) return true;
+  // Match unicode emoji (basic check - any non-ASCII character)
+  if (/[\p{Emoji}]/u.test(emoji)) return true;
+  return false;
+}
+
 function getHostDisplay(hostType, cfgHosts, emojis) {
   const hostInfo = cfgHosts[hostType] || {};
   const display = hostInfo.display || hostType;
@@ -249,11 +258,47 @@ module.exports = {
           new TextDisplayBuilder().setContent(`You acquired: **${hostDisplay}** (ID: ${host.id})`)
         );
 
-        return safeReply(
+        const resultRow = new ActionRowBuilder()
+          .addComponents(
+            new PrimaryButtonBuilder().setCustomId('hunt-view-list-from-result').setLabel('📋 View Hunt List')
+          );
+        container.addActionRowComponents(resultRow);
+
+        await safeReply(
           interaction,
           { components: [container], flags: MessageFlags.IsComponentsV2, ephemeral: true },
           { loggerName: 'command:hunt' }
         );
+
+        let msg = null;
+        try { msg = await interaction.fetchReply(); } catch (_) {}
+        if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
+
+        const resultCollector = msg.createMessageComponentCollector({
+          filter: i => i.user.id === userId,
+          time: 300_000
+        });
+
+        resultCollector.on('collect', async i => {
+          try {
+            if (i.customId === 'hunt-view-list-from-result') {
+              const rows = await hostModel.listHostsByOwner(userId);
+              if (!rows || rows.length === 0) {
+                await i.update({ content: 'You have no hunted hosts.', components: [] });
+              } else {
+                await i.update({ components: buildHostListPage({ pageIdx: 0, rows, selectedIds: new Set(), cfgHosts, emojis: emojisCfg }) });
+              }
+            }
+          } catch (err) {
+            try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt' }); } catch (_) {}
+          }
+        });
+
+        resultCollector.on('end', () => {
+          try { msg.edit({ components: [] }).catch(() => {}); } catch (_) {}
+        });
+
+        return;
       } catch (e) {
         return safeReply(interaction, { content: `Hunt failed: ${e && (e.message || e)}`, ephemeral: true }, { loggerName: 'command:hunt' });
       }
@@ -261,7 +306,6 @@ module.exports = {
 
     if (sub === 'list') {
       try {
-        await interaction.deferReply({ ephemeral: true });
         const rows = await hostModel.listHostsByOwner(userId);
 
         if (!rows || rows.length === 0) {
