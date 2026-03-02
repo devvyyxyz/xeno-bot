@@ -4,18 +4,46 @@ const logger = require('../utils/logger').get('models:egg');
 // Ensure all eggs from config are present in the database for all guilds
 async function ensureAllEggsInAllGuilds(eggTypes, knexInstance = db.knex) {
   await ensureEggStatsTable();
-  // Get all guild IDs from guild_settings table
+  const eggIds = Array.isArray(eggTypes) ? eggTypes.map(e => e && e.id).filter(Boolean) : [];
+  if (eggIds.length === 0) return;
+
   const guildRows = await knexInstance('guild_settings').select('guild_id');
+  const batchSize = Number(process.env.EGG_STATS_SYNC_BATCH_SIZE) || 500;
+  const inserts = [];
+
   for (const row of guildRows) {
     const guildId = row.guild_id;
-    for (const egg of eggTypes) {
-      const exists = await knexInstance('egg_stats').where({ egg_id: egg.id, guild_id: guildId }).first();
-      if (!exists) {
-        await knexInstance('egg_stats').insert({ egg_id: egg.id, guild_id: guildId, caught: 0 });
-        logger.info('Inserted egg stat row', { egg_id: egg.id, guild_id: guildId });
+    if (!guildId) continue;
+    for (const eggId of eggIds) {
+      inserts.push({ egg_id: eggId, guild_id: guildId, caught: 0 });
+    }
+  }
+
+  let attempted = 0;
+  for (let i = 0; i < inserts.length; i += batchSize) {
+    const batch = inserts.slice(i, i + batchSize);
+    attempted += batch.length;
+    try {
+      await knexInstance('egg_stats').insert(batch).onConflict(['egg_id', 'guild_id']).ignore();
+    } catch (err) {
+      // Fallback for databases/drivers that don't support onConflict().ignore() reliably
+      for (const row of batch) {
+        try {
+          await knexInstance('egg_stats').insert(row);
+        } catch (innerErr) {
+          const msg = String((innerErr && (innerErr.message || innerErr.stack)) || '').toLowerCase();
+          if (!msg.includes('duplicate') && !msg.includes('unique')) throw innerErr;
+        }
       }
     }
   }
+
+  logger.info('Egg stats synchronization completed', {
+    guilds: guildRows.length,
+    eggTypes: eggIds.length,
+    attemptedRows: attempted,
+    batchSize
+  });
 }
 
 // Ensure the egg_stats table exists

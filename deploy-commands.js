@@ -13,6 +13,16 @@ const commands = [];
 const commandsPath = path.join(__dirname, 'src', 'commands');
 const { getCommandsObject } = require('./src/utils/commandsConfig');
 const commandsConfig = getCommandsObject() || {};
+
+const isCommandCategory = (catObj) => {
+  if (!catObj || typeof catObj !== 'object' || Array.isArray(catObj)) return false;
+  const values = Object.values(catObj);
+  if (values.length === 0) return false;
+  return values.some(v => v && typeof v === 'object' && (Object.prototype.hasOwnProperty.call(v, 'name') || Object.prototype.hasOwnProperty.call(v, 'description')));
+};
+
+const commandCategories = Object.entries(commandsConfig || {}).filter(([, catObj]) => isCommandCategory(catObj));
+
 if (fs.existsSync(commandsPath)) {
   try {
     const loader = require(path.join(__dirname, 'src', 'commands', 'loader'));
@@ -22,7 +32,7 @@ if (fs.existsSync(commandsPath)) {
       existingKeys.add(name);
       if (command && command.data) commands.push(command.data);
       const cfgEntry = (() => {
-        for (const [catName, catObj] of Object.entries(commandsConfig || {})) {
+        for (const [catName, catObj] of commandCategories) {
           if (catObj && Object.prototype.hasOwnProperty.call(catObj, name)) return { cfg: catObj[name], category: catName };
         }
         return null;
@@ -33,8 +43,7 @@ if (fs.existsSync(commandsPath)) {
     }
 
     // Validate commands.json entries have corresponding command modules
-    for (const [category, catObj] of Object.entries(commandsConfig || {})) {
-      if (!catObj || typeof catObj !== 'object') continue;
+    for (const [category, catObj] of commandCategories) {
       for (const cmdKey of Object.keys(catObj)) {
         if (!existingKeys.has(cmdKey)) {
           logger.warn(`commands.json entry missing module: ${category}/${cmdKey}`, { category, key: cmdKey });

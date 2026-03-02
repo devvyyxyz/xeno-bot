@@ -45,21 +45,44 @@ let inProgress = new Set();
 // lastSpawnAt: guildId -> timestamp of last completed spawn, used to suppress near-duplicate spawns
 let lastSpawnAt = new Map();
 
+function chunkArray(values, size) {
+  const out = [];
+  for (let i = 0; i < values.length; i += size) out.push(values.slice(i, i + size));
+  return out;
+}
+
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 async function init(botClient) {
   client = botClient;
-  // start schedules for all guilds that have settings
+  // start schedules for guilds that belong to this shard
   try {
     const knex = db.knex;
-    const rows = await knex('guild_settings').select('*');
+    const shardGuildIds = Array.from(client.guilds.cache.keys());
+    const guildIdSet = new Set(shardGuildIds);
+    const inChunkSize = Number(process.env.SPAWN_MANAGER_GUILD_CHUNK) || 250;
+    const guildIdChunks = chunkArray(shardGuildIds, inChunkSize);
+
+    let rows = [];
+    for (const ids of guildIdChunks) {
+      if (!ids.length) continue;
+      const chunkRows = await knex('guild_settings').whereIn('guild_id', ids).select('*');
+      rows = rows.concat(chunkRows);
+    }
+
     // restore any active spawns from DB
     try {
-    const activeRows = await knex('active_spawns').select('*');
+    let activeRows = [];
+      for (const ids of guildIdChunks) {
+        if (!ids.length) continue;
+        const chunkRows = await knex('active_spawns').whereIn('guild_id', ids).select('*');
+        activeRows = activeRows.concat(chunkRows);
+      }
       for (const r of activeRows) {
         try {
+          if (!guildIdSet.has(String(r.guild_id))) continue;
           const ch = await client.channels.fetch(r.channel_id).catch(() => null);
           if (!ch) {
             // channel missing, cleanup
@@ -107,6 +130,7 @@ async function init(botClient) {
     }
 
     for (const row of rows) {
+      if (!guildIdSet.has(String(row.guild_id))) continue;
       // if there's a persisted next_spawn_at, respect it; otherwise schedule normally
       if (row.next_spawn_at) {
         const ts = Number(row.next_spawn_at);
@@ -121,7 +145,7 @@ async function init(botClient) {
       }
       scheduleNext(row.guild_id);
     }
-    logger.info('Spawn manager initialized', { guilds: rows.length });
+    logger.info('Spawn manager initialized', { shardGuilds: shardGuildIds.length, configuredGuilds: rows.length, chunkSize: inChunkSize });
   } catch (err) {
     logger.error('Failed initializing spawn manager', { error: err.stack || err });
   }

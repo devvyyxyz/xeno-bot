@@ -104,102 +104,149 @@ const eggTypes = require('../config/eggTypes.json');
 const eggModel = require('./models/egg');
 const childProcess = require('child_process');
 
-async function startup() {
-  try {
-    await db.migrate();
-    baseLogger.info('DB migrate complete');
-  } catch (err) {
-    baseLogger.error('DB migrate failed', { error: err.stack || err });
-    // Continue — migrate() already falls back to SQLite on connection refusal
-  }
+function createStartupProgress(totalSteps) {
+  let completed = 0;
+  const startedAt = Date.now();
+  const width = 20;
 
-  try {
-    await eggModel.ensureAllEggsInAllGuilds(eggTypes, db.knex);
-    baseLogger.info('Egg stats ensured in DB');
-  } catch (err) {
-    baseLogger.error('Failed to ensure all eggs in DB', { error: err.stack || err });
-  }
+  const render = (label, state) => {
+    const ratio = totalSteps > 0 ? completed / totalSteps : 0;
+    const filled = Math.max(0, Math.min(width, Math.round(ratio * width)));
+    const empty = width - filled;
+    const percent = Math.round(ratio * 100);
+    const bar = `${'█'.repeat(filled)}${'░'.repeat(empty)}`;
+    baseLogger.info(`[startup] [${bar}] ${percent}% (${completed}/${totalSteps}) ${state} - ${label}`);
+  };
 
-  // Optionally auto-deploy dev guild commands when developing locally.
-    // Unified auto-deploy behavior:
-    // - If running the public bot via `npm start` -> register/update global commands for public bot.
-    // - If running the dev bot via `npm start dev` or `npm run start:dev` -> register/update dev guild commands only.
-    try {
-      const isDevProfile = process.env.BOT_PROFILE === 'dev' || profile === 'dev' || (process.argv && process.argv.slice(2).some(a => /(^|\W)(dev|development)(\W|$)/i.test(String(a))));
-      const isPublicProfile = !isDevProfile;
-
-      const lifecycle = process.env.npm_lifecycle_event ? String(process.env.npm_lifecycle_event).toLowerCase() : null;
-
-      const shouldAutoDeployDev = isDevProfile && (
-        lifecycle === 'start:dev' || lifecycle === 'dev' || lifecycle === 'start' && process.argv.slice(2).some(a => /(^|\W)(dev|development)(\W|$)/i.test(String(a))) || process.env.DEV_AUTO_DEPLOY === 'true'
-      );
-
-      const shouldAutoDeployPublic = isPublicProfile && (
-        lifecycle === 'start' || process.env.AUTO_DEPLOY_PUBLIC === 'true'
-      );
-
-      const guildToUse = process.env.GUILD_ID || (process.env.BOT_CONFIG_PATH ? (() => {
-        try { const pc = require(process.env.BOT_CONFIG_PATH); return pc && pc.guildId; } catch (_) { return null; }
-      })() : null);
-
-      const deployChild = async (envOverrides = {}) => {
-        try {
-          const node = process.execPath || 'node';
-          const deployPath = path.join(__dirname, '..', 'deploy-commands.js');
-          const env = Object.assign({}, process.env, envOverrides);
-          const res = childProcess.spawnSync(node, [deployPath], { env, stdio: 'inherit' });
-          if (res.error) baseLogger.warn('Auto-deploy child process failed to start', { error: String(res.error) });
-          else if (res.status !== 0) baseLogger.warn('Auto-deploy child process exited non-zero', { status: res.status });
-          else baseLogger.info('Auto-deploy completed successfully');
-        } catch (e) {
-          baseLogger.warn('Auto-deploy failed', { error: e && (e.stack || e) });
-        }
-      };
-
-      if (shouldAutoDeployDev) {
-        if (!guildToUse) baseLogger.warn('Dev auto-deploy requested but no GUILD_ID/profile.guildId found; skipping dev deploy');
-        else {
-          baseLogger.info('Auto-deploying dev guild commands', { guild: guildToUse });
-          await deployChild({ BOT_PROFILE: 'dev', GUILD_ID: guildToUse });
-        }
-      }
-
-      if (shouldAutoDeployPublic) {
-        baseLogger.info('Auto-deploying public global commands');
-        await deployChild({ BOT_PROFILE: 'public', ALLOW_GLOBAL_REGISTRATION: 'true' });
-      }
-    } catch (e) {
-      baseLogger.warn('Auto-deploy check failed', { error: e && (e.stack || e) });
-    }
-
-  // Optionally auto-deploy public/global commands on the host when explicitly enabled.
-  try {
-    const autoPublic = process.env.AUTO_DEPLOY_PUBLIC === 'true';
-    const isPublic = process.env.BOT_PROFILE === 'public' || profile === 'public';
-    if (autoPublic && isPublic) {
-      baseLogger.info('AUTO_DEPLOY_PUBLIC enabled — running deploy-commands for public profile (global)', { profile });
+  return {
+    async runStep(label, fn) {
+      render(label, 'RUNNING');
+      const stepStart = Date.now();
       try {
-        const node = process.execPath || 'node';
-        const deployPath = path.join(__dirname, '..', 'deploy-commands.js');
-        const env = Object.assign({}, process.env, { BOT_PROFILE: 'public', ALLOW_GLOBAL_REGISTRATION: 'true' });
-        const res = childProcess.spawnSync(node, [deployPath], { env, stdio: 'inherit' });
-        if (res.error) baseLogger.warn('Auto-deploy-public child process failed to start', { error: String(res.error) });
-        else if (res.status !== 0) baseLogger.warn('Auto-deploy-public child process exited non-zero', { status: res.status });
-        else baseLogger.info('Auto-deploy-public completed successfully');
-      } catch (e) {
-        baseLogger.warn('Auto-deploy-public failed', { error: e && (e.stack || e) });
+        const result = await fn();
+        completed += 1;
+        render(label, `DONE (${Date.now() - stepStart}ms)`);
+        return result;
+      } catch (err) {
+        completed += 1;
+        render(label, `FAILED (${Date.now() - stepStart}ms)`);
+        throw err;
       }
+    },
+    finish() {
+      const totalMs = Date.now() - startedAt;
+      baseLogger.info('[startup] All startup tasks completed', { totalMs, completed, totalSteps });
     }
-  } catch (e) {
-    baseLogger.warn('AUTO_DEPLOY_PUBLIC check failed', { error: e && (e.stack || e) });
-  }
+  };
+}
 
-  // Now login the Discord client
+async function startup() {
+  const startupProgress = createStartupProgress(4);
+
   try {
-    await client.login(process.env.TOKEN);
-    logger.info('Login initiated');
+    await startupProgress.runStep('Database migration', async () => {
+      try {
+        await db.migrate();
+        baseLogger.info('DB migrate complete');
+      } catch (err) {
+        baseLogger.error('DB migrate failed', { error: err.stack || err });
+        // Continue — migrate() already falls back to SQLite on connection refusal
+      }
+    });
+
+    await startupProgress.runStep('Egg stats synchronization', async () => {
+      try {
+        await eggModel.ensureAllEggsInAllGuilds(eggTypes, db.knex);
+        baseLogger.info('Egg stats ensured in DB');
+      } catch (err) {
+        baseLogger.error('Failed to ensure all eggs in DB', { error: err.stack || err });
+      }
+    });
+
+    await startupProgress.runStep('Command auto-deploy checks', async () => {
+      // Optionally auto-deploy dev guild commands when developing locally.
+      // Unified auto-deploy behavior:
+      // - If running the public bot via `npm start` -> register/update global commands for public bot.
+      // - If running the dev bot via `npm start dev` or `npm run start:dev` -> register/update dev guild commands only.
+      try {
+        const isDevProfile = process.env.BOT_PROFILE === 'dev' || profile === 'dev' || (process.argv && process.argv.slice(2).some(a => /(^|\W)(dev|development)(\W|$)/i.test(String(a))));
+        const isPublicProfile = !isDevProfile;
+
+        const lifecycle = process.env.npm_lifecycle_event ? String(process.env.npm_lifecycle_event).toLowerCase() : null;
+
+        const shouldAutoDeployDev = isDevProfile && (
+          lifecycle === 'start:dev' || lifecycle === 'dev' || lifecycle === 'start' && process.argv.slice(2).some(a => /(^|\W)(dev|development)(\W|$)/i.test(String(a))) || process.env.DEV_AUTO_DEPLOY === 'true'
+        );
+
+        const shouldAutoDeployPublic = isPublicProfile && (
+          lifecycle === 'start' || process.env.AUTO_DEPLOY_PUBLIC === 'true'
+        );
+
+        const guildToUse = process.env.GUILD_ID || (process.env.BOT_CONFIG_PATH ? (() => {
+          try { const pc = require(process.env.BOT_CONFIG_PATH); return pc && pc.guildId; } catch (_) { return null; }
+        })() : null);
+
+        const deployChild = async (envOverrides = {}) => {
+          try {
+            const node = process.execPath || 'node';
+            const deployPath = path.join(__dirname, '..', 'deploy-commands.js');
+            const env = Object.assign({}, process.env, envOverrides);
+            const res = childProcess.spawnSync(node, [deployPath], { env, stdio: 'inherit' });
+            if (res.error) baseLogger.warn('Auto-deploy child process failed to start', { error: String(res.error) });
+            else if (res.status !== 0) baseLogger.warn('Auto-deploy child process exited non-zero', { status: res.status });
+            else baseLogger.info('Auto-deploy completed successfully');
+          } catch (e) {
+            baseLogger.warn('Auto-deploy failed', { error: e && (e.stack || e) });
+          }
+        };
+
+        if (shouldAutoDeployDev) {
+          if (!guildToUse) baseLogger.warn('Dev auto-deploy requested but no GUILD_ID/profile.guildId found; skipping dev deploy');
+          else {
+            baseLogger.info('Auto-deploying dev guild commands', { guild: guildToUse });
+            await deployChild({ BOT_PROFILE: 'dev', GUILD_ID: guildToUse });
+          }
+        }
+
+        if (shouldAutoDeployPublic) {
+          baseLogger.info('Auto-deploying public global commands');
+          await deployChild({ BOT_PROFILE: 'public', ALLOW_GLOBAL_REGISTRATION: 'true' });
+        }
+      } catch (e) {
+        baseLogger.warn('Auto-deploy check failed', { error: e && (e.stack || e) });
+      }
+
+      // Optionally auto-deploy public/global commands on the host when explicitly enabled.
+      try {
+        const autoPublic = process.env.AUTO_DEPLOY_PUBLIC === 'true';
+        const isPublic = process.env.BOT_PROFILE === 'public' || profile === 'public';
+        if (autoPublic && isPublic) {
+          baseLogger.info('AUTO_DEPLOY_PUBLIC enabled — running deploy-commands for public profile (global)', { profile });
+          try {
+            const node = process.execPath || 'node';
+            const deployPath = path.join(__dirname, '..', 'deploy-commands.js');
+            const env = Object.assign({}, process.env, { BOT_PROFILE: 'public', ALLOW_GLOBAL_REGISTRATION: 'true' });
+            const res = childProcess.spawnSync(node, [deployPath], { env, stdio: 'inherit' });
+            if (res.error) baseLogger.warn('Auto-deploy-public child process failed to start', { error: String(res.error) });
+            else if (res.status !== 0) baseLogger.warn('Auto-deploy-public child process exited non-zero', { status: res.status });
+            else baseLogger.info('Auto-deploy-public completed successfully');
+          } catch (e) {
+            baseLogger.warn('Auto-deploy-public failed', { error: e && (e.stack || e) });
+          }
+        }
+      } catch (e) {
+        baseLogger.warn('AUTO_DEPLOY_PUBLIC check failed', { error: e && (e.stack || e) });
+      }
+    });
+
+    await startupProgress.runStep('Discord login', async () => {
+      await client.login(process.env.TOKEN);
+      logger.info('Login initiated');
+    });
+
+    startupProgress.finish();
   } catch (err) {
-    logger.error('Failed to login', { error: err.stack || err });
+    logger.error('Startup failed', { error: err && (err.stack || err) });
     process.exit(1);
   }
 }

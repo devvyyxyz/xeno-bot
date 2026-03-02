@@ -10,29 +10,64 @@ module.exports = {
     // Avoid raw console output; log via logger for consistent formatting
     // (previously also printed a plain "Logged in as..." line to stdout)
 
-    // Warm-up guild settings cache: load all guild_settings into cache for quick access
+    // Warm-up guild settings cache for guilds this shard actually serves.
+    // Loading every guild in a sharded deployment can cause large heap spikes.
     try {
-      const rows = await db.knex('guild_settings').select('*');
-      for (const row of rows) {
-        const parsed = row.data ? JSON.parse(row.data) : null;
-        // Normalize spawn timing fields into cache so consumers don't see missing fields
-        const spawnMin = row.spawn_min_seconds != null ? row.spawn_min_seconds : (row.spawn_rate_minutes != null ? Number(row.spawn_rate_minutes) * 60 : null);
-        const spawnMax = row.spawn_max_seconds != null ? row.spawn_max_seconds : (row.spawn_rate_minutes != null ? Number(row.spawn_rate_minutes) * 60 : null);
-        const entry = {
-          id: row.id,
-          guild_id: row.guild_id,
-          channel_id: row.channel_id,
-          spawn_min_seconds: spawnMin,
-          spawn_max_seconds: spawnMax,
-          spawn_rate_minutes: row.spawn_rate_minutes,
-          egg_limit: row.egg_limit,
-          data: parsed,
-          created_at: row.created_at,
-          updated_at: row.updated_at
-        };
-        cache.set(`guild:${row.guild_id}`, entry, Number(process.env.GUILD_CACHE_TTL_MS) || 30000);
+      const guildIds = Array.from(client.guilds.cache.keys());
+      const ttlMs = Number(process.env.GUILD_CACHE_TTL_MS) || 30000;
+      const chunkSize = Number(process.env.GUILD_CACHE_WARMUP_CHUNK) || 250;
+      let totalLoaded = 0;
+
+      for (let i = 0; i < guildIds.length; i += chunkSize) {
+        const chunk = guildIds.slice(i, i + chunkSize);
+        if (!chunk.length) continue;
+        let rows = [];
+        try {
+          rows = await db.knex('guild_settings')
+            .select('id', 'guild_id', 'channel_id', 'spawn_min_seconds', 'spawn_max_seconds', 'spawn_rate_minutes', 'egg_limit', 'data', 'created_at', 'updated_at')
+            .whereIn('guild_id', chunk.map(String));
+        } catch (chunkErr) {
+          // Some DB/driver setups can be strict about whereIn parameter handling.
+          // Fallback to per-guild queries so startup can continue safely.
+          logger.warn('Chunked guild settings warm-up failed, using per-guild fallback', { error: chunkErr && (chunkErr.stack || chunkErr), chunkSize: chunk.length });
+          for (const guildId of chunk) {
+            const row = await db.knex('guild_settings')
+              .select('id', 'guild_id', 'channel_id', 'spawn_min_seconds', 'spawn_max_seconds', 'spawn_rate_minutes', 'egg_limit', 'data', 'created_at', 'updated_at')
+              .where({ guild_id: String(guildId) })
+              .first();
+            if (row) rows.push(row);
+          }
+        }
+
+        for (const row of rows) {
+          let parsed = null;
+          try {
+            parsed = row.data ? JSON.parse(row.data) : null;
+          } catch (_) {
+            parsed = null;
+          }
+
+          // Normalize spawn timing fields into cache so consumers don't see missing fields
+          const spawnMin = row.spawn_min_seconds != null ? row.spawn_min_seconds : (row.spawn_rate_minutes != null ? Number(row.spawn_rate_minutes) * 60 : null);
+          const spawnMax = row.spawn_max_seconds != null ? row.spawn_max_seconds : (row.spawn_rate_minutes != null ? Number(row.spawn_rate_minutes) * 60 : null);
+          const entry = {
+            id: row.id,
+            guild_id: row.guild_id,
+            channel_id: row.channel_id,
+            spawn_min_seconds: spawnMin,
+            spawn_max_seconds: spawnMax,
+            spawn_rate_minutes: row.spawn_rate_minutes,
+            egg_limit: row.egg_limit,
+            data: parsed,
+            created_at: row.created_at,
+            updated_at: row.updated_at
+          };
+          cache.set(`guild:${row.guild_id}`, entry, ttlMs);
+          totalLoaded += 1;
+        }
       }
-      logger.info('Guild settings cache warm-up complete', { count: rows.length });
+
+      logger.info('Guild settings cache warm-up complete', { loaded: totalLoaded, shardGuilds: guildIds.length, chunkSize });
     } catch (err) {
       logger.error('Failed warming guild settings cache', { error: err.stack || err });
     }
