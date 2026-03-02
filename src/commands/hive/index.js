@@ -19,27 +19,49 @@ const HIVE_ACTION_UPGRADE_MODULE_ID = 'hive-action-upgrade-module';
 
 function buildNavigationRow({ screen, disabled = false }) {
   return new ActionRowBuilder().addComponents(
-    new SecondaryButtonBuilder().setCustomId('hive-nav-stats').setLabel('📊 Stats').setDisabled(screen === 'stats' || disabled),
-    new SecondaryButtonBuilder().setCustomId('hive-nav-modules').setLabel('🔧 Modules').setDisabled(screen === 'modules' || disabled),
-    new SecondaryButtonBuilder().setCustomId('hive-nav-milestones').setLabel('🎯 Milestones').setDisabled(screen === 'milestones' || disabled),
-    new SecondaryButtonBuilder().setCustomId('hive-nav-queen').setLabel('👑 Queen').setDisabled(screen === 'queen' || disabled),
-    new SecondaryButtonBuilder().setCustomId('hive-nav-types').setLabel('ℹ️ Types').setDisabled(screen === 'types' || disabled)
+    new SecondaryButtonBuilder().setCustomId('hive-nav-stats').setLabel('Stats').setDisabled(screen === 'stats' || disabled),
+    new SecondaryButtonBuilder().setCustomId('hive-nav-modules').setLabel('Modules').setDisabled(screen === 'modules' || disabled),
+    new SecondaryButtonBuilder().setCustomId('hive-nav-milestones').setLabel('Milestones').setDisabled(screen === 'milestones' || disabled),
+    new SecondaryButtonBuilder().setCustomId('hive-nav-queen').setLabel('Queen').setDisabled(screen === 'queen' || disabled),
+    new SecondaryButtonBuilder().setCustomId('hive-nav-types').setLabel('Types').setDisabled(screen === 'types' || disabled)
   );
 }
 
-function buildQuickActionsRow({ disabled = false, canAct = true }) {
+function getQuickModuleCandidate(modulesRows = []) {
+  const modulesCfg = hiveDefaults.modules || {};
+  let candidate = null;
+
+  for (const moduleKey of Object.keys(modulesCfg)) {
+    const cfg = modulesCfg[moduleKey] || {};
+    const moduleRow = Array.isArray(modulesRows) ? modulesRows.find(m => m.module_key === moduleKey) : null;
+    const level = moduleRow ? Number(moduleRow.level || 0) : Number(cfg.default_level || 0);
+    const maxLevel = Number(cfg.max_level || 0);
+    if (maxLevel > 0 && level >= maxLevel) continue;
+    const cost = Math.max(1, Math.floor(Number(cfg.base_cost_jelly || 1) * (level + 1)));
+
+    if (!candidate || cost < candidate.cost) {
+      candidate = { moduleKey, cfg, level, row: moduleRow, cost };
+    }
+  }
+
+  return candidate;
+}
+
+function buildQuickActionsRow({ disabled = false, canAct = true, queenCost = 50, moduleCandidate = null }) {
+  const moduleLabel = moduleCandidate ? `Quick Module (${moduleCandidate.cost} RJ)` : 'Quick Module (MAX)';
+
   return new ActionRowBuilder().addComponents(
     new PrimaryButtonBuilder()
       .setCustomId(HIVE_ACTION_UPGRADE_QUEEN_ID)
-      .setLabel('⬆️ Queen +1')
+      .setLabel(`Queen +1 (${queenCost} RJ)`)
       .setDisabled(disabled || !canAct),
     new SecondaryButtonBuilder()
       .setCustomId(HIVE_ACTION_UPGRADE_MODULE_ID)
-      .setLabel('⚡ Quick Module')
-      .setDisabled(disabled || !canAct),
+      .setLabel(moduleLabel)
+      .setDisabled(disabled || !canAct || !moduleCandidate),
     new SecondaryButtonBuilder()
       .setCustomId(HIVE_ACTION_REFRESH_ID)
-      .setLabel('🔄 Refresh')
+      .setLabel('Refresh')
       .setDisabled(disabled)
   );
 }
@@ -133,7 +155,8 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
   }
 
   if (!expired) {
-    container.addActionRowComponents(buildQuickActionsRow({ disabled: false, canAct }));
+    const moduleCandidate = getQuickModuleCandidate(rows.modules || []);
+    container.addActionRowComponents(buildQuickActionsRow({ disabled: false, canAct, queenCost: 50, moduleCandidate }));
     container.addActionRowComponents(buildNavigationRow({ screen, disabled: false }));
   } else {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('_Hive view expired_'));
@@ -152,7 +175,7 @@ function buildNoHiveV2Payload({ includeFlags = true }) {
   container.addActionRowComponents(
     new ActionRowBuilder().addComponents(
       new PrimaryButtonBuilder()
-        .setLabel('🏗️ Create Hive')
+        .setLabel('Create Hive')
         .setCustomId('hive-create-prompt')
         .setDisabled(false)
     )
@@ -286,7 +309,7 @@ module.exports = {
               );
               container.addActionRowComponents(
                 new ActionRowBuilder().addComponents(
-                  new PrimaryButtonBuilder().setLabel('🏗️ Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
+                  new PrimaryButtonBuilder().setLabel('Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
                 )
               );
               await i.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
@@ -302,7 +325,7 @@ module.exports = {
               );
               container.addActionRowComponents(
                 new ActionRowBuilder().addComponents(
-                  new PrimaryButtonBuilder().setLabel('🏗️ Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
+                  new PrimaryButtonBuilder().setLabel('Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
                 )
               );
               await i.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
@@ -317,7 +340,7 @@ module.exports = {
             );
             container.addActionRowComponents(
               new ActionRowBuilder().addComponents(
-                new PrimaryButtonBuilder().setLabel('🏗️ Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
+                new PrimaryButtonBuilder().setLabel('Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
               )
             );
             await i.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
@@ -329,7 +352,7 @@ module.exports = {
             );
             container.addActionRowComponents(
               new ActionRowBuilder().addComponents(
-                new PrimaryButtonBuilder().setLabel('🏗️ Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
+                new PrimaryButtonBuilder().setLabel('Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
               )
             );
             try { await i.update({ components: [container], flags: MessageFlags.IsComponentsV2 }); } catch (_) {}
@@ -376,7 +399,7 @@ module.exports = {
                   );
                   container.addActionRowComponents(
                     new ActionRowBuilder().addComponents(
-                      new PrimaryButtonBuilder().setLabel('🏗️ Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
+                      new PrimaryButtonBuilder().setLabel('Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
                     )
                   );
                   await i.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
@@ -392,7 +415,7 @@ module.exports = {
                   );
                   container.addActionRowComponents(
                     new ActionRowBuilder().addComponents(
-                      new PrimaryButtonBuilder().setLabel('🏗️ Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
+                      new PrimaryButtonBuilder().setLabel('Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
                     )
                   );
                   await i.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
@@ -407,7 +430,7 @@ module.exports = {
                 );
                 container.addActionRowComponents(
                   new ActionRowBuilder().addComponents(
-                    new PrimaryButtonBuilder().setLabel('🏗️ Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
+                    new PrimaryButtonBuilder().setLabel('Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
                   )
                 );
                 await i.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
@@ -419,7 +442,7 @@ module.exports = {
                 );
                 container.addActionRowComponents(
                   new ActionRowBuilder().addComponents(
-                    new PrimaryButtonBuilder().setLabel('🏗️ Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
+                    new PrimaryButtonBuilder().setLabel('Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
                   )
                 );
                 try { await i.update({ components: [container], flags: MessageFlags.IsComponentsV2 }); } catch (_) {}

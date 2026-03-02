@@ -101,7 +101,7 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
       new ActionRowBuilder()
         .addComponents(
           new SecondaryButtonBuilder()
-            .setLabel('◀ Prev')
+            .setLabel('Prev')
             .setCustomId('hunt-prev-page')
             .setDisabled(safePageIdx === 0),
           new PrimaryButtonBuilder()
@@ -109,7 +109,7 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
             .setCustomId('hunt-page-counter')
             .setDisabled(true),
           new SecondaryButtonBuilder()
-            .setLabel('Next ▶')
+            .setLabel('Next')
             .setCustomId('hunt-next-page')
             .setDisabled(safePageIdx >= totalPages - 1)
         )
@@ -125,16 +125,16 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
       new ActionRowBuilder()
         .addComponents(
           new SecondaryButtonBuilder()
-            .setLabel('📊 Stats')
+            .setLabel('Stats')
             .setCustomId('hunt-view-stats'),
           new SecondaryButtonBuilder()
-            .setLabel('🏰 Hive')
+            .setLabel('Hive')
             .setCustomId('hunt-open-hive'),
           new PrimaryButtonBuilder()
-            .setLabel('🎯 Hunt')
+            .setLabel('Hunt')
             .setCustomId('hunt-go-now'),
           new SecondaryButtonBuilder()
-            .setLabel('🎒 Inventory')
+            .setLabel('Inventory')
             .setCustomId('hunt-open-inventory')
         )
     );
@@ -182,7 +182,7 @@ function buildStatsPage({ userId, allHosts, cfgHosts }) {
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(stats.join('\n')));
 
   const backRow = new ActionRowBuilder().addComponents(
-    new SecondaryButtonBuilder().setCustomId('hunt-back-to-list').setLabel('← Back to Hosts')
+    new SecondaryButtonBuilder().setCustomId('hunt-back-to-list').setLabel('Back to Hosts')
   );
   container.addActionRowComponents(backRow);
 
@@ -265,7 +265,7 @@ module.exports = {
 
         const resultRow = new ActionRowBuilder()
           .addComponents(
-            new PrimaryButtonBuilder().setCustomId('hunt-view-list-from-result').setLabel('📋 View Hunt List')
+            new PrimaryButtonBuilder().setCustomId('hunt-view-list-from-result').setLabel('View Hunt List')
           );
         container.addActionRowComponents(resultRow);
 

@@ -47,7 +47,7 @@ function buildEmojiPage({ pageIdx = 0, expired = false }) {
     const navRow = new ActionRowBuilder().addComponents(
       new SecondaryButtonBuilder()
         .setCustomId('emoji-prev-page')
-        .setLabel('◀ Prev')
+        .setLabel('Prev')
         .setDisabled(safePageIdx === 0),
       new PrimaryButtonBuilder()
         .setCustomId('emoji-current-page')
@@ -55,7 +55,7 @@ function buildEmojiPage({ pageIdx = 0, expired = false }) {
         .setDisabled(true),
       new SecondaryButtonBuilder()
         .setCustomId('emoji-next-page')
-        .setLabel('Next ▶')
+        .setLabel('Next')
         .setDisabled(safePageIdx >= totalPages - 1)
     );
     container.addActionRowComponents(navRow);
