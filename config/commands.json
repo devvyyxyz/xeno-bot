@@ -109,6 +109,7 @@
       }
     },
     "forcespawn": { "name": "forcespawn", "description": "Force spawn eggs in the configured channel (admin only)" },
+    "joinnotice": { "name": "joinnotice", "description": "Trigger the new-server webhook notice for this server (admin only)" },
     "give": {
       "name": "give",
       "description": "Give items to users (admin only)",
