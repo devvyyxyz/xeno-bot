@@ -80,6 +80,13 @@
       "ephemeral": false,
       "examples": ["/support-server - Join the support server for help"]
     },
+    "suggest": {
+      "name": "suggest",
+      "description": "Get where to submit bot suggestions.",
+      "group": "Information",
+      "ephemeral": false,
+      "examples": ["/suggest - Learn where to submit feature suggestions"]
+    },
     "collect": {
       "name": "collect",
       "description": "Collect a spawned egg from the channel.",
