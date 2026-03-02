@@ -16,6 +16,7 @@ const hostModel = require('../../models/host');
 const userModel = require('../../models/user');
 const db = require('../../db');
 const { getCommandConfig } = require('../../utils/commandsConfig');
+const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const safeReply = require('../../utils/safeReply');
 const hostsCfg = require('../../../config/hosts.json');
 const emojisCfg = require('../../../config/emojis.json');
@@ -100,12 +101,22 @@ function buildEvolveView({
   jobs = [],
   selectedXenoId = null,
   message = null,
-  expired = false
+  expired = false,
+  client = null
 }) {
   const container = new ContainerBuilder();
 
+  const titleMap = {
+    'list': 'Evolve',
+    'info': 'Evolve',
+    'cancel': 'Evolve',
+    'start-help': 'Evolve',
+    'result': 'Evolve'
+  };
+
+  addV2TitleWithBotThumbnail({ container, title: titleMap[screen] || 'Evolve', client });
+
   if (screen === 'list') {
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('## Evolve • List'));
     if (!xenos.length) {
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent('You have no xenomorphs.'));
     } else {
@@ -113,7 +124,6 @@ function buildEvolveView({
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n\n')));
     }
   } else if (screen === 'info') {
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('## Evolve • Info'));
     if (!xenos.length) {
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent('You have no xenomorphs to inspect.'));
     } else {
@@ -135,7 +145,6 @@ function buildEvolveView({
       }
     }
   } else if (screen === 'cancel') {
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('## Evolve • Cancel Jobs'));
     if (!jobs.length) {
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent('You have no queued evolution jobs.'));
     } else {
@@ -157,12 +166,10 @@ function buildEvolveView({
     }
   } else if (screen === 'start-help') {
     container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent('## Evolve • Start Help'),
       new TextDisplayBuilder().setContent('Use `/evolve start` with:\n- `xenomorph`\n- `next_stage`\n- optional `host` (required for some pathways)')
     );
   } else if (screen === 'result') {
     container.addTextDisplayComponents(
-      new TextDisplayBuilder().setContent('## Evolve • Result'),
       new TextDisplayBuilder().setContent(String(message || 'Done.'))
     );
   }
@@ -222,22 +229,22 @@ module.exports = {
       if (sub === 'list') {
         const list = await loadXenos();
         const prefix = hydrated > 0 ? `Converted ${hydrated} legacy facehugger item(s) into xenomorphs.` : null;
-        await respond({ components: buildEvolveView({ screen: 'list', xenos: list, message: prefix }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+        await respond({ components: buildEvolveView({ screen: 'list', xenos: list, message: prefix, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
       } else if (sub === 'start') {
         const xenoId = interaction.options.getInteger('xenomorph');
         const hostId = interaction.options.getInteger('host');
         const target = String(interaction.options.getString('next_stage') || '').trim().toLowerCase();
         const xeno = await xenoModel.getById(xenoId);
         if (!xeno) {
-          await respond({ components: buildEvolveView({ screen: 'result', message: 'Xenomorph not found.' }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+          await respond({ components: buildEvolveView({ screen: 'result', message: 'Xenomorph not found.', client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
         } else if (String(xeno.owner_id) !== userId) {
-          await respond({ components: buildEvolveView({ screen: 'result', message: 'You do not own this xenomorph.' }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+          await respond({ components: buildEvolveView({ screen: 'result', message: 'You do not own this xenomorph.', client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
         } else {
           const existingJob = await db.knex('evolution_queue')
             .where({ xeno_id: xenoId, user_id: userId, status: 'queued' })
             .first();
           if (existingJob) {
-            await respond({ components: buildEvolveView({ screen: 'result', message: `This xenomorph already has a queued evolution (job #${existingJob.id}).` }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+            await respond({ components: buildEvolveView({ screen: 'result', message: `This xenomorph already has a queued evolution (job #${existingJob.id}).`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
           } else {
             const evol = require('../../../config/evolutions.json');
             const pathwayKey = String(xeno.pathway || 'standard');
@@ -246,28 +253,28 @@ module.exports = {
             const stepReq = reqByPath[fromStage] || null;
 
             if (!stepReq) {
-              await respond({ components: buildEvolveView({ screen: 'result', message: `No evolution step is configured for stage ${fromStage} in pathway ${pathwayKey}.` }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+              await respond({ components: buildEvolveView({ screen: 'result', message: `No evolution step is configured for stage ${fromStage} in pathway ${pathwayKey}.`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
             } else if (String(stepReq.to) !== String(target)) {
-              await respond({ components: buildEvolveView({ screen: 'result', message: `Invalid target for ${fromStage} in ${pathwayKey}. Next allowed stage is ${stepReq.to}.` }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+              await respond({ components: buildEvolveView({ screen: 'result', message: `Invalid target for ${fromStage} in ${pathwayKey}. Next allowed stage is ${stepReq.to}.`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
             } else {
               let hostValidationFailed = false;
               if (Array.isArray(stepReq.requires_host_types) && stepReq.requires_host_types.length > 0) {
                 if (!hostId) {
-                  await respond({ components: buildEvolveView({ screen: 'result', message: `This evolution requires a host (${stepReq.requires_host_types.join(', ')}). Provide the host option.` }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                  await respond({ components: buildEvolveView({ screen: 'result', message: `This evolution requires a host (${stepReq.requires_host_types.join(', ')}). Provide the host option.`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
                   hostValidationFailed = true;
                 } else {
                   const host = await hostModel.getHostById(hostId);
                   if (!host) {
-                    await respond({ components: buildEvolveView({ screen: 'result', message: 'Host not found.' }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                    await respond({ components: buildEvolveView({ screen: 'result', message: 'Host not found.', client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
                     hostValidationFailed = true;
                   } else if (String(host.owner_id) !== userId) {
-                    await respond({ components: buildEvolveView({ screen: 'result', message: 'You do not own this host.' }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                    await respond({ components: buildEvolveView({ screen: 'result', message: 'You do not own this host.', client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
                     hostValidationFailed = true;
                   } else {
                     const hostType = String(host.host_type || '').toLowerCase();
                     const allowedTypes = stepReq.requires_host_types.map(h => String(h).toLowerCase());
                     if (!allowedTypes.includes(hostType)) {
-                      await respond({ components: buildEvolveView({ screen: 'result', message: `Host type ${host.host_type} is invalid for this evolution. Allowed: ${stepReq.requires_host_types.join(', ')}.` }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                      await respond({ components: buildEvolveView({ screen: 'result', message: `Host type ${host.host_type} is invalid for this evolution. Allowed: ${stepReq.requires_host_types.join(', ')}.`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
                       hostValidationFailed = true;
                     } else {
                       await hostModel.removeHostById(hostId);
@@ -281,7 +288,7 @@ module.exports = {
                 const resRow = await db.knex('user_resources').where({ user_id: userId }).first();
                 const jelly = resRow ? Number(resRow.royal_jelly || 0) : 0;
                 if (jelly < defaults.cost_jelly) {
-                  await respond({ components: buildEvolveView({ screen: 'result', message: `Insufficient royal jelly. Need ${defaults.cost_jelly}.` }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                  await respond({ components: buildEvolveView({ screen: 'result', message: `Insufficient royal jelly. Need ${defaults.cost_jelly}.`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
                 } else {
                   if (defaults.cost_jelly > 0) {
                     await db.knex('user_resources').where({ user_id: userId }).update({ royal_jelly: Math.max(0, jelly - defaults.cost_jelly), updated_at: db.knex.fn.now() });
@@ -291,7 +298,7 @@ module.exports = {
                   const inserted = await db.knex('evolution_queue').insert({ xeno_id: xenoId, user_id: userId, hive_id: xeno.hive_id || null, target_role: target, started_at: now, finishes_at: finishes, cost_jelly: defaults.cost_jelly, stabilizer_used: false, status: 'queued' });
                   const id = Array.isArray(inserted) ? inserted[0] : inserted;
                   const hostPart = hostId ? ` Host #${hostId} consumed.` : '';
-                  await respond({ components: buildEvolveView({ screen: 'result', message: `Evolution started (job #${id}) for xeno #${xenoId} → ${target}. Cost: ${defaults.cost_jelly} royal jelly.${hostPart} Finishes in ~${Math.round(defaults.time_ms / 60000)} minutes.` }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                  await respond({ components: buildEvolveView({ screen: 'result', message: `Evolution started (job #${id}) for xeno #${xenoId} → ${target}. Cost: ${defaults.cost_jelly} royal jelly.${hostPart} Finishes in ~${Math.round(defaults.time_ms / 60000)} minutes.`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
                 }
               }
             }
@@ -300,24 +307,24 @@ module.exports = {
       } else if (sub === 'info') {
         const list = await loadXenos();
         const firstId = list.length ? list[0].id : null;
-        await respond({ components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: firstId }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+        await respond({ components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: firstId, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
       } else if (sub === 'cancel') {
         const jobId = interaction.options.getInteger('job_id');
         if (jobId) {
           const job = await db.knex('evolution_queue').where({ id: jobId }).first();
           if (!job) {
-            await respond({ components: buildEvolveView({ screen: 'result', message: 'Job not found.' }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+            await respond({ components: buildEvolveView({ screen: 'result', message: 'Job not found.', client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
           } else if (String(job.user_id) !== userId) {
-            await respond({ components: buildEvolveView({ screen: 'result', message: 'You do not own this job.' }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+            await respond({ components: buildEvolveView({ screen: 'result', message: 'You do not own this job.', client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
           } else if (job.status !== 'queued') {
-            await respond({ components: buildEvolveView({ screen: 'result', message: 'Job has already started or completed and cannot be cancelled.' }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+            await respond({ components: buildEvolveView({ screen: 'result', message: 'Job has already started or completed and cannot be cancelled.', client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
           } else {
             await db.knex('evolution_queue').where({ id: jobId }).del();
-            await respond({ components: buildEvolveView({ screen: 'result', message: 'Evolution cancelled. Resources are not refunded.' }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+            await respond({ components: buildEvolveView({ screen: 'result', message: 'Evolution cancelled. Resources are not refunded.', client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
           }
         } else {
           const jobs = await loadJobs();
-          await respond({ components: buildEvolveView({ screen: 'cancel', jobs }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+          await respond({ components: buildEvolveView({ screen: 'cancel', jobs, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
         }
       }
 
@@ -335,32 +342,32 @@ module.exports = {
           const userIdInner = String(i.user.id);
           if (i.customId === 'evolve-nav-list') {
             const list = await xenoModel.listByOwner(userIdInner);
-            await i.update({ components: buildEvolveView({ screen: 'list', xenos: list }) });
+            await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-nav-info') {
             const list = await xenoModel.listByOwner(userIdInner);
             const firstId = list.length ? list[0].id : null;
-            await i.update({ components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: firstId }) });
+            await i.update({ components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: firstId, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-nav-cancel') {
             const jobs = await db.knex('evolution_queue').where({ user_id: userIdInner, status: 'queued' }).orderBy('id', 'asc').limit(25);
-            await i.update({ components: buildEvolveView({ screen: 'cancel', jobs }) });
+            await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-nav-start') {
-            await i.update({ components: buildEvolveView({ screen: 'start-help' }) });
+            await i.update({ components: buildEvolveView({ screen: 'start-help', client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-new-xeno') {
-            await i.update({ components: buildEvolveView({ screen: 'start-help' }) });
+            await i.update({ components: buildEvolveView({ screen: 'start-help', client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-info-select') {
             const selected = i.values && i.values[0] ? i.values[0] : null;
             const list = await xenoModel.listByOwner(userIdInner);
-            await i.update({ components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: selected }) });
+            await i.update({ components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: selected, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-cancel-select') {
@@ -368,12 +375,12 @@ module.exports = {
             const job = await db.knex('evolution_queue').where({ id: selectedJobId }).first();
             if (!job || String(job.user_id) !== userIdInner || job.status !== 'queued') {
               const jobs = await db.knex('evolution_queue').where({ user_id: userIdInner, status: 'queued' }).orderBy('id', 'asc').limit(25);
-              await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, message: 'Selected job is no longer cancellable.' }) });
+              await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, message: 'Selected job is no longer cancellable.', client: interaction.client }) });
               return;
             }
             await db.knex('evolution_queue').where({ id: selectedJobId }).del();
             const jobs = await db.knex('evolution_queue').where({ user_id: userIdInner, status: 'queued' }).orderBy('id', 'asc').limit(25);
-            await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, message: `Cancelled job #${selectedJobId}.` }) });
+            await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, message: `Cancelled job #${selectedJobId}.`, client: interaction.client }) });
             return;
           }
         } catch (err) {
@@ -384,13 +391,15 @@ module.exports = {
       collector.on('end', async () => {
         try {
           const list = await xenoModel.listByOwner(userId);
-          await safeReply(interaction, { components: buildEvolveView({ screen: 'list', xenos: list, expired: true }), flags: MessageFlags.IsComponentsV2, ephemeral: true }, { loggerName: 'command:evolve' });
+          if (msg) {
+            await msg.edit({ components: buildEvolveView({ screen: 'list', xenos: list, expired: true, client: interaction.client }) });
+          }
         } catch (_) {}
       });
 
       return;
     } catch (e) {
-      return respond({ components: buildEvolveView({ screen: 'result', message: `Error: ${e && (e.message || e)}` }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+      return respond({ components: buildEvolveView({ screen: 'result', message: `Error: ${e && (e.message || e)}`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
     }
   }
   ,
