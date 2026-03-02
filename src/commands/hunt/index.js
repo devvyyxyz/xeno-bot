@@ -21,7 +21,7 @@ const { getCommandConfig } = require('../../utils/commandsConfig');
 const hostsCfg = require('../../../config/hosts.json');
 const emojisCfg = require('../../../config/emojis.json');
 const huntFlavorsCfg = require('../../../config/huntFlavors.json');
-const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
+const { addV2TitleWithBotThumbnail, addV2TitleWithImageThumbnail } = require('../../utils/componentsV2');
 const safeReply = require('../../utils/safeReply');
 const logger = require('../../utils/logger').get('command:hunt');
 
@@ -61,6 +61,24 @@ function getRandomFlavor(hostType, flavors) {
   return hostFlavors.flavors[Math.floor(Math.random() * hostFlavors.flavors.length)];
 }
 
+function getHostEmojiUrl(hostType, cfgHosts = {}, emojis = {}) {
+  const hostInfo = cfgHosts[hostType] || {};
+  const emojiKey = hostInfo.emoji;
+  const emoji = emojiKey && emojis[emojiKey] ? emojis[emojiKey] : '';
+  
+  if (!emoji) return null;
+  
+  // Parse custom emoji format <:name:id> or <a:name:id>
+  const emojiMatch = emoji.match(/<a?:(\w+):(\d+)>/);
+  if (emojiMatch) {
+    const isAnimated = emoji.startsWith('<a:');
+    const emojiId = emojiMatch[2];
+    return `https://cdn.discordapp.com/emojis/${emojiId}.${isAnimated ? 'gif' : 'png'}?size=256`;
+  }
+  
+  return null;
+}
+
 function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts = {}, emojis = {}, client = null }) {
   const totalPages = Math.ceil(rows.length / HOSTS_PER_PAGE);
   const safePageIdx = Math.max(0, Math.min(pageIdx, totalPages - 1));
@@ -70,7 +88,17 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
 
   const container = new ContainerBuilder();
 
-  addV2TitleWithBotThumbnail({ container, title: 'Host Collection', client });
+  // Use first host's emoji if available, otherwise fallback to bot avatar
+  let hostEmojiUrl = null;
+  if (rows.length > 0) {
+    hostEmojiUrl = getHostEmojiUrl(rows[0].host_type, cfgHosts, emojis);
+  }
+  
+  if (hostEmojiUrl) {
+    addV2TitleWithImageThumbnail({ container, title: 'Host Collection', imageUrl: hostEmojiUrl });
+  } else {
+    addV2TitleWithBotThumbnail({ container, title: 'Host Collection', client });
+  }
 
   if (page.length === 0) {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('You have no hunted hosts. Use `/hunt go` to search.'));
@@ -146,14 +174,14 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
   return [container];
 }
 
-function buildStatsPage({ userId, allHosts, cfgHosts, client = null }) {
+function buildStatsPage({ userId, allHosts, cfgHosts, emojis = {}, client = null }) {
   const container = new ContainerBuilder();
-  addV2TitleWithBotThumbnail({ container, title: 'Hunt Statistics', client });
 
   const totalHunts = allHosts.length;
   const hostTypeCounts = {};
   const rarityMap = {};
   let rarest = null;
+  let rarestHostType = null;
   let rarestRarity = 'common';
 
   allHosts.forEach(h => {
@@ -165,10 +193,23 @@ function buildStatsPage({ userId, allHosts, cfgHosts, client = null }) {
 
     const rarityOrder = { 'common': 0, 'rare': 1, 'very_rare': 2 };
     if ((rarityOrder[rarity] || 0) > (rarityOrder[rarestRarity] || 0)) {
-      rarest = getHostDisplay(h.host_type, cfgHosts, emojisCfg);
+      rarest = getHostDisplay(h.host_type, cfgHosts, emojis);
+      rarestHostType = h.host_type;
       rarestRarity = rarity;
     }
   });
+
+  // Use rarest host's emoji if available, otherwise fallback to bot avatar
+  let hostEmojiUrl = null;
+  if (rarestHostType) {
+    hostEmojiUrl = getHostEmojiUrl(rarestHostType, cfgHosts, emojis);
+  }
+  
+  if (hostEmojiUrl) {
+    addV2TitleWithImageThumbnail({ container, title: 'Hunt Statistics', imageUrl: hostEmojiUrl });
+  } else {
+    addV2TitleWithBotThumbnail({ container, title: 'Hunt Statistics', client });
+  }
 
   const mostCommon = Object.entries(hostTypeCounts).sort((a, b) => b[1] - a[1])[0];
   const mostCommonDisplay = mostCommon ? getHostDisplay(mostCommon[0], cfgHosts, emojisCfg) : 'None';
@@ -263,7 +304,11 @@ module.exports = {
         }
 
         const container = new ContainerBuilder();
-        addV2TitleWithBotThumbnail({ container, title: 'Hunt Success', client: interaction.client });
+        if (emojiUrl) {
+          addV2TitleWithImageThumbnail({ container, title: 'Hunt Success', imageUrl: emojiUrl });
+        } else {
+          addV2TitleWithBotThumbnail({ container, title: 'Hunt Success', client: interaction.client });
+        }
         container.addTextDisplayComponents(
           new TextDisplayBuilder().setContent(flavor),
           new TextDisplayBuilder().setContent(`You acquired: **${hostDisplay}** (ID: ${host.id})`)
@@ -380,7 +425,7 @@ module.exports = {
 
             // View stats
             if (i.customId === 'hunt-view-stats') {
-              await i.update({ components: buildStatsPage({ userId, allHosts: rows, cfgHosts, client: interaction.client }) });
+              await i.update({ components: buildStatsPage({ userId, allHosts: rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
               currentViewMode = 'stats';
               return;
             }
