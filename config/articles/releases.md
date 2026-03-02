@@ -265,3 +265,41 @@ Date: 2026-03-02
 - Enhanced eggs command with multiple screen types (list, stats, hatch, result)
 - Improved code maintainability with modular page builders
 
+## v1.7.0 — Pathways, Devgive expansion, number formatting, and support links
+
+Date: 2026-03-02
+
+### Key Features
+
+- **Pathway command registration fix**: Fixed `/pathway` not appearing by restoring proper command `data` export so it deploys and registers correctly.
+- **Evolution pathway stage corrections**: Updated egg first-stage mapping so pathways hatch into lore-appropriate starts:
+  - Neomorph eggs now hatch to `bloodburster`
+  - Deacon-path eggs now hatch to `hammerpede`
+  - King-path eggs now hatch to `king_facehugger`
+- **Devgive expansion and UX cleanup**:
+  - Added ability to grant `xenomorphs` at specific pathway/stage
+  - Added ability to grant `royal_jelly`
+  - Consolidated `/devgive` into a single unified flow with a `type` selector and contextual autocomplete
+- **New public utility commands**:
+  - Added `/invite` to provide bot OAuth invite link
+  - Added `/support-server` to provide support Discord link
+
+### Improvements
+
+- **Readable number formatting system**:
+  - Added `src/utils/numberFormat.js` (`formatNumber`, `formatNumberShort`, `formatNumberAuto`)
+  - Applied formatting across key surfaces (including `devgive`, `stats`, `inventory`, `eggs`, and hive displays) so large values are shown as comma-separated or compact forms.
+- **Error-response support routing**:
+  - Interaction failure replies now include a support-server link when configured.
+  - Added support invite and bot invite URLs in `config/links.json`.
+
+### Bug Fixes
+
+- Fixed `ButtonBuilder is not a constructor` runtime errors affecting `/invite`, `/support-server`, and fallback interaction error replies by using compatibility-safe link button payloads.
+- Prevented secondary error-reply failures in interaction error handling path.
+
+### Internal
+
+- Version bumped to `1.7.0`.
+- Updated release documentation to include all post-`1.6.0` shipped changes.
+
