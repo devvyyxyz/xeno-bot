@@ -232,256 +232,147 @@ function buildStatsPage({ userId, allHosts, cfgHosts, emojis = {}, client = null
 
 const cmd = getCommandConfig('hunt') || { name: 'hunt', description: 'Hunt for hosts to use in evolutions' };
 
+async function performHunt(interaction, client) {
+  const userId = interaction.user.id;
+  const cfgHosts = (hostsCfg && hostsCfg.hosts) || {};
+  const hostKeys = Object.keys(cfgHosts || {});
+
+  try {
+    const findChance = Number((hostsCfg && hostsCfg.findChance) || 0.75);
+    const found = Math.random() < findChance;
+
+    if (!found) {
+      const container = new ContainerBuilder();
+      addV2TitleWithBotThumbnail({ container, title: 'Hunt Failed', client });
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent('You searched but found no suitable hosts this time.')
+      );
+
+      const payload = { components: [container], flags: MessageFlags.IsComponentsV2, ephemeral: true };
+      return safeReply(interaction, payload, { loggerName: 'command:hunt' });
+    }
+
+    // Track hunt
+    try {
+      const user = await userModel.getUserByDiscordId(userId);
+      if (user && user.data) {
+        user.data.hunt_stats = user.data.hunt_stats || {};
+        user.data.hunt_stats.total_hunts = (user.data.hunt_stats.total_hunts || 0) + 1;
+        await userModel.updateUserDataRawById(user.id, user.data);
+      }
+    } catch (e) {
+      logger.warn('Failed tracking hunt stat', { userId, error: e && e.message });
+    }
+
+    const weights = hostKeys.map(k => Number(cfgHosts[k].weight || 1));
+    const total = weights.reduce((s, v) => s + v, 0);
+    let pick = Math.floor(Math.random() * total);
+    let chosenKey = hostKeys[0] || 'human';
+    for (let i = 0; i < hostKeys.length; i++) {
+      if (pick < weights[i]) { chosenKey = hostKeys[i]; break; }
+      pick -= weights[i];
+    }
+
+    const hostDisplay = getHostDisplay(chosenKey, cfgHosts, emojisCfg);
+    const flavor = getRandomFlavor(chosenKey, huntFlavorsCfg);
+    const host = await hostModel.addHostForUser(userId, chosenKey);
+
+    // Get emoji and construct image URL
+    const hostInfo = cfgHosts[chosenKey] || {};
+    const emojiKey = hostInfo.emoji;
+    const emoji = emojiKey && emojisCfg[emojiKey] ? emojisCfg[emojiKey] : '';
+    let emojiUrl = null;
+    
+    if (emoji) {
+      // Parse custom emoji format <:name:id> or <a:name:id>
+      const emojiMatch = emoji.match(/<a?:(\w+):(\d+)>/);
+      if (emojiMatch) {
+        const isAnimated = emoji.startsWith('<a:');
+        const emojiId = emojiMatch[2];
+        emojiUrl = `https://cdn.discordapp.com/emojis/${emojiId}.${isAnimated ? 'gif' : 'png'}?size=256`;
+      }
+    }
+
+    const container = new ContainerBuilder();
+    if (emojiUrl) {
+      addV2TitleWithImageThumbnail({ container, title: 'Hunt Success', imageUrl: emojiUrl });
+    } else {
+      addV2TitleWithBotThumbnail({ container, title: 'Hunt Success', client });
+    }
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(flavor),
+      new TextDisplayBuilder().setContent(`You acquired: **${hostDisplay}** (ID: ${host.id})`)
+    );
+
+    const resultRow = new ActionRowBuilder()
+      .addComponents(
+        new PrimaryButtonBuilder().setCustomId('hunt-view-list-from-result').setLabel('View Hunt List')
+      );
+    container.addActionRowComponents(resultRow);
+
+    const payload = { components: [container], flags: MessageFlags.IsComponentsV2, ephemeral: true };
+    if (emojiUrl) {
+      payload.files = [{ attachment: emojiUrl, name: 'host.png' }];
+    }
+
+    await safeReply(
+      interaction,
+      payload,
+      { loggerName: 'command:hunt' }
+    );
+
+    let msg = null;
+    try { msg = await interaction.fetchReply(); } catch (_) {}
+    if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
+
+    const collector = msg.createMessageComponentCollector({
+      filter: i => i.user.id === userId,
+      time: 300_000
+    });
+
+    collector.on('collect', async i => {
+      if (i.customId === 'hunt-view-list-from-result') {
+        const hostList = await hostModel.getHostsForUser(userId);
+        await i.update({ components: buildHostListPage({ rows: hostList, cfgHosts, emojis: emojisCfg, client }) });
+      }
+    });
+
+    collector.on('end', async () => {
+      try {
+        if (msg) {
+          const container = new ContainerBuilder();
+          if (emojiUrl) {
+            addV2TitleWithImageThumbnail({ container, title: 'Hunt Success', imageUrl: emojiUrl });
+          } else {
+            addV2TitleWithBotThumbnail({ container, title: 'Hunt Success', client });
+          }
+          container.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(flavor),
+            new TextDisplayBuilder().setContent(`You acquired: **${hostDisplay}** (ID: ${host.id})`)
+          );
+          await msg.edit({ components: [container] });
+        }
+      } catch (_) {}
+    });
+  } catch (e) {
+    return safeReply(interaction, { content: `Hunt failed: ${e && (e.message || e)}`, ephemeral: true }, { loggerName: 'command:hunt' });
+  }
+}
+
 module.exports = {
   name: cmd.name,
   description: cmd.description,
   data: new ChatInputCommandBuilder()
     .setName(cmd.name)
-    .setDescription(cmd.description)
-    .addSubcommands(sub => sub.setName('go').setDescription('Go hunt for a host (chance to find one)'))
-    .addSubcommands(sub => sub.setName('list').setDescription('List your hunted hosts')),
+    .setDescription(cmd.description),
 
   async executeInteraction(interaction) {
-    const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
-    const userId = interaction.user.id;
-    const cfgHosts = (hostsCfg && hostsCfg.hosts) || {};
-    const hostKeys = Object.keys(cfgHosts || {});
-
-    if (sub === 'go') {
-      try {
-        const findChance = Number((hostsCfg && hostsCfg.findChance) || 0.75);
-        const found = Math.random() < findChance;
-
-        if (!found) {
-          return safeReply(interaction, { content: 'You searched but found no suitable hosts this time.', ephemeral: true }, { loggerName: 'command:hunt' });
-        }
-
-        // Track hunt
-        try {
-          const user = await userModel.getUserByDiscordId(userId);
-          if (user && user.data) {
-            user.data.hunt_stats = user.data.hunt_stats || {};
-            user.data.hunt_stats.total_hunts = (user.data.hunt_stats.total_hunts || 0) + 1;
-            await userModel.updateUserDataRawById(user.id, user.data);
-          }
-        } catch (e) {
-          logger.warn('Failed tracking hunt stat', { userId, error: e && e.message });
-        }
-
-        const weights = hostKeys.map(k => Number(cfgHosts[k].weight || 1));
-        const total = weights.reduce((s, v) => s + v, 0);
-        let pick = Math.floor(Math.random() * total);
-        let chosenKey = hostKeys[0] || 'human';
-        for (let i = 0; i < hostKeys.length; i++) {
-          if (pick < weights[i]) { chosenKey = hostKeys[i]; break; }
-          pick -= weights[i];
-        }
-
-        const hostDisplay = getHostDisplay(chosenKey, cfgHosts, emojisCfg);
-        const flavor = getRandomFlavor(chosenKey, huntFlavorsCfg);
-        const host = await hostModel.addHostForUser(userId, chosenKey);
-
-        // Get emoji and construct image URL
-        const hostInfo = cfgHosts[chosenKey] || {};
-        const emojiKey = hostInfo.emoji;
-        const emoji = emojiKey && emojisCfg[emojiKey] ? emojisCfg[emojiKey] : '';
-        let emojiUrl = null;
-        
-        if (emoji) {
-          // Parse custom emoji format <:name:id> or <a:name:id>
-          const emojiMatch = emoji.match(/<a?:(\w+):(\d+)>/);
-          if (emojiMatch) {
-            const isAnimated = emoji.startsWith('<a:');
-            const emojiId = emojiMatch[2];
-            emojiUrl = `https://cdn.discordapp.com/emojis/${emojiId}.${isAnimated ? 'gif' : 'png'}?size=256`;
-          }
-        }
-
-        const container = new ContainerBuilder();
-        if (emojiUrl) {
-          addV2TitleWithImageThumbnail({ container, title: 'Hunt Success', imageUrl: emojiUrl });
-        } else {
-          addV2TitleWithBotThumbnail({ container, title: 'Hunt Success', client: interaction.client });
-        }
-        container.addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(flavor),
-          new TextDisplayBuilder().setContent(`You acquired: **${hostDisplay}** (ID: ${host.id})`)
-        );
-
-        const resultRow = new ActionRowBuilder()
-          .addComponents(
-            new PrimaryButtonBuilder().setCustomId('hunt-view-list-from-result').setLabel('View Hunt List')
-          );
-        container.addActionRowComponents(resultRow);
-
-        const payload = { components: [container], flags: MessageFlags.IsComponentsV2, ephemeral: true };
-        if (emojiUrl) {
-          payload.files = [{ attachment: emojiUrl, name: 'host.png' }];
-        }
-
-        await safeReply(
-          interaction,
-          payload,
-          { loggerName: 'command:hunt' }
-        );
-
-        let msg = null;
-        try { msg = await interaction.fetchReply(); } catch (_) {}
-        if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
-
-        const resultCollector = msg.createMessageComponentCollector({
-          filter: i => i.user.id === userId,
-          time: 300_000
-        });
-
-        resultCollector.on('collect', async i => {
-          try {
-            if (i.customId === 'hunt-view-list-from-result') {
-              const rows = await hostModel.listHostsByOwner(userId);
-              if (!rows || rows.length === 0) {
-                await i.update({ content: 'You have no hunted hosts.', components: [] });
-              } else {
-                await i.update({ components: buildHostListPage({ pageIdx: 0, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
-              }
-            }
-          } catch (err) {
-            try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt' }); } catch (_) {}
-          }
-        });
-
-        resultCollector.on('end', () => {
-          try { msg.edit({ components: [] }).catch(() => {}); } catch (_) {}
-        });
-
-        return;
-      } catch (e) {
-        return safeReply(interaction, { content: `Hunt failed: ${e && (e.message || e)}`, ephemeral: true }, { loggerName: 'command:hunt' });
-      }
-    }
-
-    if (sub === 'list') {
-      try {
-        let rows = await hostModel.listHostsByOwner(userId);
-
-        if (!rows || rows.length === 0) {
-          return safeReply(interaction, { content: 'You have no hunted hosts. Use `/hunt go` to search.', ephemeral: true }, { loggerName: 'command:hunt' });
-        }
-
-        await safeReply(
-          interaction,
-          { components: buildHostListPage({ pageIdx: 0, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true },
-          { loggerName: 'command:hunt' }
-        );
-
-        let msg = null;
-        try { msg = await interaction.fetchReply(); } catch (_) {}
-        if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
-
-        let currentPage = 0;
-        let currentViewMode = 'list'; // 'list', 'stats'
-
-        const collector = msg.createMessageComponentCollector({
-          filter: i => i.user.id === userId,
-          time: 300_000
-        });
-
-        collector.on('collect', async i => {
-          try {
-            // Navigation
-            if (i.customId === 'hunt-prev-page') {
-              currentPage = Math.max(0, currentPage - 1);
-              await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
-              return;
-            }
-            if (i.customId === 'hunt-next-page') {
-              const totalPages = Math.ceil(rows.length / HOSTS_PER_PAGE);
-              currentPage = Math.min(totalPages - 1, currentPage + 1);
-              await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
-              return;
-            }
-
-            // Delete single host
-            if (i.customId.startsWith('hunt-delete-one:')) {
-              const hostId = Number(i.customId.split(':')[1]);
-              await hostModel.deleteHostsById([hostId]);
-              rows = rows.filter(r => r.id !== hostId);
-              
-              // Adjust current page if empty
-              const totalPages = Math.ceil(rows.length / HOSTS_PER_PAGE);
-              if (currentPage >= totalPages && currentPage > 0) {
-                currentPage = totalPages - 1;
-              }
-              
-              await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
-              currentViewMode = 'list';
-              return;
-            }
-
-            // View stats
-            if (i.customId === 'hunt-view-stats') {
-              await i.update({ components: buildStatsPage({ userId, allHosts: rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
-              currentViewMode = 'stats';
-              return;
-            }
-
-            // Quick hunt from list
-            if (i.customId === 'hunt-go-now') {
-              const findChance = Number((hostsCfg && hostsCfg.findChance) || 0.75);
-              const found = Math.random() < findChance;
-              if (!found) {
-                await i.reply({ content: 'You searched but found no suitable hosts this time.', ephemeral: true });
-                return;
-              }
-
-              const weights = hostKeys.map(k => Number(cfgHosts[k].weight || 1));
-              const total = weights.reduce((s, v) => s + v, 0);
-              let pick = Math.floor(Math.random() * total);
-              let chosenKey = hostKeys[0] || 'human';
-              for (let idx = 0; idx < hostKeys.length; idx++) {
-                if (pick < weights[idx]) { chosenKey = hostKeys[idx]; break; }
-                pick -= weights[idx];
-              }
-
-              const host = await hostModel.addHostForUser(userId, chosenKey);
-              rows.push(host);
-              await i.reply({
-                content: `🎯 Hunt success! You found **${getHostDisplay(chosenKey, cfgHosts, emojisCfg)}** (ID: ${host.id}).`,
-                ephemeral: true
-              });
-              return;
-            }
-
-            // Back to list
-            if (i.customId === 'hunt-back-to-list') {
-              currentPage = 0;
-              await i.update({ components: buildHostListPage({ pageIdx: 0, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
-              currentViewMode = 'list';
-              return;
-            }
-          } catch (err) {
-            try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt' }); } catch (_) {}
-          }
-        });
-
-        collector.on('end', async () => {
-          try {
-            if (msg) {
-              await msg.edit({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, expired: true, client: interaction.client }) });
-            }
-          } catch (_) {}
-        });
-
-        return;
-      } catch (e) {
-        return safeReply(interaction, { content: `Failed listing hosts: ${e && (e.message || e)}`, ephemeral: true }, { loggerName: 'command:hunt' });
-      }
-    }
-
-    return safeReply(interaction, { content: 'Unknown hunt subcommand.', ephemeral: true }, { loggerName: 'command:hunt' });
+    return performHunt(interaction, interaction.client);
   },
 
   async autocomplete(interaction) {
     return;
   }
 };
+
 
