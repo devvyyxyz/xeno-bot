@@ -117,7 +117,7 @@ const rest = new REST({ version: '10' }).setToken(token);
       logger.info('CLEAR_GLOBAL_COMMANDS requested — clearing global commands for client', { clientId });
       await rest.put(Routes.applicationCommands(clientId), { body: [] });
       logger.info('Cleared global commands for client', { clientId });
-      return;
+      process.exit(0);
     }
 
     // Likewise, allow clearing a specific guild's commands via CLEAR_GUILD_COMMANDS=true and GUILD_ID
@@ -130,7 +130,7 @@ const rest = new REST({ version: '10' }).setToken(token);
         await rest.put(Routes.applicationGuildCommands(clientId, guildToClear), { body: [] });
         logger.info('Cleared guild commands for', { guildId: guildToClear });
       }
-      return;
+      process.exit(0);
     }
 
     logger.info('Refreshing application (/) commands...');
@@ -164,5 +164,16 @@ const rest = new REST({ version: '10' }).setToken(token);
     }
   } catch (error) {
     logger.error('deploy-commands failed', { error: error && (error.stack || error) });
+    // Close logger transports before exit
+    if (logger && logger.close) logger.close();
+    if (baseLogger && baseLogger.close) baseLogger.close();
+    process.exit(1);
   }
+  
+  // Close logger transports before exit
+  if (logger && logger.close) logger.close();
+  if (baseLogger && baseLogger.close) baseLogger.close();
+  
+  // Exit cleanly after deployment
+  process.exit(0);
 })();

@@ -16,7 +16,10 @@ const { getCommandConfig, getCommandsObject } = require('../../utils/commandsCon
 const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const fallbackLogger = require('../../utils/fallbackLogger');
 const safeReply = require('../../utils/safeReply');
-const cmd = getCommandConfig('help') || { name: 'help', description: 'Show help for available commands' };
+// Reload cmd each time to get fresh config (in case it changes)
+function getCmd() {
+  return getCommandConfig('help') || { name: 'help', description: 'Show help for available commands' };
+}
 
 function getCategories() {
   const commandsConfig = getCommandsObject();
@@ -83,11 +86,12 @@ function getCommandsByCategory(category) {
 }
 
 module.exports = {
-  name: cmd.name,
-  description: cmd.description,
-  data: { name: cmd.name, description: cmd.description },
+  name: 'help',
+  description: 'Show help for available commands',
+  data: { name: 'help', description: 'Show help for available commands' },
   async executeInteraction(interaction) {
     const logger = require('../../utils/logger').get('command:help');
+    const cmd = getCmd();
     const categories = getCategories();
     // include "All" category at the front
     if (!categories.includes('All')) categories.unshift('All');
@@ -303,6 +307,7 @@ module.exports = {
     let page = 0;
 
     try {
+      logger.info('Sending help command', { cmdEphemeral: cmd.ephemeral, isTrue: cmd.ephemeral === true });
       await safeReply(interaction, {
         components: buildHelpComponents(currentCategory, pages, page, false, interaction.client),
         flags: MessageFlags.IsComponentsV2,

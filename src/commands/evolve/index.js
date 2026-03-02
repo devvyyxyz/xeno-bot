@@ -16,6 +16,7 @@ const hostModel = require('../../models/host');
 const userModel = require('../../models/user');
 const db = require('../../db');
 const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
+const { checkCommandRateLimit } = require('../../utils/rateLimiter');
 const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const safeReply = require('../../utils/safeReply');
 const hostsCfg = require('../../../config/hosts.json');
@@ -208,6 +209,11 @@ module.exports = {
   },
 
   async executeInteraction(interaction) {
+    // Rate limit check for evolution operations
+    if (!await checkCommandRateLimit(interaction, 'expensive')) {
+      return; // Rate limit message already sent
+    }
+
     const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
     const subCfg = sub ? (getCommandConfig(`evolve ${sub}`) || getCommandConfig(`evolve.${sub}`)) : null;
     if (subCfg && subCfg.developerOnly) {

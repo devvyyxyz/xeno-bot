@@ -204,9 +204,7 @@ async function startup() {
   }
 }
 
-// Start async startup tasks
-startup();
-
+// Create client BEFORE startup so it's available in startup()
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
   partials: [Partials.Channel]
@@ -214,6 +212,9 @@ const client = new Client({
 
 client.commands = new Collection();
 client.config = config;
+
+// Start async startup tasks (now client exists)
+startup();
 
 // Start background workers after the client is ready
 try {

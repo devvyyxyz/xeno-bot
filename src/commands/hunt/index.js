@@ -19,6 +19,7 @@ const hiveModel = require('../../models/hive');
 const xenomorphModel = require('../../models/xenomorph');
 const db = require('../../db');
 const { getCommandConfig } = require('../../utils/commandsConfig');
+const { checkCommandRateLimit } = require('../../utils/rateLimiter');
 const hostsCfg = require('../../../config/hosts.json');
 const emojisCfg = require('../../../config/emojis.json');
 const huntFlavorsCfg = require('../../../config/huntFlavors.json');
@@ -235,6 +236,11 @@ function buildStatsPage({ userId, allHosts, cfgHosts, emojis = {}, client = null
 const cmd = getCommandConfig('hunt') || { name: 'hunt', description: 'Hunt for hosts to use in evolutions' };
 
 async function performHunt(interaction, client) {
+  // Rate limit check - prevents spam and abuse
+  if (!await checkCommandRateLimit(interaction, 'expensive')) {
+    return; // Rate limit message already sent to user
+  }
+
   const userId = interaction.user.id;
   const guildId = interaction.guildId;
   const cfgHosts = (hostsCfg && hostsCfg.hosts) || {};

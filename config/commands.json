@@ -190,7 +190,7 @@
       "name": "help",
       "description": "Show help for available commands.",
       "group": "Bot Info",
-      "ephemeral": false,
+      "ephemeral": true,
       "examples": ["/help - Browse all available commands by category"]
     },
     "credits": {

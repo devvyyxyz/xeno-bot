@@ -80,7 +80,7 @@ async function init(botClient) {
             const ageMismatchMs = Math.abs((msg.createdTimestamp || 0) - spawnedAtNum);
             const maxMismatch = 1000 * 60 * 60; // 1 hour tolerance
             if (msg.author?.id !== client.user?.id || ageMismatchMs > maxMismatch) {
-              logger.warn('Skipping restore of active spawn: message validation failed', { row: r, msgAuthor: msg.author && msg.author.id, msgTs: msg.createdTimestamp, spawnedAt: spawnedAtNum, ageMismatchMs });
+              logger.info('Cleaned up stale active spawn (message validation failed)', { messageId: r.message_id, channelId: r.channel_id, ageMismatchMs });
               await knex('active_spawns').where({ id: r.id }).del();
               continue;
             }

@@ -1,17 +1,26 @@
 const db = require('../db');
 const logger = require('../utils/logger').get('models:user');
+const cache = require('../utils/enhancedCache');
 const userDefaults = require('../../config/userDefaults.json');
 
+// Cache users for 2 minutes to reduce database load
+const USER_CACHE_TTL = 120000;
+
 async function getUserByDiscordId(discordId) {
-  const row = await db.knex('users').where({ discord_id: discordId }).first();
-  if (!row) return null;
-  try {
-    const data = row.data ? JSON.parse(row.data) : null;
-    return { id: row.id, discord_id: row.discord_id, data, created_at: row.created_at, updated_at: row.updated_at };
-  } catch (err) {
-    logger.error('Failed parsing user data JSON', { discordId, error: err.stack || err });
-    return { id: row.id, discord_id: row.discord_id, data: null };
-  }
+  const cacheKey = `user:${discordId}`;
+  
+  // Try cache first
+  return await cache.getOrCompute(cacheKey, async () => {
+    const row = await db.knex('users').where({ discord_id: discordId }).first();
+    if (!row) return null;
+    try {
+      const data = row.data ? JSON.parse(row.data) : null;
+      return { id: row.id, discord_id: row.discord_id, data, created_at: row.created_at, updated_at: row.updated_at };
+    } catch (err) {
+      logger.error('Failed parsing user data JSON', { discordId, error: err.stack || err });
+      return { id: row.id, discord_id: row.discord_id, data: null };
+    }
+  }, USER_CACHE_TTL);
 }
 
 async function createUser(discordId, initialData = {}) {
@@ -31,6 +40,10 @@ async function createUser(discordId, initialData = {}) {
 async function updateUserData(discordId, newData) {
   const updated = await db.knex('users').where({ discord_id: discordId }).update({ data: JSON.stringify(newData), updated_at: db.knex.fn.now() });
   if (!updated) return null;
+  
+  // Invalidate cache after update
+  cache.del(`user:${discordId}`);
+  
   return getUserByDiscordId(discordId);
 }
 
@@ -43,6 +56,12 @@ async function findOrCreate(discordId, defaults = {}) {
 async function updateUserDataRawById(userId, newData) {
   try {
     await db.knex('users').where({ id: userId }).update({ data: JSON.stringify(newData), updated_at: db.knex.fn.now() });
+    
+    // Invalidate cache - need to get discord_id from database
+    const row = await db.knex('users').where({ id: userId }).select('discord_id').first();
+    if (row) {
+      cache.del(`user:${row.discord_id}`);
+    }
   } catch (err) {
     logger.error('Failed to update user data (raw)', { userId, error: err.stack || err });
     throw err;
