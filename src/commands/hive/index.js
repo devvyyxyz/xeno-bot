@@ -3,7 +3,7 @@ const { ActionRowBuilder, SecondaryButtonBuilder, PrimaryButtonBuilder, DangerBu
 const hiveModel = require('../../models/hive');
 const xenomorphModel = require('../../models/xenomorph');
 const userResources = require('../../models/userResources');
-const { getCommandConfig } = require('../../utils/commandsConfig');
+const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
 const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const hiveTypes = require('../../../config/hiveTypes.json');
 const hiveDefaults = require('../../../config/hiveDefaults.json');
@@ -241,18 +241,19 @@ module.exports = {
   data: {
     name: cmd.name,
     description: cmd.description,
-    options: [
-      { type: 1, name: 'create', description: 'Create your personal hive' },
-      { type: 1, name: 'stats', description: 'Show your hive stats', options: [ { type: 6, name: 'user', description: 'View stats for this user (optional)', required: false } ] },
-      { type: 1, name: 'modules', description: 'View hive modules' },
-      { type: 1, name: 'upgrade-module', description: 'Upgrade a hive module', options: [ { type: 3, name: 'module', description: 'Module key to upgrade', required: true } ] },
-      { type: 1, name: 'milestones', description: 'View milestones and progress' },
-      { type: 1, name: 'queen-status', description: 'View queen and jelly production' },
-      { type: 1, name: 'upgrade-queen', description: 'Upgrade the queen chamber (increase jelly output)' },
-        { type: 1, name: 'type-info', description: 'Show hive type info', options: [ { type: 3, name: 'type', description: 'Which type', required: false, autocomplete: true } ] },
-        { type: 1, name: 'delete', description: 'Delete your hive (irreversible)'
-        }
-    ]
+    options: buildSubcommandOptions('hive', [
+      { type: 1, name: 'create', description: 'Create your personal hive (placeholder)' },
+      { type: 1, name: 'stats', description: 'Show your hive stats (placeholder)', options: [{ type: 6, name: 'user', description: 'View stats for this user (optional)', required: false}]},
+      { type: 1, name: 'modules', description: 'View hive modules (placeholder)' },
+      { type: 1, name: 'upgrade-module', description: 'Upgrade a hive module (placeholder)', options: [{type: 3, name: 'module', description: 'Module key to upgrade', required: true}]},
+      { type: 1, name: 'milestones', description: 'View milestones and progress (placeholder)' },
+      { type: 1, name: 'queen-status', description: 'View queen and jelly production (placeholder)' },
+      { type: 1, name: 'upgrade-queen', description: 'Upgrade the queen chamber (placeholder)' },
+      { type: 1, name: 'type-info', description: 'Show hive type info (placeholder)', options: [{type: 3, name: 'type', description: 'Which type', required: false, autocomplete: true}]},
+      { type: 1, name: 'delete', description: 'Delete your hive (placeholder)' },
+      { type: 1, name: 'events', description: 'Show recent hive events (placeholder)' },
+      { type: 1, name: 'defend', description: 'Defend against attack (placeholder)' }
+    ])
   },
 
   async executeInteraction(interaction) {

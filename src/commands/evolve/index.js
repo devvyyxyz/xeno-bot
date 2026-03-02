@@ -15,7 +15,7 @@ const xenoModel = require('../../models/xenomorph');
 const hostModel = require('../../models/host');
 const userModel = require('../../models/user');
 const db = require('../../db');
-const { getCommandConfig } = require('../../utils/commandsConfig');
+const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');", "oldString": "const { getCommandConfig } = require('../../utils/commandsConfig');", "newString": "const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
 const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const safeReply = require('../../utils/safeReply');
 const hostsCfg = require('../../../config/hosts.json');
@@ -192,19 +192,20 @@ module.exports = {
   requiredPermissions: cmd.requiredPermissions,
   hidden: cmd.hidden === true,
   ephemeral: cmd.ephemeral === true,
-  data: new ChatInputCommandBuilder()
-    .setName(cmd.name)
-    .setDescription(cmd.description)
-    .addSubcommands(sub =>
-      sub.setName('start')
-        .setDescription('Start the next evolution step for a xenomorph')
-        .addIntegerOptions(opt => opt.setName('xenomorph').setDescription('Which xenomorph to evolve').setRequired(true).setAutocomplete(true))
-        .addStringOptions(opt => opt.setName('next_stage').setDescription('Next stage to evolve into').setRequired(true).setAutocomplete(true))
-        .addIntegerOptions(opt => opt.setName('host').setDescription('Host to consume (required for some pathways)').setRequired(false).setAutocomplete(true))
-    )
-    .addSubcommands(sub => sub.setName('list').setDescription('List your xenomorphs'))
-    .addSubcommands(sub => sub.setName('info').setDescription('Show evolution info and choose xenomorph from a menu'))
-    .addSubcommands(sub => sub.setName('cancel').setDescription('Cancel an ongoing evolution').addIntegerOptions(opt => opt.setName('job_id').setDescription('Evolution job id').setRequired(false).setAutocomplete(true))),
+  data: {
+    name: cmd.name,
+    description: cmd.description,
+    options: buildSubcommandOptions('evolve', [
+      {type: 1, name: 'start', description: 'Start evolution (placeholder)', options: [
+        {type: 4, name: 'xenomorph', description: 'Which xenomorph to evolve', required: true, autocomplete: true},
+        {type:3, name: 'next_stage', description: 'Next stage to evolve into', required: true, autocomplete: true},
+        {type: 4, name: 'host', description: 'Host to consume (required for some pathways)', required: false, autocomplete: true}
+      ]},
+      {type: 1, name: 'list', description: 'List your xenomorphs (placeholder)'},
+      {type: 1, name: 'info', description: 'Show evolution info (placeholder)'},
+      {type: 1, name: 'cancel', description: 'Cancel an ongoing evolution (placeholder)', options: [{type: 4, name: 'job_id', description: 'Evolution job id', required: false, autocomplete: true}]}
+    ])
+  },
 
   async executeInteraction(interaction) {
     const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();

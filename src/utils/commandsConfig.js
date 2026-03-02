@@ -92,4 +92,64 @@ function getCommandsObject() {
   return loadCommands();
 }
 
-module.exports = { getCommandConfig, getCommandsObject };
+/**
+ * Build subcommand options array from commands.json for a command.
+ * Uses descriptions from config, with optional fallback options to preserve existing option definitions.
+ * Merges config descriptions with fallback options while preserving complex option structures.
+ * @param {string} commandName - Command name (e.g., 'eggs', 'hive', 'evolve')
+ * @param {Array} fallbackOptions - Optional fallback options with full structure; descriptions from config will override
+ * @returns {Array} Array of subcommand option objects with descriptions from commands.json
+ */
+function buildSubcommandOptions(commandName, fallbackOptions = []) {
+  const commands = loadCommands();
+  if (!commands || typeof commands !== 'object') return fallbackOptions;
+
+  // Find the command config
+  let cmdConfig = null;
+  for (const cat of Object.values(commands)) {
+    if (cat && Object.prototype.hasOwnProperty.call(cat, commandName)) {
+      cmdConfig = cat[commandName];
+      break;
+    }
+  }
+
+  if (!cmdConfig || !cmdConfig.subcommands || typeof cmdConfig.subcommands !== 'object') {
+    return fallbackOptions;
+  }
+
+  // If no fallback options provided, build minimal options from config
+  if (!fallbackOptions || !fallbackOptions.length) {
+    const options = [];
+    for (const [key, subCmd] of Object.entries(cmdConfig.subcommands)) {
+      options.push({
+        type: 1, // SUB_COMMAND
+        name: key,
+        description: subCmd.description || 'Subcommand',
+        options: subCmd.options || []
+      });
+    }
+    return options;
+  }
+
+  // Merge: use descriptions from config while preserving option structures from fallback
+  const merged = [];
+  for (const fallbackOpt of fallbackOptions) {
+    const subKey = fallbackOpt.name;
+    const configSubCmd = cmdConfig.subcommands[subKey];
+    
+    if (configSubCmd) {
+      // Update description from config but keep all other properties from fallback
+      merged.push({
+        ...fallbackOpt,
+        description: configSubCmd.description || fallbackOpt.description || 'Subcommand',
+        // If config has options defined, use them; otherwise keep fallback options
+        options: (configSubCmd.options && configSubCmd.options.length) ? configSubCmd.options : (fallbackOpt.options || [])
+      });
+    } else {
+      // Keep fallback option if not found in config
+      merged.push(fallbackOpt);
+    }
+  }
+
+  return merged;
+module.exports = { getCommandConfig, getCommandsObject, buildSubcommandOptions };

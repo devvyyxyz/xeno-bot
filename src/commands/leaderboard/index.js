@@ -1,4 +1,4 @@
-const { getCommandConfig } = require('../../utils/commandsConfig');
+const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
 const { ContainerBuilder, TextDisplayBuilder, MessageFlags, SeparatorBuilder, SeparatorSpacingSize } = require('discord.js');
 const { ActionRowBuilder, StringSelectMenuBuilder } = require('@discordjs/builders');
 const userModel = require('../../models/user');
@@ -80,36 +80,20 @@ module.exports = {
   data: {
     name: cmd.name,
     description: cmd.description,
-    options: [
+    options: buildSubcommandOptions('leaderboard', [
       {
         name: 'server',
-        description: 'Show local server leaderboard',
+        description: 'Show local server leaderboard (placeholder)',
         type: 1,
-        options: [
-          {
-            name: 'sort',
-            description: 'Sort by',
-            type: 3,
-            required: false,
-            autocomplete: true
-          }
-        ]
+        options: [{name: 'sort', description: 'Sort by', type: 3, required: false, autocomplete: true}]
       },
       {
         name: 'global',
-        description: 'Show global leaderboard (server rankings)',
+        description: 'Show global leaderboard (placeholder)',
         type: 1,
-        options: [
-          {
-            name: 'sort',
-            description: 'Sort by',
-            type: 3,
-            required: false,
-            autocomplete: true
-          }
-        ]
+        options: [{name: 'sort', description: 'Sort by', type: 3, required: false, autocomplete: true}]
       }
-    ]
+    ])
   },
    async autocomplete(interaction) {
      const eggTypes = require('../../../config/eggTypes.json');

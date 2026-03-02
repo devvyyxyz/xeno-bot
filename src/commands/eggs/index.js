@@ -1,4 +1,4 @@
-const { getCommandConfig } = require('../../utils/commandsConfig');
+const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
 const userModel = require('../../models/user');
 const hatchManager = require('../../hatchManager');
 const eggTypes = require('../../../config/eggTypes.json');
@@ -59,39 +59,7 @@ module.exports = {
   data: {
     name: cmd.name,
     description: cmd.description,
-    options: [
-      {
-        type: 1, // SUB_COMMAND
-        name: 'sell',
-        description: 'Sell an egg for royal jelly',
-        options: [
-          { type: 3, name: 'egg', description: 'Egg type id', required: true, autocomplete: true },
-          { type: 4, name: 'amount', description: 'Amount to sell', required: false }
-        ]
-      },
-      {
-        type: 1, // SUB_COMMAND
-        name: 'hatch',
-        description: 'Start hatching an egg',
-        options: [
-          { type: 3, name: 'egg', description: 'Egg type id', required: true, autocomplete: true },
-          { type: 4, name: 'amount', description: 'Amount to hatch', required: false }
-        ]
-      },
-        {
-          type: 1,
-          name: 'list',
-          description: 'List your hatches (in-progress and ready to collect)'
-        },
-        {
-          type: 1,
-          name: 'collect',
-          description: 'Collect a finished hatch',
-          options: [
-            { type: 3, name: 'ready_hatch', description: 'Choose a ready hatch', required: true, autocomplete: true }
-          ]
-        }
-    ]
+    options: buildSubcommandOptions('eggs', [])
   },
   async autocomplete(interaction) {
     try {

@@ -1,6 +1,6 @@
 const { ChatInputCommandBuilder } = require('@discordjs/builders');
 const { EmbedBuilder } = require('discord.js');
-const { getCommandConfig } = require('../../utils/commandsConfig');
+const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
 const shopConfig = require('../../../config/shop.json');
 const userModel = require('../../models/user');
 const safeReply = require('../../utils/safeReply');
@@ -20,29 +20,11 @@ module.exports = {
   data: {
     name: 'item',
     description: 'Item utilities',
-    options: [
-      {
-        type: 1,
-        name: 'use',
-        description: 'Use an item',
-        options: [
-          { type: 3, name: 'item_id', description: 'Item id', required: true },
-          { type: 3, name: 'target', description: 'Target id (optional)', required: false }
-        ]
-      },
-      {
-        type: 1,
-        name: 'info',
-        description: 'Get item info',
-        options: [ { type: 3, name: 'item_id', description: 'Item id', required: true } ]
-      },
-      {
-        type: 1,
-        name: 'combine',
-        description: 'Combine two items',
-        options: [ { type: 3, name: 'item1', description: 'First item id', required: true }, { type: 3, name: 'item2', description: 'Second item id', required: true } ]
-      }
-    ]
+    options: buildSubcommandOptions('item', [
+      {type: 1, name: 'use', description: 'Use an item (placeholder)', options: [{type: 3, name: 'item_id', description: 'Item id', required: true}, {type: 3, name: 'target', description: 'Target id (optional)', required: false}]},
+      {type: 1, name: 'info', description: 'Get item info (placeholder)', options: [{type: 3, name: 'item_id', description: 'Item id', required: true}]},
+      {type: 1, name: 'combine', description: 'Combine two items (placeholder)', options: [{type: 3, name: 'item1', description: 'First item id', required: true}, {type: 3, name: 'item2', description: 'Second item id', required: true}]}
+    ])
   },
 
   async executeInteraction(interaction) {
