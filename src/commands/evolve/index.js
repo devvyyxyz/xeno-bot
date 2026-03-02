@@ -18,10 +18,13 @@ const db = require('../../db');
 const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
 const { checkCommandRateLimit } = require('../../utils/rateLimiter');
 const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
+const { getPaginationState, buildPaginationRow } = require('../../utils/pagination');
 const safeReply = require('../../utils/safeReply');
 const hostsCfg = require('../../../config/hosts.json');
 const emojisCfg = require('../../../config/emojis.json');
 const cmd = { name: 'evolve', description: 'Evolve your xenomorphs' };
+const EVOLVE_LIST_PAGE_SIZE = 10;
+const EVOLVE_CANCEL_PAGE_SIZE = 10;
 
 function getHostDisplay(hostType, cfgHosts, emojis) {
   const hostInfo = cfgHosts[hostType] || {};
@@ -101,6 +104,8 @@ function buildEvolveView({
   xenos = [],
   jobs = [],
   selectedXenoId = null,
+  listPage = 0,
+  cancelPage = 0,
   message = null,
   expired = false,
   client = null
@@ -121,8 +126,27 @@ function buildEvolveView({
     if (!xenos.length) {
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent('You have no xenomorphs.'));
     } else {
-      const lines = xenos.slice(0, 25).map(x => `**#${x.id} ${x.role || x.stage}**\nPath: ${x.pathway || 'standard'}`);
+      const pagination = getPaginationState({
+        items: xenos,
+        pageIdx: listPage,
+        pageSize: EVOLVE_LIST_PAGE_SIZE
+      });
+      const lines = pagination.pageItems.map(x => `**#${x.id} ${x.role || x.stage}**\nPath: ${x.pathway || 'standard'}`);
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n\n')));
+      if (!expired) {
+        container.addActionRowComponents(
+          buildPaginationRow({
+            prefix: 'evolve-list',
+            pageIdx: pagination.safePageIdx,
+            totalPages: pagination.totalPages,
+            totalItems: pagination.totalItems,
+            prevLabel: 'Prev',
+            nextLabel: 'Next',
+            totalLabel: 'Total',
+            showPageInfo: true
+          })
+        );
+      }
     }
   } else if (screen === 'info') {
     if (!xenos.length) {
@@ -149,15 +173,33 @@ function buildEvolveView({
     if (!jobs.length) {
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent('You have no queued evolution jobs.'));
     } else {
-      const lines = jobs.slice(0, 25).map(j => `**#${j.id}** xeno:${j.xeno_id} → ${j.target_role}`);
+      const pagination = getPaginationState({
+        items: jobs,
+        pageIdx: cancelPage,
+        pageSize: EVOLVE_CANCEL_PAGE_SIZE
+      });
+      const pageJobs = pagination.pageItems;
+      const lines = pageJobs.map(j => `**#${j.id}** xeno:${j.xeno_id} → ${j.target_role}`);
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n')));
       if (!expired) {
+        container.addActionRowComponents(
+          buildPaginationRow({
+            prefix: 'evolve-cancel',
+            pageIdx: pagination.safePageIdx,
+            totalPages: pagination.totalPages,
+            totalItems: pagination.totalItems,
+            prevLabel: 'Prev',
+            nextLabel: 'Next',
+            totalLabel: 'Total',
+            showPageInfo: true
+          })
+        );
         container.addActionRowComponents(
           new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder()
               .setCustomId('evolve-cancel-select')
               .setPlaceholder('Choose a queued job to cancel')
-              .addOptions(...jobs.slice(0, 25).map(j => ({
+              .addOptions(...pageJobs.map(j => ({
                 label: `#${j.id} x:${j.xeno_id} -> ${j.target_role}`.slice(0, 100),
                 value: String(j.id)
               })))
@@ -231,12 +273,12 @@ module.exports = {
       const userId = String(interaction.user.id);
       const hydrated = await hydrateLegacyFacehuggers(userId, interaction.guildId);
       const loadXenos = async () => await xenoModel.listByOwner(userId);
-      const loadJobs = async () => await db.knex('evolution_queue').where({ user_id: userId, status: 'queued' }).orderBy('id', 'asc').limit(25);
+      const loadJobs = async () => await db.knex('evolution_queue').where({ user_id: userId, status: 'queued' }).orderBy('id', 'asc');
 
       if (sub === 'list') {
         const list = await loadXenos();
         const prefix = hydrated > 0 ? `Converted ${hydrated} legacy facehugger item(s) into xenomorphs.` : null;
-        await respond({ components: buildEvolveView({ screen: 'list', xenos: list, message: prefix, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+        await respond({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, message: prefix, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
       } else if (sub === 'start') {
         const xenoId = interaction.options.getInteger('xenomorph');
         const hostId = interaction.options.getInteger('host');
@@ -331,7 +373,7 @@ module.exports = {
           }
         } else {
           const jobs = await loadJobs();
-          await respond({ components: buildEvolveView({ screen: 'cancel', jobs, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+          await respond({ components: buildEvolveView({ screen: 'cancel', jobs, cancelPage: 0, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
         }
       }
 
@@ -343,13 +385,23 @@ module.exports = {
         filter: i => i.user.id === interaction.user.id && String(i.customId || '').startsWith('evolve-'),
         time: 120_000
       });
+      let currentListPage = 0;
+      let currentCancelPage = 0;
 
       collector.on('collect', async i => {
         try {
           const userIdInner = String(i.user.id);
-          if (i.customId === 'evolve-nav-list') {
+          if (i.customId === 'evolve-list-prev-page' || i.customId === 'evolve-list-next-page') {
+            const isPrev = i.customId === 'evolve-list-prev-page';
+            currentListPage = isPrev ? currentListPage - 1 : currentListPage + 1;
             const list = await xenoModel.listByOwner(userIdInner);
-            await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, client: interaction.client }) });
+            await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, client: interaction.client }) });
+            return;
+          }
+          if (i.customId === 'evolve-nav-list') {
+            currentListPage = 0;
+            const list = await xenoModel.listByOwner(userIdInner);
+            await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-nav-info') {
@@ -359,8 +411,16 @@ module.exports = {
             return;
           }
           if (i.customId === 'evolve-nav-cancel') {
-            const jobs = await db.knex('evolution_queue').where({ user_id: userIdInner, status: 'queued' }).orderBy('id', 'asc').limit(25);
-            await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, client: interaction.client }) });
+            currentCancelPage = 0;
+            const jobs = await db.knex('evolution_queue').where({ user_id: userIdInner, status: 'queued' }).orderBy('id', 'asc');
+            await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, cancelPage: currentCancelPage, client: interaction.client }) });
+            return;
+          }
+          if (i.customId === 'evolve-cancel-prev-page' || i.customId === 'evolve-cancel-next-page') {
+            const isPrev = i.customId === 'evolve-cancel-prev-page';
+            currentCancelPage = isPrev ? currentCancelPage - 1 : currentCancelPage + 1;
+            const jobs = await db.knex('evolution_queue').where({ user_id: userIdInner, status: 'queued' }).orderBy('id', 'asc');
+            await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, cancelPage: currentCancelPage, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-nav-start') {
@@ -381,13 +441,13 @@ module.exports = {
             const selectedJobId = Number(i.values && i.values[0]);
             const job = await db.knex('evolution_queue').where({ id: selectedJobId }).first();
             if (!job || String(job.user_id) !== userIdInner || job.status !== 'queued') {
-              const jobs = await db.knex('evolution_queue').where({ user_id: userIdInner, status: 'queued' }).orderBy('id', 'asc').limit(25);
-              await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, message: 'Selected job is no longer cancellable.', client: interaction.client }) });
+              const jobs = await db.knex('evolution_queue').where({ user_id: userIdInner, status: 'queued' }).orderBy('id', 'asc');
+              await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, cancelPage: currentCancelPage, message: 'Selected job is no longer cancellable.', client: interaction.client }) });
               return;
             }
             await db.knex('evolution_queue').where({ id: selectedJobId }).del();
-            const jobs = await db.knex('evolution_queue').where({ user_id: userIdInner, status: 'queued' }).orderBy('id', 'asc').limit(25);
-            await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, message: `Cancelled job #${selectedJobId}.`, client: interaction.client }) });
+            const jobs = await db.knex('evolution_queue').where({ user_id: userIdInner, status: 'queued' }).orderBy('id', 'asc');
+            await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, cancelPage: currentCancelPage, message: `Cancelled job #${selectedJobId}.`, client: interaction.client }) });
             return;
           }
         } catch (err) {
@@ -399,7 +459,7 @@ module.exports = {
         try {
           const list = await xenoModel.listByOwner(userId);
           if (msg) {
-            await msg.edit({ components: buildEvolveView({ screen: 'list', xenos: list, expired: true, client: interaction.client }) });
+            await msg.edit({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, expired: true, client: interaction.client }) });
           }
         } catch (_) {}
       });

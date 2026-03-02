@@ -6,6 +6,7 @@ const emojis = require('../../../config/emojis.json');
 const rarities = require('../../../config/rarities.json');
 const { formatNumber } = require('../../utils/numberFormat');
 const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
+const { getPaginationState, buildPaginationRow } = require('../../utils/pagination');
 const {
   ActionRowBuilder,
   SecondaryButtonBuilder,
@@ -45,12 +46,13 @@ function getRarityBadge(rarity) {
 function buildEggsListPage({ pageIdx = 0, hatches = [], client = null }) {
   // Show all hatches (including collected)
   const activeHatches = hatches;
-  
-  const totalPages = Math.ceil(activeHatches.length / HATCHES_PER_PAGE);
-  const safePageIdx = Math.max(0, Math.min(pageIdx, totalPages - 1));
-  const start = safePageIdx * HATCHES_PER_PAGE;
-  const end = start + HATCHES_PER_PAGE;
-  const page = activeHatches.slice(start, end);
+
+  const pagination = getPaginationState({
+    items: activeHatches,
+    pageIdx,
+    pageSize: HATCHES_PER_PAGE
+  });
+  const page = pagination.pageItems;
 
   const container = new ContainerBuilder();
   addV2TitleWithBotThumbnail({ container, title: 'Active Hatches', client });
@@ -104,26 +106,18 @@ function buildEggsListPage({ pageIdx = 0, hatches = [], client = null }) {
   );
 
   // Pagination Row
-  const navRow = new ActionRowBuilder();
-  if (safePageIdx > 0) {
-    navRow.addComponents(
-      new SecondaryButtonBuilder().setCustomId('eggs-prev-page').setLabel('Prev')
-    );
-  }
-  const pageInfo = totalPages > 1 ? ` (${safePageIdx + 1}/${totalPages})` : '';
-  const pageBtn = new SecondaryButtonBuilder()
-    .setCustomId('eggs-page-info')
-    .setLabel(`Total: ${activeHatches.length}${pageInfo}`)
-    .setDisabled(true);
-  navRow.addComponents(pageBtn);
-
-  if (safePageIdx < totalPages - 1) {
-    navRow.addComponents(
-      new SecondaryButtonBuilder().setCustomId('eggs-next-page').setLabel('Next')
-    );
-  }
-
-  container.addActionRowComponents(navRow);
+  container.addActionRowComponents(
+    buildPaginationRow({
+      prefix: 'eggs',
+      pageIdx: pagination.safePageIdx,
+      totalPages: pagination.totalPages,
+      totalItems: pagination.totalItems,
+      prevLabel: 'Prev',
+      nextLabel: 'Next',
+      totalLabel: 'Total',
+      showPageInfo: true
+    })
+  );
 
   // Action Row (Stats, Hatch)
   const actionRow = new ActionRowBuilder()
