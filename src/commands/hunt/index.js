@@ -156,15 +156,9 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
           new SecondaryButtonBuilder()
             .setLabel('Stats')
             .setCustomId('hunt-view-stats'),
-          new SecondaryButtonBuilder()
-            .setLabel('Hive')
-            .setCustomId('hunt-open-hive'),
           new PrimaryButtonBuilder()
             .setLabel('Hunt')
-            .setCustomId('hunt-go-now'),
-          new SecondaryButtonBuilder()
-            .setLabel('Inventory')
-            .setCustomId('hunt-open-inventory')
+            .setCustomId('hunt-go-now')
         )
     );
   } else if (expired) {
@@ -430,33 +424,6 @@ module.exports = {
               return;
             }
 
-            // Quick hive access (or create if missing)
-            if (i.customId === 'hunt-open-hive') {
-              const existingHive = await hiveModel.getHiveByUser(userId);
-              if (existingHive) {
-                await i.reply({
-                  content: `🏰 **Hive Found**\nID: ${existingHive.id}\nType: ${existingHive.type || existingHive.hive_type || 'default'}\nCapacity: ${existingHive.capacity || 0}\nUse \`/hive stats\` for the full hive screen.`,
-                  ephemeral: true
-                });
-                return;
-              }
-
-              let xenos = [];
-              try { xenos = await xenomorphModel.getXenosByOwner(userId); } catch (_) { xenos = []; }
-              const hasEvolved = Array.isArray(xenos) && xenos.some(x => (x.role && x.role !== 'egg') || (x.stage && x.stage !== 'egg'));
-              if (!hasEvolved) {
-                await i.reply({
-                  content: '❌ You need at least one xenomorph evolved beyond egg stage to create a hive.',
-                  ephemeral: true
-                });
-                return;
-              }
-
-              const newHive = await hiveModel.createHiveForUser(userId, { type: 'default', name: `${interaction.user.username}'s Hive` });
-              await i.reply({ content: `✅ Hive created (ID: ${newHive.id}).`, ephemeral: true });
-              return;
-            }
-
             // Quick hunt from list
             if (i.customId === 'hunt-go-now') {
               const findChance = Number((hostsCfg && hostsCfg.findChance) || 0.75);
@@ -479,19 +446,6 @@ module.exports = {
               rows.push(host);
               await i.reply({
                 content: `🎯 Hunt success! You found **${getHostDisplay(chosenKey, cfgHosts, emojisCfg)}** (ID: ${host.id}).`,
-                ephemeral: true
-              });
-              return;
-            }
-
-            // Quick inventory summary
-            if (i.customId === 'hunt-open-inventory') {
-              let xenos = [];
-              try { xenos = await xenomorphModel.getXenosByOwner(userId); } catch (_) { xenos = []; }
-              const hostCount = Array.isArray(rows) ? rows.length : 0;
-              const xenoCount = Array.isArray(xenos) ? xenos.length : 0;
-              await i.reply({
-                content: `🎒 **Inventory**\nHosts: ${hostCount}\nXenomorphs: ${xenoCount}\nUse \`/inventory\` to open full inventory view.`,
                 ephemeral: true
               });
               return;
