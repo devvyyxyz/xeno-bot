@@ -139,7 +139,7 @@ function buildHostDetailsPage({ host, cfgHosts, emojis }) {
   const fields = [
     `**Rarity:** ${rarity}`,
     `**Type:** \`${host.host_type}\``,
-    `**Found:** ${new Date(Number(host.found_at || host.created_at)).toLocaleString()}`,
+    `**Found:** <t:${Math.floor(Number(host.found_at || host.created_at) / 1000)}:f>`,
     `**Host ID:** \`${host.id}\``
   ];
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(fields.join('\n')));

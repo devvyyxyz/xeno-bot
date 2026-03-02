@@ -180,7 +180,7 @@ module.exports = {
           const rows = await hostModel.listHostsByOwner(target.id);
           for (const r of rows) {
             const label = `${getHostDisplay(r.host_type, hostsCfg.hosts || {}, emojisCfg)} [${r.id}]`;
-            out.push({ name: label, value: `Found ${new Date(Number(r.found_at || r.created_at)).toLocaleString()}`, inline: false });
+            out.push({ name: label, value: `Found <t:${Math.floor(Number(r.found_at || r.created_at) / 1000)}:f>`, inline: false });
           }
         } catch (e) {
           // ignore and return empty
@@ -193,7 +193,7 @@ module.exports = {
           const rows = await xenoModel.getXenosByOwner(target.id);
           for (const x of rows) {
             const label = `#${x.id} ${x.role || x.stage}`;
-            out.push({ name: label, value: `Pathway: ${x.pathway || 'standard'} • Created: ${new Date(Number(x.created_at || x.started_at || Date.now())).toLocaleString()}`, inline: false });
+            out.push({ name: label, value: `Pathway: ${x.pathway || 'standard'} • Created: <t:${Math.floor(Number(x.created_at || x.started_at || Date.now()) / 1000)}:f>`, inline: false });
           }
         } catch (e) {
           // ignore

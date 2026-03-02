@@ -269,7 +269,7 @@ module.exports = {
             { label: 'Egg Limit', value: String(cfg.egg_limit ?? '1') },
             { label: 'Spawn Min / Max (s)', value: `${cfg.spawn_min_seconds ?? '60'} / ${cfg.spawn_max_seconds ?? '3600'}` }
           ];
-          if (nextSpawn) rows.push({ label: 'Next scheduled spawn', value: new Date(nextSpawn).toLocaleString() });
+          if (nextSpawn) rows.push({ label: 'Next scheduled spawn', value: `<t:${Math.floor(nextSpawn / 1000)}:f>` });
           if (cfg && cfg.data && cfg.data.botAvatar) rows.push({ label: 'Avatar URL', value: String(cfg.data.botAvatar) });
 
           await safeReply(interaction, {
