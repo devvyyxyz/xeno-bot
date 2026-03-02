@@ -241,19 +241,28 @@ function scheduleNext(guildId) {
   }
   // Wrap async IIFE with error handler to prevent unhandled rejections
   (async () => {
-    // If there are active eggs and a reschedule was requested, wait until cleared
+    // Checkpoint 1: Check active eggs
     const activeMap = activeEggs.get(guildId);
     if (activeMap && activeMap.size > 0) {
       logger.info('Active eggs present; delaying schedule until cleared', { guildId, active: activeMap.size });
       pendingReschedule.add(guildId);
       return;
     }
-    const cfg = await guildModel.getGuildConfig(guildId);
+    
+    // Checkpoint 2: Get guild config
+    let cfg;
+    try {
+      cfg = await guildModel.getGuildConfig(guildId);
+    } catch (cfgErr) {
+      logger.warn('Failed to get guild config during scheduleNext', { guildId, error: cfgErr && (cfgErr.stack || cfgErr) });
+      cfg = null;
+    }
+    
     const min = (cfg && cfg.spawn_min_seconds) || 60;
     const max = (cfg && cfg.spawn_max_seconds) || 3600;
     let delay = randomInt(min, max) * 1000;
     
-    // Apply exponential backoff for repeated failures
+    // Checkpoint 3: Apply exponential backoff for repeated failures
     const backoffDelay = getSpawnBackoffDelay(guildId);
     if (backoffDelay > 0) {
       delay = Math.max(delay, backoffDelay);
@@ -261,36 +270,65 @@ function scheduleNext(guildId) {
     }
     
     const scheduledAt = Date.now() + delay;
+    
+    // Checkpoint 4: Log debug info
     try {
       const guildName = client ? (client.guilds.cache.get(guildId)?.name || null) : null;
-      logger.debug('About to schedule next spawn', { guildId, guildName, min, max, delay, scheduledAt, pendingReschedule: pendingReschedule.has(guildId), existingTimer: timers.has(guildId), persistedNext: (await (async () => { try { const k = db.knex; const row = await k('guild_settings').where({ guild_id: guildId }).first('next_spawn_at'); return row && row.next_spawn_at; } catch (e) { return null; } })()) });
-    } catch (e) {
-      logger.debug('About to schedule next spawn', { guildId, min, max, delay, scheduledAt });
+      const persistedNext = await (async () => { 
+        try { 
+          const k = db.knex; 
+          const row = await k('guild_settings').where({ guild_id: guildId }).first('next_spawn_at'); 
+          return row && row.next_spawn_at; 
+        } catch (e) { 
+          return null; 
+        } 
+      })();
+      logger.debug('About to schedule next spawn', { guildId, guildName, min, max, delay, scheduledAt, pendingReschedule: pendingReschedule.has(guildId), existingTimer: timers.has(guildId), persistedNext });
+    } catch (debugErr) {
+      logger.debug('About to schedule next spawn (debug logging failed)', { guildId, min, max, delay, scheduledAt });
     }
-    const t = setTimeout(() => enqueueSpawn(guildId).catch(err => {
-      const guildName = getGuildName(guildId);
-      logger.error(`Spawn error (${guildName})`, { guildId, error: err.stack || err });
-    }), delay);
-    timers.set(guildId, t);
-    nextSpawnAt.set(guildId, scheduledAt);
-    // persist scheduled time to DB so it survives restarts
+    
+    // Checkpoint 5: Set timeout
+    try {
+      const t = setTimeout(() => enqueueSpawn(guildId).catch(err => {
+        const guildName = getGuildName(guildId);
+        logger.error(`Spawn error (${guildName})`, { guildId, error: err.stack || err });
+      }), delay);
+      timers.set(guildId, t);
+      nextSpawnAt.set(guildId, scheduledAt);
+    } catch (timerErr) {
+      logger.error('Failed to set spawn timer', { guildId, error: timerErr && (timerErr.stack || timerErr) });
+      throw timerErr;
+    }
+    
+    // Checkpoint 6: Persist to DB
     try {
       const knex = db.knex;
       await knex('guild_settings').where({ guild_id: guildId }).update({ next_spawn_at: scheduledAt });
-    } catch (e) {
-      try { logger.warn('Failed persisting next_spawn_at to DB', { guildId, error: e && (e.stack || e) }); } catch (le) { try { require('./utils/logger').get('spawn').warn('Failed logging next_spawn_at persistence error', { error: le && (le.stack || le) }); } catch (lle) { fallbackLogger.warn('Failed logging next_spawn_at persistence error fallback', lle && (lle.stack || lle)); } }
+    } catch (dbErr) {
+      logger.warn('Failed persisting next_spawn_at to DB', { guildId, error: dbErr && (dbErr.stack || dbErr) });
+      // Don't re-throw - persistence is non-critical
     }
+    
+    // Checkpoint 7: Log completion
     try {
       const guildName = client ? (client.guilds.cache.get(guildId)?.name || null) : null;
-      logger.debug('Scheduled next spawn', { guildId, guildName, in_ms: delay, scheduled_at: scheduledAt });
-    } catch (e) {
+      logger.debug('Scheduled next spawn successfully', { guildId, guildName, in_ms: delay, scheduled_at: scheduledAt });
+    } catch (logErr) {
       logger.debug('Scheduled next spawn', { guildId, in_ms: delay, scheduled_at: scheduledAt });
     }
   })().catch(err => {
-    try {
-      logger.error('scheduleNext async error', { guildId, error: err && (err.stack || err) });
-    } catch (logErr) {
-      try { fallbackLogger.error('scheduleNext error (fallback logger)', { guildId, error: String(err), logError: String(logErr) }); } catch (ignored) {}
+    const guildName = getGuildName(guildId);
+    
+    if (err instanceof Error) {
+      logger.error(`scheduleNext failed (${guildName})`, { guildId, message: err.message, stack: err.stack });
+      console.error(`[SPAWN ERROR] Guild ${guildId} (${guildName}): ${err.message}\n${err.stack}`);
+    } else if (typeof err === 'object' && err) {
+      logger.error(`scheduleNext failed (${guildName})`, { guildId, errorObj: String(err) });
+      console.error(`[SPAWN ERROR] Guild ${guildId} (${guildName}):`, err);
+    } else {
+      logger.error(`scheduleNext failed (${guildName})`, { guildId, error: String(err) });
+      console.error(`[SPAWN ERROR] Guild ${guildId} (${guildName}): ${String(err)}`);
     }
   });
 }
