@@ -116,7 +116,7 @@ module.exports = {
 
       await safeReply(
         interaction,
-          { components: buildEmojiPage({ pageIdx: 0, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true },
+          { components: buildEmojiPage({ pageIdx: 0, client: interaction.client }), flags: MessageFlags.IsComponentsV2 },
         { loggerName: 'command:emojis' }
       );
 

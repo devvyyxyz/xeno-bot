@@ -175,7 +175,7 @@ module.exports = {
       
       await safeReply(
         interaction,
-        { components: buildPathwayListView({ client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true },
+        { components: buildPathwayListView({ client: interaction.client }), flags: MessageFlags.IsComponentsV2 },
         { loggerName: 'command:pathway' }
       );
 

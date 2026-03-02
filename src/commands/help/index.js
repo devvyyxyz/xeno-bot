@@ -319,7 +319,7 @@ module.exports = {
       await safeReply(interaction, {
         components: buildHelpComponents(currentCategory, pages, page, false, interaction.client),
         flags: MessageFlags.IsComponentsV2
-        // ephemeral is set by deferReply, don't pass it to editReply
+        // ephemeral is set by deferReply and cannot be changed in editReply
       }, { loggerName: 'command:help' });
     } catch (e) {
       try {

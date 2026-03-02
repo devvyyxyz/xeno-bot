@@ -1,5 +1,5 @@
 {
-  "findChance": 0.75,
+  "findChance": 0.25,
   "hosts": {
     "human": { "display": "Human", "emoji": "civilian_male", "rarity": "common", "weight": 90, "description": "A standard human host useful for basic evolutions." },
     "dog": { "display": "Dog", "emoji": "dog", "rarity": "common", "weight": 40, "description": "A canine host useful for certain pathways." },

@@ -152,8 +152,8 @@ module.exports = {
         expired: false,
         client: interaction.client
       }),
-      flags: MessageFlags.IsComponentsV2,
-      ephemeral: true
+      flags: MessageFlags.IsComponentsV2
+      // ephemeral is set by deferReply and cannot be changed in editReply
     }, { loggerName: 'command:shop' });
 
     let msg = null;
