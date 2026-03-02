@@ -2,6 +2,9 @@ const logger = require('../utils/logger').get('ready');
 const db = require('../db');
 const cache = require('../utils/cache');
 
+// Store interval reference to clean up on reconnect
+let statusCyclingInterval = null;
+
 module.exports = {
   name: 'clientReady',
   once: true,
@@ -170,7 +173,12 @@ module.exports = {
         // set immediately then interval
         setPresence();
         const intervalMs = (statusCycling?.intervalSeconds || 30) * 1000;
-        setInterval(setPresence, intervalMs);
+        // Clear any existing interval from previous ready events (e.g., reconnects)
+        if (statusCyclingInterval) {
+          clearInterval(statusCyclingInterval);
+          logger.debug('Cleared previous status cycling interval');
+        }
+        statusCyclingInterval = setInterval(setPresence, intervalMs);
         logger.info('Status cycling started', { 
           intervalSeconds: statusCycling?.intervalSeconds || 30,
           displayMembers: statusCycling?.displayMembers !== false,

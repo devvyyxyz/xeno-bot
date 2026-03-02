@@ -252,6 +252,28 @@ async function startup() {
   }
 }
 
+// Handle uncaught promise rejections (prevents silent crashes)
+process.on('unhandledRejection', (reason, promise) => {
+  try {
+    const msg = reason && (reason.stack || String(reason)) || String(promise);
+    baseLogger.error('Unhandled promise rejection', { reason: msg, promise: String(promise) });
+  } catch (e) {
+    console.error('Unhandled rejection (logger failed)', reason, promise);
+  }
+});
+
+// Handle uncaught exceptions as last resort
+process.on('uncaughtException', (error) => {
+  try {
+    baseLogger.error('Uncaught exception', { error: error && (error.stack || error) });
+  } catch (e) {
+    console.error('Uncaught exception (logger failed)', error);
+  }
+  // Restart after brief delay to avoid rapid restart loops
+  baseLogger.info('Process will exit in 5s to prevent restart loops');
+  setTimeout(() => process.exit(1), 5000);
+});
+
 // Create client BEFORE startup so it's available in startup()
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],

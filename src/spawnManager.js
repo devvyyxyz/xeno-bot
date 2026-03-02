@@ -86,6 +86,32 @@ function recordSpawnFailure(guildId) {
   failureTracker.set(guildId, tracker);
 }
 
+function isRateLimitError(error) {
+  // Detect rate limit errors from Discord or DB
+  if (!error) return false;
+  const msg = (error.message || error.toString() || '').toLowerCase();
+  const code = error.code || error.status || 0;
+  // Discord rate limit: HTTP 429
+  if (code === 429) return true;
+  // Common rate limit error indicators
+  if (msg.includes('rate limit') || msg.includes('too many requests')) return true;
+  if (msg.includes('ratelimit')) return true;
+  return false;
+}
+
+function isPermissionError(error) {
+  // Detect permission errors that won't go away on retry
+  if (!error) return false;
+  const msg = (error.message || error.toString() || '').toLowerCase();
+  const code = error.code || error.status || 0;
+  // Discord permission denied: HTTP 403
+  if (code === 403) return true;
+  // Common permission error indicators
+  if (msg.includes('permission') || msg.includes('forbidden') || msg.includes('unauthorized')) return true;
+  if (msg.includes('no attach') || msg.includes('attach') && msg.includes('permission')) return true;
+  return false;
+}
+
 function enqueueSpawn(guildId, forcedEggTypeId, isForced = false) {
   // Prevent queue from growing unbounded during failure cascades
   if (spawnQueue.length >= maxSpawnQueueDepth) {
@@ -493,8 +519,24 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     return true;
   } catch (err) {
     const guildName = getGuildName(guildId);
-    logger.error(`Error during doSpawn (${guildName})`, { guildId, error: err.stack || err });
+    const isRateLimit = isRateLimitError(err);
+    const isPermission = isPermissionError(err);
+    const errorType = isRateLimit ? 'rate-limit' : isPermission ? 'permission' : 'other';
+    
+    logger.error(`Error during doSpawn (${guildName})`, { guildId, error: err.stack || err, errorType, code: err.code, status: err.status });
+    
     recordSpawnFailure(guildId);
+    
+    // Apply extra backoff for rate limits (wait longer before retry)
+    if (isRateLimit) {
+      const tracker = failureTracker.get(guildId);
+      if (tracker) {
+        // Double the failure count for rate limits to increase backoff aggressively
+        tracker.count = Math.min(20, tracker.count + 1);
+        logger.warn(`Aggressive backoff applied to ${guildName} due to rate limit`, { guildId, newCount: tracker.count });
+      }
+    }
+    
     scheduleNext(guildId);
     return false;
   }
