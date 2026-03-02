@@ -16,48 +16,83 @@ Sharding is a technique that splits your bot's load across multiple processes, e
 - **Bot is in 2000+ servers**: Sharding becomes essential for stability
 - **High command volume across guilds**: Spreads load across multiple processes
 - **Bot needs 99.9% uptime**: Shard redundancy improves availability
-- **Running in production**: Recommended for all public bots
+- **Running in production**: **Default now** - `npm start` uses sharding automatically
+- **Confident in your setup**: Sharding adds operational complexity
+
+## When NOT to Use Sharding
+
+- **Bot is in <500 servers**: Single process is sufficient
+- **Development/testing**: Use `npm run dev` (non-sharded)
+- **Troubleshooting issues**: Easier to debug with `npm run start:single`
+- **Limited resources**: Each shard uses memory; single process may be more efficient for very small bots
 
 ## Running with Sharding
 
-### Production (Sharded)
+### Production (Sharded - Default)
 ```bash
-npm run start:shards
+npm start
 ```
 
-This will:
+This is the default production command and automatically uses sharding. It will:
 1. Start the ShardingManager (main process)
 2. Auto-fetch the recommended shard count from Discord
 3. Spawn all shards as worker processes
 4. Handle respawning failed shards
 5. Display shard information in logs
 
+### Production (Single Process - Non-Sharded)
+```bash
+npm run start:single
+```
+
+Use this for smaller deployments (<2000 guilds) or if you don't need sharding.
+
+### Shorthand for Sharded Mode
+```bash
+npm run start:shards
+```
+
+This is equivalent to `npm start` but explicit about sharding.
+
 ### Development (Sharded)
 ```bash
 npm run dev:shards
 ```
 
-Same as production but with `NODE_ENV=development`.
+Sharded development mode with `NODE_ENV=development`.
 
-### Without Sharding (Single Process)
+### Development (Single Process - Default)
 ```bash
-npm run dev        # Development
-npm start          # Production
+npm run dev
 ```
+
+Default development mode without sharding. Perfect for testing without shard complexity.
 
 ## Shard Information Display
 
-The `/ping` command now shows shard information:
+The bot automatically displays cycling status messages showing:
+
+1. **Member Count**: How many total Discord users the bot is managing
+   ```
+   🎮 Watching 150,432 members
+   ```
+
+2. **Server Count**: How many Discord servers the bot is in
+   ```
+   🎮 Watching 2,847 servers
+   ```
+
+3. **Shard Info** (when sharded): Which shard the bot is running on
+   ```
+   🎮 Playing Shard 2/7
+   ```
+
+The `/ping` command also shows which shard your current server is on:
 ```
 ## Pong!
 Bot: 45ms • API: 120ms
-📍 Shard 0/4
+📍 Shard 2/7
 ```
-
-This tells you:
-- Bot response latency (client-side)
-- API latency (Discord gateway)
-- **Current shard and total shard count**
 
 ## Configuration
 

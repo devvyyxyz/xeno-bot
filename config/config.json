@@ -9,5 +9,14 @@
     ],
     "intervalSeconds": 60,
     "status": "online"
+  },
+  "statusCycling": {
+    "enabled": true,
+    "intervalSeconds": 30,
+    "status": "online",
+    "displayMembers": true,
+    "displayServers": true,
+    "displayShard": true,
+    "customActivities": []
   }
 }

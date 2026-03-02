@@ -4,7 +4,8 @@
   "description": "Scalable discord.js v14 bot scaffold",
   "main": "src/index.js",
   "scripts": {
-    "start": "NODE_ENV=production node src/index.js",
+    "start": "NODE_ENV=production node shard.js",
+    "start:single": "NODE_ENV=production node src/index.js",
     "start:dev": "NODE_ENV=development node src/index.js",
     "dev": "NODE_ENV=development nodemon",
     "start:shards": "NODE_ENV=production node shard.js",

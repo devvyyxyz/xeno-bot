@@ -55,40 +55,97 @@ module.exports = {
     // Start cycling presence if configured
     try {
       const config = require('../../config/config.json');
-      const presence = config.presence;
-      if (presence && Array.isArray(presence.activities) && presence.activities.length > 0) {
+      const statusCycling = config.statusCycling;
+      
+      // Enable status cycling by default unless explicitly disabled
+      if (statusCycling && statusCycling.enabled === false) {
+        logger.info('Status cycling disabled in config');
+      } else {
         let idx = 0;
         const { ActivityType } = require('discord.js');
+        
+        // Generate dynamic status messages based on config
+        const generateActivities = () => {
+          const activities = [];
+          
+          // Member count across all guilds (if enabled in config)
+          if (statusCycling?.displayMembers !== false) {
+            const memberCount = client.guilds.cache.reduce((total, guild) => total + guild.memberCount, 0);
+            activities.push({
+              name: `${memberCount.toLocaleString()} members`,
+              type: ActivityType.Watching
+            });
+          }
+          
+          // Server/guild count (if enabled in config)
+          if (statusCycling?.displayServers !== false) {
+            const serverCount = client.guilds.cache.size;
+            activities.push({
+              name: `${serverCount.toLocaleString()} servers`,
+              type: ActivityType.Watching
+            });
+          }
+          
+          // Shard info (if sharded and enabled in config)
+          if (client.shard && statusCycling?.displayShard !== false) {
+            const shardId = client.shard.ids[0];
+            const shardCount = client.shard.count;
+            activities.push({
+              name: `Shard ${shardId}/${shardCount - 1}`,
+              type: ActivityType.Playing
+            });
+          }
+          
+          // Add custom activities from config if any
+          if (statusCycling?.customActivities && Array.isArray(statusCycling.customActivities) && statusCycling.customActivities.length > 0) {
+            for (const item of statusCycling.customActivities) {
+              let activity = null;
+              if (typeof item === 'string') {
+                activity = { name: item };
+              } else if (item && typeof item === 'object') {
+                const name = item.name || item.text || '';
+                let typeVal = undefined;
+                if (item.type) {
+                  const t = String(item.type).toUpperCase();
+                  if (ActivityType[t] !== undefined) typeVal = ActivityType[t];
+                }
+                activity = typeVal !== undefined ? { name, type: typeVal } : { name };
+              }
+              if (activity) activities.push(activity);
+            }
+          }
+          
+          return activities.length > 0 ? activities : [];
+        };
+        
         const setPresence = async () => {
           try {
-            const item = presence.activities[idx % presence.activities.length];
-            // allow either string or object { name, type }
-            let activity = null;
-            if (typeof item === 'string') {
-              activity = { name: item };
-            } else if (item && typeof item === 'object') {
-              const name = item.name || item.text || '';
-              let typeVal = undefined;
-              if (item.type) {
-                const t = String(item.type).toUpperCase();
-                if (ActivityType[t] !== undefined) typeVal = ActivityType[t];
-              }
-              activity = typeVal !== undefined ? { name, type: typeVal } : { name };
+            const activities = generateActivities();
+            if (activities.length > 0) {
+              const activity = activities[idx % activities.length];
+              const status = statusCycling?.status || 'online';
+              await client.user.setPresence({ activities: [activity], status });
+              idx++;
             }
-            if (activity) await client.user.setPresence({ activities: [activity], status: presence.status || 'online' });
-            idx++;
           } catch (e) {
             logger.warn('Failed to set presence', { error: e && (e.stack || e) });
           }
         };
+        
         // set immediately then interval
         setPresence();
-        const intervalMs = (presence.intervalSeconds || 60) * 1000;
+        const intervalMs = (statusCycling?.intervalSeconds || 30) * 1000;
         setInterval(setPresence, intervalMs);
-        logger.info('Presence cycling started', { count: presence.activities.length, intervalSeconds: presence.intervalSeconds || 60 });
+        logger.info('Status cycling started', { 
+          intervalSeconds: statusCycling?.intervalSeconds || 30,
+          displayMembers: statusCycling?.displayMembers !== false,
+          displayServers: statusCycling?.displayServers !== false,
+          displayShard: statusCycling?.displayShard !== false,
+          customActivities: statusCycling?.customActivities?.length || 0
+        });
       }
     } catch (err) {
-      logger.warn('Presence cycling not configured or failed to start', { error: err && (err.stack || err) });
+      logger.warn('Status cycling not configured or failed to start', { error: err && (err.stack || err) });
     }
   }
 };
