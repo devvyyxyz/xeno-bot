@@ -1,9 +1,27 @@
-const { EmbedBuilder } = require('discord.js');
+const { ChatInputCommandBuilder } = require('@discordjs/builders');
+const {
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  SecondaryButtonBuilder,
+  PrimaryButtonBuilder,
+  DangerButtonBuilder
+} = require('@discordjs/builders');
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MessageFlags
+} = require('discord.js');
 const hostModel = require('../../models/host');
+const userModel = require('../../models/user');
+const db = require('../../db');
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const hostsCfg = require('../../../config/hosts.json');
 const emojisCfg = require('../../../config/emojis.json');
-const createInteractionCollector = require('../../utils/collectorHelper');
+const huntFlavorsCfg = require('../../../config/huntFlavors.json');
+const safeReply = require('../../utils/safeReply');
+const logger = require('../../utils/logger').get('command:hunt');
+
+const HOSTS_PER_PAGE = 10;
 
 function getHostDisplay(hostType, cfgHosts, emojis) {
   const hostInfo = cfgHosts[hostType] || {};
@@ -13,37 +31,204 @@ function getHostDisplay(hostType, cfgHosts, emojis) {
   return emoji ? `${emoji} ${display}` : display;
 }
 
+function getRarityBadge(rarity) {
+  const badges = {
+    'common': '⬜ Common',
+    'rare': '🟦 Rare',
+    'very_rare': '🟪 Very Rare'
+  };
+  return badges[rarity] || rarity;
+}
+
+function getRandomFlavor(hostType, flavors) {
+  const hostFlavors = flavors.hosts[hostType];
+  if (!hostFlavors || !Array.isArray(hostFlavors.flavors) || hostFlavors.flavors.length === 0) {
+    return flavors.locations[Math.floor(Math.random() * flavors.locations.length)];
+  }
+  return hostFlavors.flavors[Math.floor(Math.random() * hostFlavors.flavors.length)];
+}
+
+function buildHostListPage({ pageIdx = 0, rows = [], selectedIds = new Set(), expired = false, cfgHosts = {}, emojis = {} }) {
+  const totalPages = Math.ceil(rows.length / HOSTS_PER_PAGE);
+  const safePageIdx = Math.max(0, Math.min(pageIdx, totalPages - 1));
+  const start = safePageIdx * HOSTS_PER_PAGE;
+  const end = start + HOSTS_PER_PAGE;
+  const page = rows.slice(start, end);
+
+  const container = new ContainerBuilder();
+
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent('## Host Collection'));
+
+  if (page.length === 0) {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('You have no hunted hosts. Use `/hunt go` to search.'));
+  } else {
+    const lines = page.map(r => {
+      const isSelected = selectedIds.has(String(r.id));
+      const info = cfgHosts[r.host_type] || {};
+      const display = getHostDisplay(r.host_type, cfgHosts, emojis);
+      const rarity = getRarityBadge(info.rarity || 'common');
+      const check = isSelected ? '☑️' : '☐';
+      return `${check} **#${r.id}** — ${display} — ${rarity}`;
+    }).join('\n');
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines));
+  }
+
+  if (!expired && page.length > 0) {
+    const navRow = new ActionRowBuilder()
+      .addComponents(
+        new SecondaryButtonBuilder().setCustomId('hunt-prev-page').setLabel('◀ Prev').setDisabled(safePageIdx === 0),
+        new PrimaryButtonBuilder().setCustomId('hunt-page-counter').setLabel(`${safePageIdx + 1} / ${Math.max(1, totalPages)}`).setDisabled(true),
+        new SecondaryButtonBuilder().setCustomId('hunt-next-page').setLabel('Next ▶').setDisabled(safePageIdx >= totalPages - 1)
+      );
+    container.addActionRowComponents(navRow);
+
+    const selectRow = new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('hunt-select-host')
+        .setPlaceholder('Select a host to view')
+        .addOptions(...page.map(r => {
+          const info = cfgHosts[r.host_type] || {};
+          const display = getHostDisplay(r.host_type, cfgHosts, emojis);
+          const desc = `${info.description || ''}`.slice(0, 100);
+          return {
+            label: `#${r.id} ${display}`.slice(0, 100),
+            value: String(r.id),
+            description: desc
+          };
+        }))
+    );
+    container.addActionRowComponents(selectRow);
+
+    const actionRow = new ActionRowBuilder()
+      .addComponents(
+        new SecondaryButtonBuilder().setCustomId('hunt-toggle-select').setLabel(`Toggle Select (${selectedIds.size})`),
+        new DangerButtonBuilder()
+          .setCustomId('hunt-delete-selected')
+          .setLabel(`Delete Selected (${selectedIds.size})`)
+          .setDisabled(selectedIds.size === 0),
+        new SecondaryButtonBuilder().setCustomId('hunt-view-stats').setLabel('📊 Stats')
+      );
+    container.addActionRowComponents(actionRow);
+  } else if (expired) {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('_Host list view expired_'));
+  }
+
+  return [container];
+}
+
+function buildHostDetailsPage({ host, cfgHosts, emojis }) {
+  const info = cfgHosts[host.host_type] || {};
+  const display = getHostDisplay(host.host_type, cfgHosts, emojis);
+  const rarity = getRarityBadge(info.rarity || 'common');
+
+  const container = new ContainerBuilder();
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`## ${display} [#${host.id}]`),
+    new TextDisplayBuilder().setContent(info.description || 'No description available.')
+  );
+
+  const fields = [
+    `**Rarity:** ${rarity}`,
+    `**Type:** \`${host.host_type}\``,
+    `**Found:** ${new Date(Number(host.found_at || host.created_at)).toLocaleString()}`,
+    `**Host ID:** \`${host.id}\``
+  ];
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(fields.join('\n')));
+
+  const actionRow = new ActionRowBuilder()
+    .addComponents(
+      new PrimaryButtonBuilder().setCustomId(`hunt-copy-id:${host.id}`).setLabel('📋 Copy ID'),
+      new SecondaryButtonBuilder().setCustomId(`hunt-use-evolve:${host.id}`).setLabel('🧬 Use for /evolve'),
+      new DangerButtonBuilder().setCustomId(`hunt-delete-one:${host.id}`).setLabel('🗑️ Delete'),
+      new SecondaryButtonBuilder().setCustomId('hunt-back-to-list').setLabel('← Back')
+    );
+  container.addActionRowComponents(actionRow);
+
+  return [container];
+}
+
+function buildStatsPage({ userId, allHosts, cfgHosts }) {
+  const container = new ContainerBuilder();
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent('## 📊 Hunt Statistics'));
+
+  const totalHunts = allHosts.length;
+  const hostTypeCounts = {};
+  const rarityMap = {};
+  let rarest = null;
+  let rarestRarity = 'common';
+
+  allHosts.forEach(h => {
+    hostTypeCounts[h.host_type] = (hostTypeCounts[h.host_type] || 0) + 1;
+    const info = cfgHosts[h.host_type] || {};
+    const rarity = info.rarity || 'common';
+    if (!rarityMap[rarity]) rarityMap[rarity] = [];
+    rarityMap[rarity].push(h.host_type);
+
+    const rarityOrder = { 'common': 0, 'rare': 1, 'very_rare': 2 };
+    if ((rarityOrder[rarity] || 0) > (rarityOrder[rarestRarity] || 0)) {
+      rarest = getHostDisplay(h.host_type, cfgHosts, emojisCfg);
+      rarestRarity = rarity;
+    }
+  });
+
+  const mostCommon = Object.entries(hostTypeCounts).sort((a, b) => b[1] - a[1])[0];
+  const mostCommonDisplay = mostCommon ? getHostDisplay(mostCommon[0], cfgHosts, emojisCfg) : 'None';
+  const mostCommonCount = mostCommon ? mostCommon[1] : 0;
+
+  const stats = [
+    `**Total Hosts:** ${totalHunts}`,
+    `**Most Common:** ${mostCommonDisplay} (×${mostCommonCount})`,
+    `**Rarest Owned:** ${rarest || 'None'} ${rarest ? getRarityBadge(rarestRarity) : ''}`,
+    `**Unique Types:** ${Object.keys(hostTypeCounts).length}`
+  ];
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(stats.join('\n')));
+
+  const backRow = new ActionRowBuilder().addComponents(
+    new SecondaryButtonBuilder().setCustomId('hunt-back-to-list').setLabel('← Back to Hosts')
+  );
+  container.addActionRowComponents(backRow);
+
+  return [container];
+}
+
 const cmd = getCommandConfig('hunt') || { name: 'hunt', description: 'Hunt for hosts to use in evolutions' };
 
 module.exports = {
   name: cmd.name,
   description: cmd.description,
-  data: {
-    name: cmd.name,
-    description: cmd.description,
-    options: [
-      { type: 1, name: 'go', description: 'Go hunt for a host (chance to find one)', options: [] },
-      { type: 1, name: 'list', description: 'List your hunted hosts' }
-    ]
-  },
+  data: new ChatInputCommandBuilder()
+    .setName(cmd.name)
+    .setDescription(cmd.description)
+    .addSubcommands(sub => sub.setName('go').setDescription('Go hunt for a host (chance to find one)'))
+    .addSubcommands(sub => sub.setName('list').setDescription('List your hunted hosts')),
 
   async executeInteraction(interaction) {
-    const safeReply = require('../../utils/safeReply');
     const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
     const userId = interaction.user.id;
-
-    // Build weighted host pool from config
     const cfgHosts = (hostsCfg && hostsCfg.hosts) || {};
     const hostKeys = Object.keys(cfgHosts || {});
 
     if (sub === 'go') {
       try {
-        // Randomly determine if user finds a host (configurable chance)
         const findChance = Number((hostsCfg && hostsCfg.findChance) || 0.75);
         const found = Math.random() < findChance;
-        if (!found) return safeReply(interaction, { content: 'You searched but found no suitable hosts this time.', ephemeral: true });
 
-        // Weighted random selection using config weights
+        if (!found) {
+          return safeReply(interaction, { content: 'You searched but found no suitable hosts this time.', ephemeral: true }, { loggerName: 'command:hunt' });
+        }
+
+        // Track hunt
+        try {
+          const user = await userModel.getUserByDiscordId(userId);
+          if (user && user.data) {
+            user.data.hunt_stats = user.data.hunt_stats || {};
+            user.data.hunt_stats.total_hunts = (user.data.hunt_stats.total_hunts || 0) + 1;
+            await userModel.updateUserDataRawById(user.id, user.data);
+          }
+        } catch (e) {
+          logger.warn('Failed tracking hunt stat', { userId, error: e && e.message });
+        }
+
         const weights = hostKeys.map(k => Number(cfgHosts[k].weight || 1));
         const total = weights.reduce((s, v) => s + v, 0);
         let pick = Math.floor(Math.random() * total);
@@ -52,96 +237,172 @@ module.exports = {
           if (pick < weights[i]) { chosenKey = hostKeys[i]; break; }
           pick -= weights[i];
         }
+
         const hostDisplay = getHostDisplay(chosenKey, cfgHosts, emojisCfg);
+        const flavor = getRandomFlavor(chosenKey, huntFlavorsCfg);
         const host = await hostModel.addHostForUser(userId, chosenKey);
-        const embed = new EmbedBuilder().setTitle('Hunt Success').setDescription(`You found a host: **${hostDisplay}** (ID: ${host.id}).`).setTimestamp();
-        return safeReply(interaction, { embeds: [embed], ephemeral: true });
+
+        const container = new ContainerBuilder();
+        container.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent('## 🎯 Hunt Success!'),
+          new TextDisplayBuilder().setContent(flavor),
+          new TextDisplayBuilder().setContent(`You acquired: **${hostDisplay}** (ID: ${host.id})`)
+        );
+
+        return safeReply(
+          interaction,
+          { components: [container], flags: MessageFlags.IsComponentsV2, ephemeral: true },
+          { loggerName: 'command:hunt' }
+        );
       } catch (e) {
-        return safeReply(interaction, { content: `Hunt failed: ${e && (e.message || e)}`, ephemeral: true });
+        return safeReply(interaction, { content: `Hunt failed: ${e && (e.message || e)}`, ephemeral: true }, { loggerName: 'command:hunt' });
       }
     }
 
     if (sub === 'list') {
       try {
+        await interaction.deferReply({ ephemeral: true });
         const rows = await hostModel.listHostsByOwner(userId);
-        if (!rows || rows.length === 0) return safeReply(interaction, { content: 'You have no hunted hosts. Use `/hunt go` to search.', ephemeral: true });
 
-        // Build select menu options (max 25)
-        const options = rows.slice(0, 25).map(r => ({ label: `${getHostDisplay(r.host_type, cfgHosts, emojisCfg)} [${r.id}]`, value: String(r.id), description: `Found ${new Date(r.created_at).toLocaleString()}` }));
-        const row = { type: 1, components: [ { type: 3, custom_id: 'hunt-select-host', placeholder: 'Select a host to view details', min_values: 1, max_values: 1, options } ] };
+        if (!rows || rows.length === 0) {
+          return safeReply(interaction, { content: 'You have no hunted hosts. Use `/hunt go` to search.', ephemeral: true }, { loggerName: 'command:hunt' });
+        }
 
-        const embed = new EmbedBuilder().setTitle(`${interaction.user.username}'s Hosts`).setDescription('Select a host from the dropdown to view details.').setTimestamp();
+        await safeReply(
+          interaction,
+          { components: buildHostListPage({ pageIdx: 0, rows, selectedIds: new Set(), cfgHosts, emojis: emojisCfg }), flags: MessageFlags.IsComponentsV2, ephemeral: true },
+          { loggerName: 'command:hunt' }
+        );
 
-        // Use collector helper to attach a select menu collector
         let msg = null;
-        const { collector, message: _msg } = await createInteractionCollector(interaction, { embeds: [embed], components: [row], time: 60_000, ephemeral: true, edit: true, collectorOptions: { componentType: 3 } });
-        if (!msg && _msg) msg = _msg;
-        if (!collector) return safeReply(interaction, { content: 'Failed creating inventory view.', ephemeral: true });
+        try { msg = await interaction.fetchReply(); } catch (_) {}
+        if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
 
-        let handled = false;
+        let currentPage = 0;
+        let selectedIds = new Set();
+        let currentViewMode = 'list'; // 'list', 'details', 'stats'
+        let selectedHostId = null;
+
+        const collector = msg.createMessageComponentCollector({
+          filter: i => i.user.id === userId,
+          time: 300_000
+        });
+
         collector.on('collect', async i => {
           try {
-            if (i.user.id !== interaction.user.id) { await i.reply({ content: 'Only the command invoker can interact with this menu.', ephemeral: true }); return; }
-            const selected = (i.values && i.values[0]) || null;
-            if (!selected) return;
-            const host = rows.find(r => String(r.id) === String(selected));
-            if (!host) { await i.reply({ content: 'Selected host not found.', ephemeral: true }); return; }
-            const info = cfgHosts[host.host_type] || {};
-            const hostDisplay = getHostDisplay(host.host_type, cfgHosts, emojisCfg);
-            const detail = new EmbedBuilder()
-              .setTitle(`${hostDisplay} [${host.id}]`)
-              .setDescription(info.description || '')
-              .addFields(
-                { name: 'Host Type', value: String(host.host_type), inline: true },
-                { name: 'Found At', value: String(new Date(Number(host.found_at || host.created_at)).toLocaleString()), inline: true }
-              )
-              .setTimestamp();
+            // Navigation
+            if (i.customId === 'hunt-prev-page') {
+              currentPage = Math.max(0, currentPage - 1);
+              await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, selectedIds, cfgHosts, emojis: emojisCfg }) });
+              return;
+            }
+            if (i.customId === 'hunt-next-page') {
+              const totalPages = Math.ceil(rows.length / HOSTS_PER_PAGE);
+              currentPage = Math.min(totalPages - 1, currentPage + 1);
+              await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, selectedIds, cfgHosts, emojis: emojisCfg }) });
+              return;
+            }
 
-            // Add action buttons: use for evolve
-            const buttonsRow = { type: 1, components: [
-              { type: 2, style: 1, custom_id: `hunt-use-evolve:${host.id}`, label: 'Use for /evolve', disabled: false },
-              { type: 2, style: 2, custom_id: 'hunt-inventory-close', label: 'Close', disabled: false }
-            ] };
+            // Host selection
+            if (i.customId === 'hunt-select-host') {
+              const selected = i.values && i.values[0];
+              selectedHostId = selected;
+              const host = rows.find(r => String(r.id) === String(selected));
+              if (host) {
+                await i.update({ components: buildHostDetailsPage({ host, cfgHosts, emojis: emojisCfg }) });
+                currentViewMode = 'details';
+              }
+              return;
+            }
 
-            handled = true;
-            await i.update({ embeds: [detail], components: [buttonsRow] });
-            // Attach a short-lived collector for the buttons
-            try {
-              const msg = await interaction.fetchReply();
-              const btnCollector = msg.createMessageComponentCollector({ filter: b => b.user.id === interaction.user.id, time: 60_000 });
-              btnCollector.on('collect', async bi => {
-                try {
-                  if (bi.customId === `hunt-use-evolve:${host.id}`) {
-                    await bi.reply({ content: `To evolve a xenomorph using this host, run: /evolve start (provide xenomorph id) and include host id ${host.id} as the host parameter.`, ephemeral: true });
-                    btnCollector.stop('used');
-                    return;
-                  }
-                  if (bi.customId === 'hunt-inventory-close') {
-                    await bi.update({ embeds: [new EmbedBuilder().setTitle('Closed').setDescription('Host details closed.').setTimestamp()], components: [] });
-                    btnCollector.stop('closed');
-                    return;
-                  }
-                } catch (err) { try { await bi.reply({ content: 'Error handling button.', ephemeral: true }); } catch (_) {} }
-              });
-            } catch (_) {}
-            collector.stop('selected');
+            // Toggle select all on current page
+            if (i.customId === 'hunt-toggle-select') {
+              const start = currentPage * HOSTS_PER_PAGE;
+              const end = start + HOSTS_PER_PAGE;
+              const pageHosts = rows.slice(start, end);
+              const allSelected = pageHosts.every(h => selectedIds.has(String(h.id)));
+
+              if (allSelected) {
+                pageHosts.forEach(h => selectedIds.delete(String(h.id)));
+              } else {
+                pageHosts.forEach(h => selectedIds.add(String(h.id)));
+              }
+              await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, selectedIds, cfgHosts, emojis: emojisCfg }) });
+              return;
+            }
+
+            // Delete selected
+            if (i.customId === 'hunt-delete-selected') {
+              if (selectedIds.size === 0) return;
+              const idsToDelete = Array.from(selectedIds).map(Number);
+              await hostModel.deleteHostsById(idsToDelete);
+              rows = rows.filter(r => !idsToDelete.includes(r.id));
+              selectedIds.clear();
+              currentPage = 0;
+              await i.update({ components: buildHostListPage({ pageIdx: 0, rows, selectedIds: new Set(), cfgHosts, emojis: emojisCfg }) });
+              return;
+            }
+
+            // Delete single host
+            if (i.customId.startsWith('hunt-delete-one:')) {
+              const hostId = Number(i.customId.split(':')[1]);
+              await hostModel.deleteHostsById([hostId]);
+              rows = rows.filter(r => r.id !== hostId);
+              await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, selectedIds, cfgHosts, emojis: emojisCfg }) });
+              currentViewMode = 'list';
+              return;
+            }
+
+            // Copy ID
+            if (i.customId.startsWith('hunt-copy-id:')) {
+              const hostId = i.customId.split(':')[1];
+              await i.reply({ content: `Host ID: \`${hostId}\` (copied to clipboard in your mind!)`, ephemeral: true });
+              return;
+            }
+
+            // Use for evolve
+            if (i.customId.startsWith('hunt-use-evolve:')) {
+              const hostId = i.customId.split(':')[1];
+              await i.reply({ content: `To evolve using host #${hostId}, run:\n\`/evolve start\`\nThen provide this as the \`host\` parameter.`, ephemeral: true });
+              return;
+            }
+
+            // View stats
+            if (i.customId === 'hunt-view-stats') {
+              await i.update({ components: buildStatsPage({ userId, allHosts: rows, cfgHosts }) });
+              currentViewMode = 'stats';
+              return;
+            }
+
+            // Back to list
+            if (i.customId === 'hunt-back-to-list') {
+              currentPage = 0;
+              await i.update({ components: buildHostListPage({ pageIdx: 0, rows, selectedIds, cfgHosts, emojis: emojisCfg }) });
+              currentViewMode = 'list';
+              return;
+            }
           } catch (err) {
-            try { await i.reply({ content: `Error handling selection: ${err && err.message}`, ephemeral: true }); } catch (_) {}
+            try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt' }); } catch (_) {}
           }
         });
 
-        collector.on('end', async (_collected, reason) => {
-          if (!handled && reason === 'time') {
-            try { await msg.edit({ embeds: [new EmbedBuilder().setTitle('Timed Out').setDescription('Inventory selection timed out.' ).setTimestamp()], components: [] }); } catch (_) {}
-          }
+        collector.on('end', async () => {
+          try {
+            await safeReply(interaction, { components: buildHostListPage({ pageIdx: currentPage, rows, selectedIds, cfgHosts, emojis: emojisCfg, expired: true }), flags: MessageFlags.IsComponentsV2, ephemeral: true }, { loggerName: 'command:hunt' });
+          } catch (_) {}
         });
 
         return;
       } catch (e) {
-        return safeReply(interaction, { content: `Failed listing hosts: ${e && (e.message || e)}`, ephemeral: true });
+        return safeReply(interaction, { content: `Failed listing hosts: ${e && (e.message || e)}`, ephemeral: true }, { loggerName: 'command:hunt' });
       }
     }
 
-    return safeReply(interaction, { content: 'Unknown hunt subcommand.', ephemeral: true });
+    return safeReply(interaction, { content: 'Unknown hunt subcommand.', ephemeral: true }, { loggerName: 'command:hunt' });
+  },
+
+  async autocomplete(interaction) {
+    return;
   }
 };
+

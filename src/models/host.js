@@ -60,4 +60,15 @@ async function removeHostById(id) {
   }
 }
 
-module.exports = { addHostForUser, listHostsByOwner, deleteHostsByOwner, getHostById, removeHostById };
+async function deleteHostsById(ids) {
+  try {
+    if (!Array.isArray(ids) || ids.length === 0) return 0;
+    const deleted = await db.knex('hosts').whereIn('id', ids.map(Number)).del();
+    return deleted;
+  } catch (e) {
+    logger.warn('Failed deleting multiple hosts by id', { error: e && e.message });
+    throw e;
+  }
+}
+
+module.exports = { addHostForUser, listHostsByOwner, deleteHostsByOwner, getHostById, removeHostById, deleteHostsById };

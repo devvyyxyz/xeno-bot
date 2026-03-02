@@ -1,0 +1,71 @@
+{
+  "locations": [
+    "You search the abandoned corridors...",
+    "You venture through the dimly lit passages...",
+    "You explore the derelict facility...",
+    "You scan the barren landscape...",
+    "You hunt through the shadows..."
+  ],
+  "hosts": {
+    "human": {
+      "flavors": [
+        "A lone survivor stumbles into your path.",
+        "You find traces of human presence.",
+        "A colonist emerges from the haze.",
+        "You spot movement ahead—a human.",
+        "A desperate figure appears before you.",
+        "You intercept a wandering colonist."
+      ]
+    },
+    "dog": {
+      "flavors": [
+        "A growl echoes through the darkness.",
+        "You encounter a feral beast.",
+        "Canine eyes gleam in the shadows.",
+        "A wild creature charges at you.",
+        "You corner a snarling animal.",
+        "A pack of beasts surrounds you."
+      ]
+    },
+    "engineer": {
+      "flavors": [
+        "A skilled technician appears before you.",
+        "You find a worker in the machinery depths.",
+        "An engineer exits the maintenance shaft.",
+        "You intercept a technical specialist.",
+        "A devoted crew member is within reach.",
+        "You locate a maintenance expert."
+      ]
+    },
+    "predator": {
+      "flavors": [
+        "An ancient hunter emerges from obscurity.",
+        "Mandibles click in the darkness.",
+        "An extraterrestrial warrior appears.",
+        "You face an apex predator.",
+        "Claws mark the ground before you.",
+        "A legendary hunter reveals itself."
+      ]
+    },
+    "neomorph_candidate": {
+      "flavors": [
+        "Something otherworldly stirs...",
+        "Reality seems to warp around the presence...",
+        "An entity of nightmares approaches.",
+        "An unnatural force manifests.",
+        "A protomorph candidate emerges.",
+        "Ancient DNA calls from within."
+      ]
+    },
+    "colonial_marine": {
+      "flavors": [
+        "A heavily armored soldier appears.",
+        "Military gear clinks in the distance.",
+        "A USCM operative comes into view.",
+        "A marine squad leader stands before you.",
+        "Combat-hardened soldiers converge.",
+        "An elite soldier crosses your path."
+      ]
+    }
+  }
+}
