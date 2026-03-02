@@ -23,6 +23,7 @@ const userModel = require('../../models/user');
 const hostModel = require('../../models/host');
 const xenoModel = require('../../models/xenomorph');
 const safeReply = require('../../utils/safeReply');
+const { formatNumber } = require('../../utils/numberFormat');
 
 const cmd = getCommandConfig('inventory') || { name: 'inventory', description: 'Show your egg inventory or another user\'s.' };
 const shopConfig = require('../../../config/shop.json');

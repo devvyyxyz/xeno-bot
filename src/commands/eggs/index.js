@@ -4,6 +4,7 @@ const hatchManager = require('../../hatchManager');
 const eggTypes = require('../../../config/eggTypes.json');
 const emojis = require('../../../config/emojis.json');
 const rarities = require('../../../config/rarities.json');
+const { formatNumber } = require('../../utils/numberFormat');
 const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const {
   ActionRowBuilder,

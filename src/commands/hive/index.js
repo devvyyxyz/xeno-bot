@@ -8,6 +8,7 @@ const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const hiveTypes = require('../../../config/hiveTypes.json');
 const hiveDefaults = require('../../../config/hiveDefaults.json');
 const db = require('../../db');
+const { formatNumber } = require('../../utils/numberFormat');
 
 const cmd = getCommandConfig('hive') || { name: 'hive', description: 'Manage your hive' };
 
@@ -510,14 +511,14 @@ module.exports = {
               const cost = 50;
               resources = await userResources.getResources(userId);
               if ((resources.royal_jelly || 0) < cost) {
-                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly. Need ${cost}.`, client: interaction.client }) });
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly. Need ${formatNumber(cost)}.`, client: interaction.client }) });
                 return;
               }
               await userResources.modifyResources(userId, { royal_jelly: -cost });
               await hiveModel.updateHiveById(viewHive.id, { jelly_production_per_hour: (Number(viewHive.jelly_production_per_hour || 0) + 1) });
               viewHive = { ...viewHive, jelly_production_per_hour: Number(viewHive.jelly_production_per_hour || 0) + 1 };
               resources = await userResources.getResources(userId);
-              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Queen upgraded. +1 jelly/hour (spent ${cost} RJ).`, client: interaction.client }) });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Queen upgraded. +1 jelly/hour (spent ${formatNumber(cost)} RJ).`, client: interaction.client }) });
               return;
             }
 
@@ -547,7 +548,7 @@ module.exports = {
 
               resources = await userResources.getResources(userId);
               if ((resources.royal_jelly || 0) < candidate.cost) {
-                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly for ${candidate.cfg.display}. Need ${candidate.cost}.`, client: interaction.client }) });
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly for ${candidate.cfg.display}. Need ${formatNumber(candidate.cost)}.`, client: interaction.client }) });
                 return;
               }
 
@@ -627,14 +628,14 @@ module.exports = {
               const cost = 50;
               resources = await userResources.getResources(userId);
               if ((resources.royal_jelly || 0) < cost) {
-                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly. Need ${cost}.`, client: interaction.client }) });
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly. Need ${formatNumber(cost)}.`, client: interaction.client }) });
                 return;
               }
               await userResources.modifyResources(userId, { royal_jelly: -cost });
               await hiveModel.updateHiveById(viewHive.id, { jelly_production_per_hour: (Number(viewHive.jelly_production_per_hour || 0) + 1) });
               viewHive = { ...viewHive, jelly_production_per_hour: Number(viewHive.jelly_production_per_hour || 0) + 1 };
               resources = await userResources.getResources(userId);
-              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Queen upgraded. +1 jelly/hour (spent ${cost} RJ).`, client: interaction.client }) });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Queen upgraded. +1 jelly/hour (spent ${formatNumber(cost)} RJ).`, client: interaction.client }) });
               return;
             }
 
@@ -659,7 +660,7 @@ module.exports = {
 
               resources = await userResources.getResources(userId);
               if ((resources.royal_jelly || 0) < candidate.cost) {
-                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly for ${candidate.cfg.display}. Need ${candidate.cost}.`, client: interaction.client }) });
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly for ${candidate.cfg.display}. Need ${formatNumber(candidate.cost)}.`, client: interaction.client }) });
                 return;
               }
 
@@ -723,7 +724,7 @@ module.exports = {
           return safeReply(interaction, { content: `Database error. Please try again later.`, ephemeral: true });
         }
         
-        return safeReply(interaction, { content: `✅ Upgraded ${cfg.display} to level ${currentLevel + 1}. Spent ${cost} Royal Jelly.`, ephemeral: true });
+        return safeReply(interaction, { content: `✅ Upgraded ${cfg.display} to level ${currentLevel + 1}. Spent ${formatNumber(cost)} Royal Jelly.`, ephemeral: true });
       }
 
       // UPGRADE QUEEN
