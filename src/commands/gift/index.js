@@ -74,7 +74,7 @@ module.exports = {
     if (focusedOption.name === 'egg_type') {
       // Get user's eggs from their inventory
       try {
-        const userData = await userModel.getUserData(userId);
+        const userData = await userModel.getUserByDiscordId(userId);
         const guildData = userData?.data?.guilds?.[guildId];
         const userEggs = guildData?.eggs || {};
         
@@ -89,15 +89,16 @@ module.exports = {
           max: 25 
         });
       } catch (error) {
-        // Fallback to all eggs if error
-        return autocomplete(interaction, eggTypes, { map: e => ({ name: e.name, value: e.id }), max: 25 });
+        fallbackLogger.error('Gift autocomplete error (egg_type):', error);
+        // Return empty array if error - don't show eggs user doesn't have
+        return interaction.respond([]);
       }
     }
     
     if (focusedOption.name === 'item_id') {
       // Get user's items from their inventory
       try {
-        const userData = await userModel.getUserData(userId);
+        const userData = await userModel.getUserByDiscordId(userId);
         const guildData = userData?.data?.guilds?.[guildId];
         const userItems = guildData?.items || {};
         
@@ -113,9 +114,9 @@ module.exports = {
           max: 25 
         });
       } catch (error) {
-        // Fallback to all items if error
-        const items = shopConfig.items || [];
-        return autocomplete(interaction, items, { map: i => ({ name: i.name, value: i.id }), max: 25 });
+        fallbackLogger.error('Gift autocomplete error (item_id):', error);
+        // Return empty array if error - don't show items user doesn't have
+        return interaction.respond([]);
       }
     }
     
@@ -140,7 +141,8 @@ module.exports = {
           max: 25 
         });
       } catch (error) {
-        return [];
+        fallbackLogger.error('Gift autocomplete error (host_id):', error);
+        return interaction.respond([]);
       }
     }
     
@@ -164,7 +166,8 @@ module.exports = {
           max: 25 
         });
       } catch (error) {
-        return [];
+        fallbackLogger.error('Gift autocomplete error (xeno_id):', error);
+        return interaction.respond([]);
       }
     }
     
@@ -207,7 +210,7 @@ module.exports = {
         }
 
         // Check sender has enough eggs
-        const senderData = await userModel.getUserData(senderId);
+        const senderData = await userModel.getUserByDiscordId(senderId);
         const senderGuildData = senderData?.data?.guilds?.[guildId];
         const senderEggs = senderGuildData?.eggs?.[eggTypeId] || 0;
 
@@ -254,7 +257,7 @@ module.exports = {
         }
 
         // Check sender has enough items
-        const senderData = await userModel.getUserData(senderId);
+        const senderData = await userModel.getUserByDiscordId(senderId);
         const senderGuildData = senderData?.data?.guilds?.[guildId];
         const senderItems = senderGuildData?.items?.[itemId] || 0;
 
