@@ -13,6 +13,9 @@ const cmd = getCommandConfig('hive') || { name: 'hive', description: 'Manage you
 
 const HIVE_DELETE_CONFIRM_ID = 'hive-delete-confirm';
 const HIVE_DELETE_CANCEL_ID = 'hive-delete-cancel';
+const HIVE_ACTION_REFRESH_ID = 'hive-action-refresh';
+const HIVE_ACTION_UPGRADE_QUEEN_ID = 'hive-action-upgrade-queen';
+const HIVE_ACTION_UPGRADE_MODULE_ID = 'hive-action-upgrade-module';
 
 function buildNavigationRow({ screen, disabled = false }) {
   return new ActionRowBuilder().addComponents(
@@ -24,7 +27,30 @@ function buildNavigationRow({ screen, disabled = false }) {
   );
 }
 
-function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}, expired = false }) {
+function buildQuickActionsRow({ disabled = false, canAct = true }) {
+  return new ActionRowBuilder().addComponents(
+    new PrimaryButtonBuilder()
+      .setCustomId(HIVE_ACTION_UPGRADE_QUEEN_ID)
+      .setLabel('⬆️ Queen +1')
+      .setDisabled(disabled || !canAct),
+    new SecondaryButtonBuilder()
+      .setCustomId(HIVE_ACTION_UPGRADE_MODULE_ID)
+      .setLabel('⚡ Quick Module')
+      .setDisabled(disabled || !canAct),
+    new SecondaryButtonBuilder()
+      .setCustomId(HIVE_ACTION_REFRESH_ID)
+      .setLabel('🔄 Refresh')
+      .setDisabled(disabled)
+  );
+}
+
+function toDiscordTimestamp(value, style = 'f') {
+  const ms = Number(value || 0);
+  if (!ms || Number.isNaN(ms)) return 'Unknown';
+  return `<t:${Math.floor(ms / 1000)}:${style}>`;
+}
+
+function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}, expired = false, canAct = true, notice = null }) {
   const container = new ContainerBuilder();
   
   const screenTitles = {
@@ -36,16 +62,26 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
   };
 
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(screenTitles[screen] || screenTitles.stats));
+  if (notice) container.addTextDisplayComponents(new TextDisplayBuilder().setContent(notice));
+
+  const hiveType = hive.type || hive.hive_type || 'default';
+  const snapshotLines = [
+    `**Owner:** <@${targetUser.id}>`,
+    `**Type:** \`${hiveType}\``,
+    `**Capacity:** ${hive.capacity || 0}`,
+    `**Jelly/hour:** ${hive.jelly_production_per_hour || 0}`,
+    `**Queen:** ${hive.queen_xeno_id || 'Unassigned'}`
+  ];
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(snapshotLines.join(' • ')));
 
   if (screen === 'stats') {
     const statLines = [
-      `**Owner:** <@${targetUser.id}>`,
-      `**Type:** \`${hive.type || hive.hive_type || 'default'}\``,
-      `**Capacity:** ${hive.capacity || 0}`,
-      `**Jelly/hour:** ${hive.jelly_production_per_hour || 0}`,
-      `**Queen Xeno:** ${hive.queen_xeno_id || 'None'}`
+      `**Hive ID:** \`${hive.id || 'unknown'}\``,
+      `**Created:** ${toDiscordTimestamp(hive.created_at, 'f')} (${toDiscordTimestamp(hive.created_at, 'R')})`,
+      `**Last Updated:** ${toDiscordTimestamp(hive.updated_at, 'f')} (${toDiscordTimestamp(hive.updated_at, 'R')})`
     ];
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(statLines.join('\n')));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('_Next actions: Upgrade modules for stronger scaling, then upgrade queen for steady jelly growth._'));
   } else if (screen === 'modules') {
     const modulesCfg = hiveDefaults.modules || {};
     const moduleLines = Object.keys(modulesCfg).map(k => {
@@ -54,30 +90,50 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
       const level = moduleRow ? Number(moduleRow.level || 0) : (cfg.default_level || 0);
       return `**${cfg.display}** (${k})\nLevel ${level} — ${cfg.description}`;
     }).join('\n\n');
+    const moduleCount = Object.keys(modulesCfg).length;
+    const upgradedCount = Object.keys(modulesCfg).filter(k => {
+      const cfg = modulesCfg[k];
+      const moduleRow = rows.modules ? rows.modules.find(r => r.module_key === k) : null;
+      const level = moduleRow ? Number(moduleRow.level || 0) : (cfg.default_level || 0);
+      return level > (cfg.default_level || 0);
+    }).length;
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Progress:** ${upgradedCount}/${moduleCount} modules upgraded`));
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(moduleLines || 'No modules found'));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('_Tip: use `/hive upgrade-module module:<key>` to improve specific bonuses._'));
   } else if (screen === 'milestones') {
     const milestonesCfg = hiveDefaults.milestones || {};
+    const milestoneKeys = Object.keys(milestonesCfg);
+    const achievedCount = milestoneKeys.filter(k => rows.milestones ? rows.milestones.some(r => r.milestone_key === k && r.achieved) : false).length;
     const milestoneLines = Object.keys(milestonesCfg).map(k => {
       const cfg = milestonesCfg[k];
       const done = rows.milestones ? rows.milestones.some(r => r.milestone_key === k && r.achieved) : false;
       return `${done ? '✅' : '❌'} **${cfg.name || k}** — ${cfg.description || ''}`;
     }).join('\n\n');
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Progress:** ${achievedCount}/${milestoneKeys.length || 0} milestones complete`));
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(milestoneLines || 'No milestones found'));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('_Tip: milestones unlock naturally as you expand and upgrade your hive._'));
   } else if (screen === 'queen') {
+    const royalJelly = rows.resources?.royal_jelly || 0;
+    const queenReady = hive.queen_xeno_id ? 'Assigned' : 'Needs assignment';
     const queenLines = [
       `**Queen Xeno ID:** ${hive.queen_xeno_id || 'None'}`,
       `**Jelly/hour:** ${hive.jelly_production_per_hour || 0}`,
-      `**Royal Jelly (you):** ${rows.resources?.royal_jelly || 0}`
+      `**Royal Jelly (you):** ${royalJelly}`,
+      `**Status:** ${queenReady}`
     ];
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(queenLines.join('\n')));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('_Tip: use `/hive upgrade-queen` when you have enough Royal Jelly._'));
   } else if (screen === 'types') {
+    const currentType = hiveType;
     const typeLines = Object.values((hiveTypes && hiveTypes.types) || {})
-      .map(t => `**${t.name}** (\`${t.id}\`)\n${t.description}`)
+      .map(t => `${t.id === currentType ? '⭐ ' : ''}**${t.name}** (\`${t.id}\`)\n${t.description}`)
       .join('\n\n');
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(typeLines || 'No hive types found'));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`_Current hive type: \`${currentType}\`_`));
   }
 
   if (!expired) {
+    container.addActionRowComponents(buildQuickActionsRow({ disabled: false, canAct }));
     container.addActionRowComponents(buildNavigationRow({ screen, disabled: false }));
   } else {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('_Hive view expired_'));
@@ -286,7 +342,8 @@ module.exports = {
       // Handle view-based subcommands (stats, modules, milestones, queen-status, type-info, and old direct view from 'stats')
       if (sub === 'stats' || sub === 'modules' || sub === 'milestones' || sub === 'queen-status') {
         const targetUser = (sub === 'stats' && (() => { try { return interaction.options.getUser('user'); } catch (e) { return null; } })()) || interaction.user;
-        const viewHive = (sub === 'stats') ? await hiveModel.getHiveByUser(String(targetUser.id)) : hive;
+        let viewHive = (sub === 'stats') ? await hiveModel.getHiveByUser(String(targetUser.id)) : hive;
+        const canAct = targetUser.id === userId;
         
         if (!viewHive) {
           if (targetUser.id === userId) {
@@ -387,10 +444,10 @@ module.exports = {
         } catch (e) {
           // Silently fail on database errors for optional tables
         }
-        const resources = await userResources.getResources(userId);
+        let resources = await userResources.getResources(userId);
 
         await safeReply(interaction, {
-          components: buildHiveScreen({ screen: initialScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false }),
+          components: buildHiveScreen({ screen: initialScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct }),
           flags: MessageFlags.IsComponentsV2,
           ephemeral: true
         }, { loggerName: 'command:hive' });
@@ -408,37 +465,110 @@ module.exports = {
 
         collector.on('collect', async i => {
           try {
+            if (i.customId === HIVE_ACTION_REFRESH_ID) {
+              const refreshedHive = await hiveModel.getHiveByUser(String(targetUser.id));
+              if (refreshedHive) viewHive = refreshedHive;
+              modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => modules);
+              milestones = await db.knex('hive_milestones').where({ hive_id: viewHive.id }).select('*').catch(() => milestones);
+              resources = await userResources.getResources(userId);
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: '✅ Refreshed hive data.' }) });
+              return;
+            }
+
+            if (i.customId === HIVE_ACTION_UPGRADE_QUEEN_ID) {
+              if (!canAct) {
+                await i.reply({ content: 'Only the hive owner can run quick upgrades.', ephemeral: true });
+                return;
+              }
+              const cost = 50;
+              resources = await userResources.getResources(userId);
+              if ((resources.royal_jelly || 0) < cost) {
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly. Need ${cost}.` }) });
+                return;
+              }
+              await userResources.modifyResources(userId, { royal_jelly: -cost });
+              await hiveModel.updateHiveById(viewHive.id, { jelly_production_per_hour: (Number(viewHive.jelly_production_per_hour || 0) + 1) });
+              viewHive = { ...viewHive, jelly_production_per_hour: Number(viewHive.jelly_production_per_hour || 0) + 1 };
+              resources = await userResources.getResources(userId);
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Queen upgraded. +1 jelly/hour (spent ${cost} RJ).` }) });
+              return;
+            }
+
+            if (i.customId === HIVE_ACTION_UPGRADE_MODULE_ID) {
+              if (!canAct) {
+                await i.reply({ content: 'Only the hive owner can run quick upgrades.', ephemeral: true });
+                return;
+              }
+
+              const modulesCfg = hiveDefaults.modules || {};
+              let candidate = null;
+              for (const moduleKey of Object.keys(modulesCfg)) {
+                const cfg = modulesCfg[moduleKey];
+                const moduleRow = modules.find(m => m.module_key === moduleKey);
+                const level = moduleRow ? Number(moduleRow.level || 0) : (cfg.default_level || 0);
+                if (level >= Number(cfg.max_level || 0)) continue;
+                const cost = Math.max(1, Math.floor(Number(cfg.base_cost_jelly || 1) * (level + 1)));
+                if (!candidate || cost < candidate.cost) {
+                  candidate = { moduleKey, cfg, level, row: moduleRow, cost };
+                }
+              }
+
+              if (!candidate) {
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: '✅ All modules are already at max level.' }) });
+                return;
+              }
+
+              resources = await userResources.getResources(userId);
+              if ((resources.royal_jelly || 0) < candidate.cost) {
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly for ${candidate.cfg.display}. Need ${candidate.cost}.` }) });
+                return;
+              }
+
+              await userResources.modifyResources(userId, { royal_jelly: -candidate.cost });
+              if (candidate.row) {
+                await db.knex('hive_modules').where({ id: candidate.row.id }).update({ level: candidate.level + 1, updated_at: db.knex.fn.now() });
+              } else {
+                await db.knex('hive_modules').insert({ hive_id: viewHive.id, module_key: candidate.moduleKey, level: 1 });
+              }
+              modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => modules);
+              resources = await userResources.getResources(userId);
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Upgraded ${candidate.cfg.display} to level ${candidate.level + 1}.` }) });
+              return;
+            }
+
             if (i.customId === 'hive-nav-stats') currentScreen = 'stats';
             else if (i.customId === 'hive-nav-modules') currentScreen = 'modules';
             else if (i.customId === 'hive-nav-milestones') currentScreen = 'milestones';
             else if (i.customId === 'hive-nav-queen') currentScreen = 'queen';
             else if (i.customId === 'hive-nav-types') currentScreen = 'types';
 
-            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false }) });
+            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct }) });
           } catch (err) {
             try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hive' }); } catch (_) {}
           }
         });
 
         collector.on('end', () => {
-          try { msg.edit({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: true }) }).catch(() => {}); } catch (_) {}
+          try { msg.edit({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: true, canAct }) }).catch(() => {}); } catch (_) {}
         });
         return;
       }
 
       if (sub === 'type-info') {
+        let viewHive = hive;
         let modules = [];
         let milestones = [];
         try {
-          modules = await db.knex('hive_modules').where({ hive_id: hive.id }).select('*').catch(() => []);
-          milestones = await db.knex('hive_milestones').where({ hive_id: hive.id }).select('*').catch(() => []);
+          modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => []);
+          milestones = await db.knex('hive_milestones').where({ hive_id: viewHive.id }).select('*').catch(() => []);
         } catch (e) {
           // Silently fail on database errors for optional tables
         }
-        const resources = await userResources.getResources(userId);
+        let resources = await userResources.getResources(userId);
+        const canAct = true;
 
         await safeReply(interaction, {
-          components: buildHiveScreen({ screen: 'types', hive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false }),
+          components: buildHiveScreen({ screen: 'types', hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct }),
           flags: MessageFlags.IsComponentsV2,
           ephemeral: true
         }, { loggerName: 'command:hive' });
@@ -456,20 +586,82 @@ module.exports = {
 
         collector.on('collect', async i => {
           try {
+            if (i.customId === HIVE_ACTION_REFRESH_ID) {
+              const refreshedHive = await hiveModel.getHiveByUser(userId);
+              if (refreshedHive) viewHive = refreshedHive;
+              modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => modules);
+              milestones = await db.knex('hive_milestones').where({ hive_id: viewHive.id }).select('*').catch(() => milestones);
+              resources = await userResources.getResources(userId);
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: '✅ Refreshed hive data.' }) });
+              return;
+            }
+
+            if (i.customId === HIVE_ACTION_UPGRADE_QUEEN_ID) {
+              const cost = 50;
+              resources = await userResources.getResources(userId);
+              if ((resources.royal_jelly || 0) < cost) {
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly. Need ${cost}.` }) });
+                return;
+              }
+              await userResources.modifyResources(userId, { royal_jelly: -cost });
+              await hiveModel.updateHiveById(viewHive.id, { jelly_production_per_hour: (Number(viewHive.jelly_production_per_hour || 0) + 1) });
+              viewHive = { ...viewHive, jelly_production_per_hour: Number(viewHive.jelly_production_per_hour || 0) + 1 };
+              resources = await userResources.getResources(userId);
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Queen upgraded. +1 jelly/hour (spent ${cost} RJ).` }) });
+              return;
+            }
+
+            if (i.customId === HIVE_ACTION_UPGRADE_MODULE_ID) {
+              const modulesCfg = hiveDefaults.modules || {};
+              let candidate = null;
+              for (const moduleKey of Object.keys(modulesCfg)) {
+                const cfg = modulesCfg[moduleKey];
+                const moduleRow = modules.find(m => m.module_key === moduleKey);
+                const level = moduleRow ? Number(moduleRow.level || 0) : (cfg.default_level || 0);
+                if (level >= Number(cfg.max_level || 0)) continue;
+                const cost = Math.max(1, Math.floor(Number(cfg.base_cost_jelly || 1) * (level + 1)));
+                if (!candidate || cost < candidate.cost) {
+                  candidate = { moduleKey, cfg, level, row: moduleRow, cost };
+                }
+              }
+
+              if (!candidate) {
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: '✅ All modules are already at max level.' }) });
+                return;
+              }
+
+              resources = await userResources.getResources(userId);
+              if ((resources.royal_jelly || 0) < candidate.cost) {
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly for ${candidate.cfg.display}. Need ${candidate.cost}.` }) });
+                return;
+              }
+
+              await userResources.modifyResources(userId, { royal_jelly: -candidate.cost });
+              if (candidate.row) {
+                await db.knex('hive_modules').where({ id: candidate.row.id }).update({ level: candidate.level + 1, updated_at: db.knex.fn.now() });
+              } else {
+                await db.knex('hive_modules').insert({ hive_id: viewHive.id, module_key: candidate.moduleKey, level: 1 });
+              }
+              modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => modules);
+              resources = await userResources.getResources(userId);
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Upgraded ${candidate.cfg.display} to level ${candidate.level + 1}.` }) });
+              return;
+            }
+
             if (i.customId === 'hive-nav-stats') currentScreen = 'stats';
             else if (i.customId === 'hive-nav-modules') currentScreen = 'modules';
             else if (i.customId === 'hive-nav-milestones') currentScreen = 'milestones';
             else if (i.customId === 'hive-nav-queen') currentScreen = 'queen';
             else if (i.customId === 'hive-nav-types') currentScreen = 'types';
 
-            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false }) });
+            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct }) });
           } catch (err) {
             try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hive' }); } catch (_) {}
           }
         });
 
         collector.on('end', () => {
-          try { msg.edit({ components: buildHiveScreen({ screen: currentScreen, hive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: true }) }).catch(() => {}); } catch (_) {}
+          try { msg.edit({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: true, canAct }) }).catch(() => {}); } catch (_) {}
         });
         return;
       }
