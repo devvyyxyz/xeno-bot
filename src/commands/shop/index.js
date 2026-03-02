@@ -17,7 +17,7 @@ const {
 } = require('@discordjs/builders');
 const userModel = require('../../models/user');
 const safeReply = require('../../utils/safeReply');
-const { buildNoticeV2Payload } = require('../../utils/componentsV2');
+const { buildNoticeV2Payload, addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 
 const logger = require('../../utils/logger').get('command:shop');
 const fallbackLogger = require('../../utils/fallbackLogger');
@@ -44,14 +44,13 @@ function makeShopComponents({
   pageIdx,
   pages,
   royalJelly = 0,
-  expired = false
+  expired = false,
+  client = null
 }) {
   const page = pages[pageIdx] || [];
   const container = new ContainerBuilder();
 
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`## ${categoryName} Shop`)
-  );
+  addV2TitleWithBotThumbnail({ container, title: 'Shop', client });
 
   if (!page.length) {
     container.addTextDisplayComponents(
@@ -150,7 +149,8 @@ module.exports = {
         pageIdx: page,
         pages,
         royalJelly: initialBalance,
-        expired: false
+        expired: false,
+        client: interaction.client
       }),
       flags: MessageFlags.IsComponentsV2,
       ephemeral: true
@@ -186,7 +186,8 @@ module.exports = {
               pageIdx: page,
               pages,
               royalJelly: bal,
-              expired: false
+              expired: false,
+              client: interaction.client
             })
           });
           return;
@@ -203,7 +204,8 @@ module.exports = {
               pageIdx: page,
               pages,
               royalJelly: bal2,
-              expired: false
+              expired: false,
+              client: interaction.client
             })
           });
           return;
@@ -261,7 +263,8 @@ module.exports = {
                 pageIdx: page,
                 pages,
                 royalJelly: refreshedBal,
-                expired: false
+                expired: false,
+                client: interaction.client
               })
             });
 
@@ -281,19 +284,20 @@ module.exports = {
     collector.on('end', async () => {
       try {
         const bal = await userModel.getCurrencyForGuild(String(interaction.user.id), interaction.guildId, 'royal_jelly');
-        await safeReply(interaction, {
-          components: makeShopComponents({
-            categories,
-            currentCategory,
-            categoryName: getCategoryName(currentCategory),
-            pageIdx: page,
-            pages,
-            royalJelly: bal,
-            expired: true
-          }),
-          flags: MessageFlags.IsComponentsV2,
-          ephemeral: true
-        }, { loggerName: 'command:shop' });
+        if (msg) {
+          await msg.edit({
+            components: makeShopComponents({
+              categories,
+              currentCategory,
+              categoryName: getCategoryName(currentCategory),
+              pageIdx: page,
+              pages,
+              royalJelly: bal,
+              expired: true,
+              client: interaction.client
+            })
+          });
+        }
       } catch (e) {
         try { logger.warn('Failed finalizing shop components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging finalizing shop components error', le && (le.stack || le)); } catch (ignored) {} }
       }
