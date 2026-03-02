@@ -308,11 +308,21 @@ module.exports = {
     let leaderboard = [];
     for (const user of rows) {
       const data = user.data || {};
-      const eggs = (data.guilds && data.guilds[guildId]?.eggs) || {};
-      const stats = data.stats || {};
+      const guildData = data.guilds && data.guilds[guildId];
+      
+      // Skip users who have no data in this guild
+      if (!guildData) continue;
+      
+      const eggs = guildData.eggs || {};
+      const eggsTotal = Object.values(eggs).reduce((a, b) => a + b, 0);
+      
+      // Skip users with 0 eggs in this guild
+      if (eggsTotal === 0) continue;
+      
+      const stats = guildData.stats || {};
       let entry = {
         id: user.discord_id,
-        eggsTotal: Object.values(eggs).reduce((a, b) => a + b, 0),
+        eggsTotal,
         eggs,
         fastest: stats.catchTimes && stats.catchTimes.length ? Math.min(...stats.catchTimes) : null,
         slowest: stats.catchTimes && stats.catchTimes.length ? Math.max(...stats.catchTimes) : null
