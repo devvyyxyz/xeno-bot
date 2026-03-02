@@ -159,3 +159,41 @@ Notes:
 
 - The spawn deletion feature defaults to off; enable via `/setup message-delete enabled:true` to start deleting spawn messages after a catch.
 - Additional followups: add an admin-facing notice when the bot lacks `Manage Messages` permission in the spawn channel, and consider de-duplicating legacy flat command files in a future cleanup release.
+
+## v1.4.0 — DevMenu, logging improvements, and leaderboard fixes
+
+Date: 2026-03-02
+
+### Key Features
+
+- **DevMenu command**: Converted `xen!devcommands` to a new `xen!devmenu` interactive command with owner-only action buttons for developer maintenance:
+  - Migrate Facehuggers, Restart Hatch Manager, Restart Spawn Manager, Clear Expired Spawns, Sync Guild Cache, Force Migration
+  - Uses direct message component collectors for message command compatibility
+  - 5-minute idle timeout with expired state UI
+
+- **Enhanced logging with guild context**: Added guild names to spawn and hatch manager logs:
+  - New `getGuildName()` helper with cache lookup and fallbacks in both managers
+  - Updated 15+ log entries to include guild context: `[info] [spawn] doSpawn entered (My Server)`
+  - Improves visibility for multi-guild bot operations
+
+- **Eggs command options registration**: Fixed missing option definitions in `config/commands.json`:
+  - Added full `options` arrays for all 6 eggs subcommands (hatch, sell, info, destroy, collect, list)
+  - Properly registered `egg` (string, required, autocomplete) and `amount` (integer, optional) parameters
+  - Public bot deployment now correctly registers all options with Discord
+
+- **Leaderboard server filtering fix**: Fixed `/leaderboard server` showing global data:
+  - Server leaderboard now filters to only users with eggs in current guild
+  - Uses guild-specific catch time stats for fastest/slowest rankings
+  - Skips users with no guild data or zero eggs collected
+  - Global leaderboard continues to aggregate all guilds as designed
+
+### Bug Fixes
+
+- Fixed DevMenu collector type mismatch (now uses message collectors, not interaction collectors)
+- Fixed guild name resolution in logs to properly display server names
+- Fixed leaderboard server subcommand to correctly filter and rank users by guild
+
+### Internal
+
+- Version bumped to `1.4.0`.
+- All improvements deployed to production.
