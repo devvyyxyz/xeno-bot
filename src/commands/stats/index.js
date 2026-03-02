@@ -4,6 +4,7 @@ const { EmbedBuilder } = require('discord.js');
 const fallbackLogger = require('../../utils/fallbackLogger');
 const db = require('../../db');
 const safeReply = require('../../utils/safeReply');
+const { formatNumber } = require('../../utils/numberFormat');
 
 const cmd = getCommandConfig('stats') || {
   name: 'stats',
@@ -129,10 +130,10 @@ module.exports = {
         .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
         .setThumbnail(typeof target.displayAvatarURL === 'function' ? target.displayAvatarURL({ size: 512, extension: 'png' }) : null)
         .addFields(
-          { name: 'Performance', value: `Catches: ${stats.catches || 0}\nAvg: ${msToHuman(stats.avg || null)}\nFastest: ${msToHuman(stats.fastest || null)}\nSlowest: ${msToHuman(stats.slowest || null)}\nLeaderboard: ${rankInfo}`, inline: false },
-          { name: 'Inventory', value: `(this server) Eggs: ${totalEggs} | Items: ${totalItems}\n(global) Eggs: ${globalEggs} | Items: ${globalItems}`, inline: false },
-          { name: 'Top Eggs', value: `(this server) ${topEggsGuild.length ? topEggsGuild.map(e => `${e.k}: ${e.v} (${fmtRate(e.v)})`).join('\n') : 'none'}\n(global) ${topEggs.length ? topEggs.map(e => `${e.k}: ${e.v} (${fmtRate(e.v)})`).join('\n') : 'none'}`, inline: false },
-          { name: 'Currency', value: `(this server) ${guildCurrencyLines.length ? guildCurrencyLines.map(c => `${c.k}: ${c.v}`).join(', ') : `royal_jelly: ${royal || 0}`}\n(global) ${globalCurrencyLines.length ? globalCurrencyLines.map(c => `${c.k}: ${c.v}`).join(', ') : 'none'}`, inline: false },
+          { name: 'Performance', value: `Catches: ${formatNumber(stats.catches || 0)}\nAvg: ${msToHuman(stats.avg || null)}\nFastest: ${msToHuman(stats.fastest || null)}\nSlowest: ${msToHuman(stats.slowest || null)}\nLeaderboard: ${rankInfo}`, inline: false },
+          { name: 'Inventory', value: `(this server) Eggs: ${formatNumber(totalEggs)} | Items: ${formatNumber(totalItems)}\n(global) Eggs: ${formatNumber(globalEggs)} | Items: ${formatNumber(globalItems)}`, inline: false },
+          { name: 'Top Eggs', value: `(this server) ${topEggsGuild.length ? topEggsGuild.map(e => `${e.k}: ${formatNumber(e.v)} (${fmtRate(e.v)})`).join('\n') : 'none'}\n(global) ${topEggs.length ? topEggs.map(e => `${e.k}: ${formatNumber(e.v)} (${fmtRate(e.v)})`).join('\n') : 'none'}`, inline: false },
+          { name: 'Currency', value: `(this server) ${guildCurrencyLines.length ? guildCurrencyLines.map(c => `${c.k}: ${formatNumber(c.v)}`).join(', ') : `royal_jelly: ${formatNumber(royal || 0)}`}\n(global) ${globalCurrencyLines.length ? globalCurrencyLines.map(c => `${c.k}: ${formatNumber(c.v)}`).join(', ') : 'none'}`, inline: false },
           { name: 'Misc', value: `Account created: ${accountCreated}\nUser ID: ${target.id}`, inline: false }
         )
         .setFooter({ text: 'Game stats' });

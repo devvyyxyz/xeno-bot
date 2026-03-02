@@ -74,7 +74,7 @@
     "price": 80000,
     "sell": 4000,
     "hatch": 480,
-    "next_stage": "facehugger"
+    "next_stage": "king_facehugger"
   },
   {
     "id": "neomorph",
@@ -85,7 +85,7 @@
     "price": 70000,
     "sell": 3500,
     "hatch": 420,
-    "next_stage": "facehugger"
+    "next_stage": "bloodburster"
   },
   {
     "id": "deacon",
@@ -96,7 +96,7 @@
     "price": 80000,
     "sell": 4000,
     "hatch": 480,
-    "next_stage": "facehugger"
+    "next_stage": "hammerpede"
   },
   {
     "id": "trilobite",
@@ -107,7 +107,7 @@
     "price": 70000,
     "sell": 3500,
     "hatch": 420,
-    "next_stage": "facehugger"
+    "next_stage": "hammerpede"
   },
   {
     "id": "belugamorph",
@@ -118,7 +118,7 @@
     "price": 80000,
     "sell": 4000,
     "hatch": 480,
-    "next_stage": "facehugger"
+    "next_stage": "hammerpede"
   },
   {
     "id": "ultramorph",
@@ -129,7 +129,7 @@
     "price": 90000,
     "sell": 4500,
     "hatch": 540,
-    "next_stage": "facehugger"
+    "next_stage": "king_facehugger"
   },
   {
     "id": "crusher",
@@ -195,7 +195,7 @@
     "price": 90000,
     "sell": 4500,
     "hatch": 540,
-    "next_stage": "facehugger"
+    "next_stage": "king_facehugger"
   },
   {
     "id": "android",
@@ -206,7 +206,7 @@
     "price": 90000,
     "sell": 4500,
     "hatch": 540,
-    "next_stage": "facehugger"
+    "next_stage": "king_facehugger"
   },
   {
     "id": "spacejockey",
@@ -217,7 +217,7 @@
     "price": 100000,
     "sell": 5000,
     "hatch": 600,
-    "next_stage": "facehugger"
+    "next_stage": "king_facehugger"
   },
   {
     "id": "engineer",
@@ -228,7 +228,7 @@
     "price": 100000,
     "sell": 5000,
     "hatch": 600,
-    "next_stage": "facehugger"
+    "next_stage": "king_facehugger"
   },
   {
     "id": "weyland",
@@ -239,7 +239,7 @@
     "price": 100000,
     "sell": 5000,
     "hatch": 600,
-    "next_stage": "facehugger"
+    "next_stage": "king_facehugger"
   },
   {
     "id": "colonist",
@@ -305,6 +305,6 @@
     "price": 100000,
     "sell": 5000,
     "hatch": 600,
-    "next_stage": "facehugger"
+    "next_stage": "king_facehugger"
   }
 ]

@@ -59,6 +59,13 @@
       "ephemeral": false,
       "examples": ["/encyclopedia - Browse all available eggs and xenomorphs"]
     },
+    "pathway": {
+      "name": "pathway",
+      "description": "View xenomorph evolution pathways and stages.",
+      "group": "Information",
+      "ephemeral": true,
+      "examples": ["/pathway - Browse all evolution pathways and their requirements"]
+    },
     "collect": {
       "name": "collect",
       "description": "Collect a spawned egg from the channel.",

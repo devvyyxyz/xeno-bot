@@ -106,7 +106,7 @@ function makeInventoryComponents(target, type, pageIdx, pages, balances = {}, op
   const royal = Number(balances.royal_jelly || 0);
   const credits = Number(balances.credits || 0);
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`_Royal Jelly: ${royal} • Credits: ${credits} • ${typeLabel} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}_`)
+    new TextDisplayBuilder().setContent(`_Royal Jelly: ${formatNumber(royal)} • Credits: ${formatNumber(credits)} • ${typeLabel} • Page ${pageIdx + 1} of ${Math.max(1, pages.length)}_`)
   );
   return [container];
 }

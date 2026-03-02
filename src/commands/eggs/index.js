@@ -470,7 +470,7 @@ module.exports = {
           const sellPrice = Math.max(0, eggConfig.sell != null ? Number(eggConfig.sell) : Math.floor(Number(eggConfig.price || 0) / 2));
           const total = sellPrice * Number(amount);
           const newBal = await userModel.modifyCurrencyForGuild(discordId, guildId, 'royal_jelly', total);
-          await safeReply(interaction, { components: buildEggsView({ screen: 'result', content: `Sold ${amount} x ${eggConfig.name} for ${total} royal jelly. New balance: ${newBal}.` }), flags: MessageFlags.IsComponentsV2, ephemeral: true }, { loggerName: 'command:eggs' });
+          await safeReply(interaction, { components: buildEggsView({ screen: 'result', content: `Sold ${amount} x ${eggConfig.name} for ${formatNumber(total)} royal jelly. New balance: ${formatNumber(newBal)}.` }), flags: MessageFlags.IsComponentsV2, ephemeral: true }, { loggerName: 'command:eggs' });
           
           // Set up collector for "View List" button with full list navigation
           let msg = null;
