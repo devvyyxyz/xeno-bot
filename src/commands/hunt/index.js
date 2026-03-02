@@ -21,6 +21,7 @@ const { getCommandConfig } = require('../../utils/commandsConfig');
 const hostsCfg = require('../../../config/hosts.json');
 const emojisCfg = require('../../../config/emojis.json');
 const huntFlavorsCfg = require('../../../config/huntFlavors.json');
+const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const safeReply = require('../../utils/safeReply');
 const logger = require('../../utils/logger').get('command:hunt');
 
@@ -60,7 +61,7 @@ function getRandomFlavor(hostType, flavors) {
   return hostFlavors.flavors[Math.floor(Math.random() * hostFlavors.flavors.length)];
 }
 
-function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts = {}, emojis = {} }) {
+function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts = {}, emojis = {}, client = null }) {
   const totalPages = Math.ceil(rows.length / HOSTS_PER_PAGE);
   const safePageIdx = Math.max(0, Math.min(pageIdx, totalPages - 1));
   const start = safePageIdx * HOSTS_PER_PAGE;
@@ -69,7 +70,7 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
 
   const container = new ContainerBuilder();
 
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent('## Host Collection'));
+  addV2TitleWithBotThumbnail({ container, title: 'Host Collection', client });
 
   if (page.length === 0) {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('You have no hunted hosts. Use `/hunt go` to search.'));
@@ -145,9 +146,9 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
   return [container];
 }
 
-function buildStatsPage({ userId, allHosts, cfgHosts }) {
+function buildStatsPage({ userId, allHosts, cfgHosts, client = null }) {
   const container = new ContainerBuilder();
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent('## 📊 Hunt Statistics'));
+  addV2TitleWithBotThumbnail({ container, title: 'Hunt Statistics', client });
 
   const totalHunts = allHosts.length;
   const hostTypeCounts = {};
@@ -257,8 +258,8 @@ module.exports = {
         }
 
         const container = new ContainerBuilder();
+        addV2TitleWithBotThumbnail({ container, title: 'Hunt Success', client: interaction.client });
         container.addTextDisplayComponents(
-          new TextDisplayBuilder().setContent('## 🎯 Hunt Success!'),
           new TextDisplayBuilder().setContent(flavor),
           new TextDisplayBuilder().setContent(`You acquired: **${hostDisplay}** (ID: ${host.id})`)
         );
@@ -296,7 +297,7 @@ module.exports = {
               if (!rows || rows.length === 0) {
                 await i.update({ content: 'You have no hunted hosts.', components: [] });
               } else {
-                await i.update({ components: buildHostListPage({ pageIdx: 0, rows, cfgHosts, emojis: emojisCfg }) });
+                await i.update({ components: buildHostListPage({ pageIdx: 0, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
               }
             }
           } catch (err) {
@@ -324,7 +325,7 @@ module.exports = {
 
         await safeReply(
           interaction,
-          { components: buildHostListPage({ pageIdx: 0, rows, cfgHosts, emojis: emojisCfg }), flags: MessageFlags.IsComponentsV2, ephemeral: true },
+          { components: buildHostListPage({ pageIdx: 0, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true },
           { loggerName: 'command:hunt' }
         );
 
@@ -345,13 +346,13 @@ module.exports = {
             // Navigation
             if (i.customId === 'hunt-prev-page') {
               currentPage = Math.max(0, currentPage - 1);
-              await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg }) });
+              await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
               return;
             }
             if (i.customId === 'hunt-next-page') {
               const totalPages = Math.ceil(rows.length / HOSTS_PER_PAGE);
               currentPage = Math.min(totalPages - 1, currentPage + 1);
-              await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg }) });
+              await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
               return;
             }
 
@@ -367,14 +368,14 @@ module.exports = {
                 currentPage = totalPages - 1;
               }
               
-              await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg }) });
+              await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
               currentViewMode = 'list';
               return;
             }
 
             // View stats
             if (i.customId === 'hunt-view-stats') {
-              await i.update({ components: buildStatsPage({ userId, allHosts: rows, cfgHosts }) });
+              await i.update({ components: buildStatsPage({ userId, allHosts: rows, cfgHosts, client: interaction.client }) });
               currentViewMode = 'stats';
               return;
             }
@@ -449,7 +450,7 @@ module.exports = {
             // Back to list
             if (i.customId === 'hunt-back-to-list') {
               currentPage = 0;
-              await i.update({ components: buildHostListPage({ pageIdx: 0, rows, cfgHosts, emojis: emojisCfg }) });
+              await i.update({ components: buildHostListPage({ pageIdx: 0, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
               currentViewMode = 'list';
               return;
             }
@@ -460,7 +461,7 @@ module.exports = {
 
         collector.on('end', async () => {
           try {
-            await safeReply(interaction, { components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, expired: true }), flags: MessageFlags.IsComponentsV2, ephemeral: true }, { loggerName: 'command:hunt' });
+            await safeReply(interaction, { components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, expired: true, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true }, { loggerName: 'command:hunt' });
           } catch (_) {}
         });
 

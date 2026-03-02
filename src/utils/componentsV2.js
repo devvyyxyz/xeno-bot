@@ -1,19 +1,49 @@
 const {
   ContainerBuilder,
+  SectionBuilder,
   SeparatorBuilder,
   SeparatorSpacingSize,
   TextDisplayBuilder,
   MessageFlags
 } = require('discord.js');
 
-function buildStatsV2Payload({ title, rows = [], footer = null }) {
+function addV2TitleWithBotThumbnail({ container, title, client }) {
+  const safeTitle = String(title || 'Title').trim();
+  const text = safeTitle.startsWith('##') ? safeTitle : `## ${safeTitle}`;
+  const avatarUrl = client && client.user && typeof client.user.displayAvatarURL === 'function'
+    ? client.user.displayAvatarURL({ size: 256 })
+    : null;
+
+  if (!avatarUrl) {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+    return;
+  }
+
+  try {
+    const section = new SectionBuilder();
+    if (typeof section.setThumbnailAccessory !== 'function') {
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+      return;
+    }
+
+    section
+      .setThumbnailAccessory((thumbnail) => {
+        if (thumbnail && typeof thumbnail.setURL === 'function') thumbnail.setURL(avatarUrl);
+        return thumbnail;
+      })
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+    container.addSectionComponents(section);
+  } catch (_) {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+  }
+}
+
+function buildStatsV2Payload({ title, rows = [], footer = null, client = null }) {
   const container = new ContainerBuilder();
   const safeTitle = String(title || 'Stats').trim();
   const safeRows = Array.isArray(rows) ? rows : [];
 
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`## ${safeTitle}`)
-  );
+  addV2TitleWithBotThumbnail({ container, title: safeTitle, client });
 
   if (safeRows.length > 0) {
     container.addSeparatorComponents(
@@ -53,7 +83,8 @@ function buildNoticeV2Payload({
   title = null,
   message,
   tone = 'error',
-  footer = null
+  footer = null,
+  client = null
 }) {
   const safeTone = ['error', 'permission', 'requirement', 'info'].includes(tone) ? tone : 'error';
   const toneMeta = {
@@ -67,9 +98,7 @@ function buildNoticeV2Payload({
   const safeTitle = String(title || `${toneMeta.icon} ${toneMeta.title}`).trim();
   const safeMessage = String(message || '').trim() || 'Something went wrong.';
 
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`## ${safeTitle}`)
-  );
+  addV2TitleWithBotThumbnail({ container, title: safeTitle, client });
   container.addSeparatorComponents(
     new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
   );
@@ -92,5 +121,6 @@ function buildNoticeV2Payload({
 module.exports = {
   buildStatsV2Payload,
   buildNoticeV2Payload,
-  classifyNoticeTone
+  classifyNoticeTone,
+  addV2TitleWithBotThumbnail
 };

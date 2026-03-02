@@ -4,7 +4,7 @@ const hiveModel = require('../../models/hive');
 const xenomorphModel = require('../../models/xenomorph');
 const userResources = require('../../models/userResources');
 const { getCommandConfig } = require('../../utils/commandsConfig');
-const { buildStatsV2Payload } = require('../../utils/componentsV2');
+const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const hiveTypes = require('../../../config/hiveTypes.json');
 const hiveDefaults = require('../../../config/hiveDefaults.json');
 const db = require('../../db');
@@ -72,7 +72,7 @@ function toDiscordTimestamp(value, style = 'f') {
   return `<t:${Math.floor(ms / 1000)}:${style}>`;
 }
 
-function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}, expired = false, canAct = true, notice = null }) {
+function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}, expired = false, canAct = true, notice = null, client = null }) {
   const container = new ContainerBuilder();
   
   const screenTitles = {
@@ -83,7 +83,7 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
     types: '## ℹ️ Hive Types'
   };
 
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(screenTitles[screen] || screenTitles.stats));
+  addV2TitleWithBotThumbnail({ container, title: screenTitles[screen] || screenTitles.stats, client });
   if (notice) container.addTextDisplayComponents(new TextDisplayBuilder().setContent(notice));
 
   const hiveType = hive.type || hive.hive_type || 'default';
@@ -165,10 +165,10 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
   return [container];
 }
 
-function buildNoHiveV2Payload({ includeFlags = true }) {
+function buildNoHiveV2Payload({ includeFlags = true, client = null }) {
   const container = new ContainerBuilder();
+  addV2TitleWithBotThumbnail({ container, title: 'No Hive Found', client });
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent('## No Hive Found'),
     new TextDisplayBuilder().setContent('You don\'t have a hive yet. Create one to unlock hive features like modules, milestones, and queen upgrades.')
   );
 
@@ -188,7 +188,7 @@ function buildNoHiveV2Payload({ includeFlags = true }) {
   return payload;
 }
 
-function buildHiveDeleteV2Payload({ hiveName, hiveId, state = 'confirm', includeFlags = true }) {
+function buildHiveDeleteV2Payload({ hiveName, hiveId, state = 'confirm', includeFlags = true, client = null }) {
   const titleMap = {
     confirm: '## Confirm Hive Deletion',
     cancelled: '## Deletion Cancelled',
@@ -204,8 +204,8 @@ function buildHiveDeleteV2Payload({ hiveName, hiveId, state = 'confirm', include
   const disableButtons = state !== 'confirm';
 
   const container = new ContainerBuilder();
+  addV2TitleWithBotThumbnail({ container, title: titleMap[state] || titleMap.confirm, client });
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(titleMap[state] || titleMap.confirm),
     new TextDisplayBuilder().setContent(bodyMap[state] || bodyMap.confirm)
   );
 
@@ -281,7 +281,7 @@ module.exports = {
       const requiresHive = ['modules', 'upgrade-module', 'milestones', 'queen-status', 'upgrade-queen', 'type-info', 'delete'];
       if (!hive && requiresHive.includes(sub)) {
         await safeReply(interaction, {
-          ...buildNoHiveV2Payload({ includeFlags: true }),
+          ...buildNoHiveV2Payload({ includeFlags: true, client: interaction.client }),
           ephemeral: true
         }, { loggerName: 'command:hive' });
 
@@ -371,7 +371,7 @@ module.exports = {
         if (!viewHive) {
           if (targetUser.id === userId) {
             await safeReply(interaction, {
-              ...buildNoHiveV2Payload({ includeFlags: true }),
+              ...buildNoHiveV2Payload({ includeFlags: true, client: interaction.client }),
               ephemeral: true
             }, { loggerName: 'command:hive' });
 
@@ -470,7 +470,7 @@ module.exports = {
         let resources = await userResources.getResources(userId);
 
         await safeReply(interaction, {
-          components: buildHiveScreen({ screen: initialScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct }),
+          components: buildHiveScreen({ screen: initialScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, client: interaction.client }),
           flags: MessageFlags.IsComponentsV2,
           ephemeral: true
         }, { loggerName: 'command:hive' });
@@ -494,7 +494,7 @@ module.exports = {
               modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => modules);
               milestones = await db.knex('hive_milestones').where({ hive_id: viewHive.id }).select('*').catch(() => milestones);
               resources = await userResources.getResources(userId);
-              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: '✅ Refreshed hive data.' }) });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: '✅ Refreshed hive data.', client: interaction.client }) });
               return;
             }
 
@@ -506,14 +506,14 @@ module.exports = {
               const cost = 50;
               resources = await userResources.getResources(userId);
               if ((resources.royal_jelly || 0) < cost) {
-                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly. Need ${cost}.` }) });
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly. Need ${cost}.`, client: interaction.client }) });
                 return;
               }
               await userResources.modifyResources(userId, { royal_jelly: -cost });
               await hiveModel.updateHiveById(viewHive.id, { jelly_production_per_hour: (Number(viewHive.jelly_production_per_hour || 0) + 1) });
               viewHive = { ...viewHive, jelly_production_per_hour: Number(viewHive.jelly_production_per_hour || 0) + 1 };
               resources = await userResources.getResources(userId);
-              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Queen upgraded. +1 jelly/hour (spent ${cost} RJ).` }) });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Queen upgraded. +1 jelly/hour (spent ${cost} RJ).`, client: interaction.client }) });
               return;
             }
 
@@ -537,13 +537,13 @@ module.exports = {
               }
 
               if (!candidate) {
-                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: '✅ All modules are already at max level.' }) });
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: '✅ All modules are already at max level.', client: interaction.client }) });
                 return;
               }
 
               resources = await userResources.getResources(userId);
               if ((resources.royal_jelly || 0) < candidate.cost) {
-                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly for ${candidate.cfg.display}. Need ${candidate.cost}.` }) });
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly for ${candidate.cfg.display}. Need ${candidate.cost}.`, client: interaction.client }) });
                 return;
               }
 
@@ -555,7 +555,7 @@ module.exports = {
               }
               modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => modules);
               resources = await userResources.getResources(userId);
-              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Upgraded ${candidate.cfg.display} to level ${candidate.level + 1}.` }) });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Upgraded ${candidate.cfg.display} to level ${candidate.level + 1}.`, client: interaction.client }) });
               return;
             }
 
@@ -565,14 +565,14 @@ module.exports = {
             else if (i.customId === 'hive-nav-queen') currentScreen = 'queen';
             else if (i.customId === 'hive-nav-types') currentScreen = 'types';
 
-            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct }) });
+            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: false, canAct, client: interaction.client }) });
           } catch (err) {
             try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hive' }); } catch (_) {}
           }
         });
 
         collector.on('end', () => {
-          try { msg.edit({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: true, canAct }) }).catch(() => {}); } catch (_) {}
+          try { msg.edit({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources }, expired: true, canAct, client: interaction.client }) }).catch(() => {}); } catch (_) {}
         });
         return;
       }
@@ -591,7 +591,7 @@ module.exports = {
         const canAct = true;
 
         await safeReply(interaction, {
-          components: buildHiveScreen({ screen: 'types', hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct }),
+          components: buildHiveScreen({ screen: 'types', hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, client: interaction.client }),
           flags: MessageFlags.IsComponentsV2,
           ephemeral: true
         }, { loggerName: 'command:hive' });
@@ -615,7 +615,7 @@ module.exports = {
               modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => modules);
               milestones = await db.knex('hive_milestones').where({ hive_id: viewHive.id }).select('*').catch(() => milestones);
               resources = await userResources.getResources(userId);
-              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: '✅ Refreshed hive data.' }) });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: '✅ Refreshed hive data.', client: interaction.client }) });
               return;
             }
 
@@ -623,14 +623,14 @@ module.exports = {
               const cost = 50;
               resources = await userResources.getResources(userId);
               if ((resources.royal_jelly || 0) < cost) {
-                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly. Need ${cost}.` }) });
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly. Need ${cost}.`, client: interaction.client }) });
                 return;
               }
               await userResources.modifyResources(userId, { royal_jelly: -cost });
               await hiveModel.updateHiveById(viewHive.id, { jelly_production_per_hour: (Number(viewHive.jelly_production_per_hour || 0) + 1) });
               viewHive = { ...viewHive, jelly_production_per_hour: Number(viewHive.jelly_production_per_hour || 0) + 1 };
               resources = await userResources.getResources(userId);
-              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Queen upgraded. +1 jelly/hour (spent ${cost} RJ).` }) });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Queen upgraded. +1 jelly/hour (spent ${cost} RJ).`, client: interaction.client }) });
               return;
             }
 
@@ -649,13 +649,13 @@ module.exports = {
               }
 
               if (!candidate) {
-                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: '✅ All modules are already at max level.' }) });
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: '✅ All modules are already at max level.', client: interaction.client }) });
                 return;
               }
 
               resources = await userResources.getResources(userId);
               if ((resources.royal_jelly || 0) < candidate.cost) {
-                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly for ${candidate.cfg.display}. Need ${candidate.cost}.` }) });
+                await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `❌ Not enough Royal Jelly for ${candidate.cfg.display}. Need ${candidate.cost}.`, client: interaction.client }) });
                 return;
               }
 
@@ -667,7 +667,7 @@ module.exports = {
               }
               modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => modules);
               resources = await userResources.getResources(userId);
-              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Upgraded ${candidate.cfg.display} to level ${candidate.level + 1}.` }) });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, notice: `✅ Upgraded ${candidate.cfg.display} to level ${candidate.level + 1}.`, client: interaction.client }) });
               return;
             }
 
@@ -677,14 +677,14 @@ module.exports = {
             else if (i.customId === 'hive-nav-queen') currentScreen = 'queen';
             else if (i.customId === 'hive-nav-types') currentScreen = 'types';
 
-            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct }) });
+            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: false, canAct, client: interaction.client }) });
           } catch (err) {
             try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hive' }); } catch (_) {}
           }
         });
 
         collector.on('end', () => {
-          try { msg.edit({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: true, canAct }) }).catch(() => {}); } catch (_) {}
+          try { msg.edit({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources }, expired: true, canAct, client: interaction.client }) }).catch(() => {}); } catch (_) {}
         });
         return;
       }
@@ -735,7 +735,7 @@ module.exports = {
       // DELETE
       if (sub === 'delete') {
         await safeReply(interaction, {
-          ...buildHiveDeleteV2Payload({ hiveName: hive.name || 'your hive', hiveId: hive.id, state: 'confirm', includeFlags: true }),
+          ...buildHiveDeleteV2Payload({ hiveName: hive.name || 'your hive', hiveId: hive.id, state: 'confirm', includeFlags: true, client: interaction.client }),
           ephemeral: true
         }, { loggerName: 'command:hive' });
 
@@ -757,14 +757,14 @@ module.exports = {
             }
             if (i.customId === HIVE_DELETE_CANCEL_ID) {
               handled = true;
-              await i.update(buildHiveDeleteV2Payload({ hiveName: hive.name || 'your hive', hiveId: hive.id, state: 'cancelled', includeFlags: false }));
+              await i.update(buildHiveDeleteV2Payload({ hiveName: hive.name || 'your hive', hiveId: hive.id, state: 'cancelled', includeFlags: false, client: interaction.client }));
               collector.stop('cancelled');
               return;
             }
             if (i.customId === HIVE_DELETE_CONFIRM_ID) {
               handled = true;
               await hiveModel.deleteHiveById(hive.id);
-              await i.update(buildHiveDeleteV2Payload({ hiveName: hive.name || 'your hive', hiveId: hive.id, state: 'deleted', includeFlags: false }));
+              await i.update(buildHiveDeleteV2Payload({ hiveName: hive.name || 'your hive', hiveId: hive.id, state: 'deleted', includeFlags: false, client: interaction.client }));
               collector.stop('deleted');
               return;
             }
@@ -775,7 +775,7 @@ module.exports = {
 
         collector.on('end', async (_collected, reason) => {
           if (!handled && reason === 'time') {
-            try { msg.edit(buildHiveDeleteV2Payload({ hiveName: hive.name || 'your hive', hiveId: hive.id, state: 'timed_out', includeFlags: false })).catch(() => {}); } catch (_) {}
+            try { msg.edit(buildHiveDeleteV2Payload({ hiveName: hive.name || 'your hive', hiveId: hive.id, state: 'timed_out', includeFlags: false, client: interaction.client })).catch(() => {}); } catch (_) {}
           }
         });
         return;

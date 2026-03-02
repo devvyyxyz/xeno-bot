@@ -10,13 +10,14 @@ const {
   MessageFlags
 } = require('discord.js');
 const { getCommandConfig } = require('../../utils/commandsConfig');
+const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const safeReply = require('../../utils/safeReply');
 const emojisCfg = require('../../../config/emojis.json');
 
 const cmd = getCommandConfig('emojis') || { name: 'emojis', description: 'View all emojis in the bot' };
 const EMOJIS_PER_PAGE = 20;
 
-function buildEmojiPage({ pageIdx = 0, expired = false }) {
+function buildEmojiPage({ pageIdx = 0, expired = false, client = null }) {
   const emojiEntries = Object.entries(emojisCfg || {});
   const totalPages = Math.ceil(emojiEntries.length / EMOJIS_PER_PAGE);
   const safePageIdx = Math.max(0, Math.min(pageIdx, totalPages - 1));
@@ -26,9 +27,7 @@ function buildEmojiPage({ pageIdx = 0, expired = false }) {
 
   const container = new ContainerBuilder();
 
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`## Emojis • Xeno-Bot Library`)
-  );
+  addV2TitleWithBotThumbnail({ container, title: 'Emojis • Xeno-Bot Library', client });
 
   if (page.length === 0) {
     container.addTextDisplayComponents(
@@ -95,7 +94,7 @@ module.exports = {
 
       await safeReply(
         interaction,
-        { components: buildEmojiPage({ pageIdx: 0 }), flags: MessageFlags.IsComponentsV2, ephemeral: true },
+          { components: buildEmojiPage({ pageIdx: 0, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true },
         { loggerName: 'command:emojis' }
       );
 
@@ -119,7 +118,7 @@ module.exports = {
           } else if (i.customId === 'emoji-next-page') {
             currentPage = Math.min(totalPages - 1, currentPage + 1);
           }
-          await i.update({ components: buildEmojiPage({ pageIdx: currentPage }) });
+          await i.update({ components: buildEmojiPage({ pageIdx: currentPage, client: interaction.client }) });
         } catch (err) {
           try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:emojis' }); } catch (_) {}
         }
@@ -127,7 +126,7 @@ module.exports = {
 
       collector.on('end', async () => {
         try {
-          await safeReply(interaction, { components: buildEmojiPage({ pageIdx: currentPage, expired: true }), flags: MessageFlags.IsComponentsV2, ephemeral: true }, { loggerName: 'command:emojis' });
+          await safeReply(interaction, { components: buildEmojiPage({ pageIdx: currentPage, expired: true, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true }, { loggerName: 'command:emojis' });
         } catch (_) {}
       });
 
