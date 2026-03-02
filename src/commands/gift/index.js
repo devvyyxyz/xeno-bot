@@ -364,7 +364,7 @@ module.exports = {
         }
 
         // Check if xenomorph is in evolution queue
-        const evolutionQueue = await db.knex('evolution_queue').where({ xenomorph_id: xenoId }).first();
+        const evolutionQueue = await db.knex('evolution_queue').where({ xeno_id: xenoId }).first();
         if (evolutionQueue) {
           await safeReply(interaction, { 
             content: 'Cannot gift a xenomorph that is currently evolving!', 
