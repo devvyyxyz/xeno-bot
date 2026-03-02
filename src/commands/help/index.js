@@ -1,14 +1,19 @@
 const {
   ContainerBuilder,
   TextDisplayBuilder,
-  MessageFlags
+  MessageFlags,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  SectionBuilder
 } = require('discord.js');
 const {
   ActionRowBuilder,
   StringSelectMenuBuilder,
-  SecondaryButtonBuilder
+  SecondaryButtonBuilder,
+  PrimaryButtonBuilder
 } = require('@discordjs/builders');
 const { getCommandConfig, getCommandsObject } = require('../../utils/commandsConfig');
+const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const fallbackLogger = require('../../utils/fallbackLogger');
 const safeReply = require('../../utils/safeReply');
 const cmd = getCommandConfig('help') || { name: 'help', description: 'Show help for available commands' };
@@ -129,10 +134,57 @@ module.exports = {
 
     function buildPagesForCategory(cat) {
       const cmds = getCommandsByCategory(cat);
-      const lines = cmds.map(c => ({ mention: toMention(c), description: c.description || '' }));
-      const PAGE_SIZE = 12;
+      const commandsCfg = getCommandsObject();
+      
+      // Group commands by their 'group' field
+      const grouped = {};
+      cmds.forEach(c => {
+        let group = 'Other';
+        
+        // Try to get group from command itself first
+        if (c.group) {
+          group = c.group;
+        } else if (commandsCfg && commandsCfg[cat]) {
+          // For subcommands: look up base command's group or subcommand's group
+          const baseName = c.base || c.name;
+          const baseEntry = commandsCfg[cat][baseName];
+          
+          if (baseEntry) {
+            if (c.sub && baseEntry.subcommands && baseEntry.subcommands[c.sub]) {
+              // Try subcommand's own group first
+              group = baseEntry.subcommands[c.sub].group || baseEntry.group || 'Other';
+            } else {
+              // Use base command's group
+              group = baseEntry.group || 'Other';
+            }
+          }
+        }
+        
+        if (!grouped[group]) grouped[group] = [];
+        grouped[group].push(c);
+      });
+      
+      // Create pages where each page contains multiple groups
       const pages = [];
-      for (let i = 0; i < lines.length; i += PAGE_SIZE) pages.push(lines.slice(i, i + PAGE_SIZE));
+      const groupEntries = Object.entries(grouped);
+      let currentPage = [];
+      let currentSize = 0;
+      
+      for (const [groupName, cmds] of groupEntries) {
+        const groupData = { groupName, commands: cmds };
+        currentSize += cmds.length + 1; // +1 for group header
+        
+        // Start new page if current would exceed size
+        if (currentSize > 10 && currentPage.length > 0) {
+          pages.push(currentPage);
+          currentPage = [];
+          currentSize = cmds.length + 1;
+        }
+        
+        currentPage.push(groupData);
+      }
+      
+      if (currentPage.length > 0) pages.push(currentPage);
       return pages.length ? pages : [[]];
     }
 
@@ -156,27 +208,47 @@ module.exports = {
     const commandsCfg = getCommandsObject();
     const catEmojis = (commandsCfg && commandsCfg.categoryEmojis) || {};
 
-    function buildHelpComponents(cat, pages, pageIndex, expired = false) {
-      const page = pages[pageIndex] || [];
+    function buildHelpComponents(cat, pages, pageIndex, expired = false, client = null) {
+      const pageGroups = pages[pageIndex] || [];
       const container = new ContainerBuilder();
 
+      addV2TitleWithBotThumbnail({ container, title: 'Commands Help', client });
+
       container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent('## 📖 Bot Commands'),
         new TextDisplayBuilder().setContent('Xeno Bot manages egg spawns, collections, and in-server economies. Use commands below to interact with bot features.'),
         new TextDisplayBuilder().setContent(`**Setup (Server Admins)**\n${setupIntroText()}`)
       );
 
-      if (!page.length) {
+      if (!pageGroups.length) {
         container.addTextDisplayComponents(
           new TextDisplayBuilder().setContent('_No visible commands in this category._')
         );
       } else {
-        const body = page
-          .map(e => `**${e.mention}**${e.description ? `\n${e.description}` : ''}`)
-          .join('\n\n');
-        container.addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(body)
-        );
+        // Render each group with its commands
+        for (const groupData of pageGroups) {
+          if (!groupData || !groupData.commands) continue;
+          
+          const { groupName, commands } = groupData;
+          const lines = commands
+            .map(c => {
+              if (!c) return null;
+              try {
+                const mention = toMention(c);
+                const desc = (c.description || '').substring(0, 100); // Limit description length
+                return desc ? `**${mention}**\n${desc}` : `**${mention}**`;
+              } catch (e) {
+                return null;
+              }
+            })
+            .filter(l => l !== null)
+            .join('\n\n');
+          
+          if (lines) {
+            container.addTextDisplayComponents(
+              new TextDisplayBuilder().setContent(`**${groupName}**\n\n${lines}`)
+            );
+          }
+        }
       }
 
       if (!expired) {
@@ -204,12 +276,18 @@ module.exports = {
           )
         );
 
-        container.addActionRowComponents(
-          new ActionRowBuilder().addComponents(
-            new SecondaryButtonBuilder().setCustomId('help-prev').setLabel('Previous').setDisabled(pageIndex === 0),
-            new SecondaryButtonBuilder().setCustomId('help-next').setLabel('Next').setDisabled(pageIndex >= pages.length - 1)
-          )
+        // Separator before pagination
+        container.addSeparatorComponents(
+          new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
         );
+
+        const pageText = pages.length > 1 ? `Page ${pageIndex + 1} of ${pages.length}` : '';
+        const navRow = new ActionRowBuilder().addComponents(
+          new SecondaryButtonBuilder().setCustomId('help-prev').setLabel('Previous').setDisabled(pageIndex === 0),
+          new SecondaryButtonBuilder().setCustomId('help-page-info').setLabel(pageText || 'Navigation').setDisabled(true),
+          new SecondaryButtonBuilder().setCustomId('help-next').setLabel('Next').setDisabled(pageIndex >= pages.length - 1)
+        );
+        container.addActionRowComponents(navRow);
       }
 
       const footer = expired
@@ -226,7 +304,7 @@ module.exports = {
 
     try {
       await safeReply(interaction, {
-        components: buildHelpComponents(currentCategory, pages, page, false),
+        components: buildHelpComponents(currentCategory, pages, page, false, interaction.client),
         flags: MessageFlags.IsComponentsV2,
         ephemeral: cmd.ephemeral === true
       }, { loggerName: 'command:help' });
@@ -264,14 +342,14 @@ module.exports = {
           currentCategory = cat;
           pages = buildPagesForCategory(cat);
           page = 0;
-          await i.update({ components: buildHelpComponents(currentCategory, pages, page, false) });
+          await i.update({ components: buildHelpComponents(currentCategory, pages, page, false, interaction.client) });
           return;
         }
 
         if (i.customId === 'help-prev' || i.customId === 'help-next') {
           if (i.customId === 'help-next' && page < pages.length - 1) page++;
           if (i.customId === 'help-prev' && page > 0) page--;
-          await i.update({ components: buildHelpComponents(currentCategory, pages, page, false) });
+          await i.update({ components: buildHelpComponents(currentCategory, pages, page, false, interaction.client) });
           return;
         }
       } catch (err) {
@@ -281,10 +359,9 @@ module.exports = {
 
     collector.on('end', async () => {
       try {
-        await safeReply(interaction, {
-          components: buildHelpComponents(currentCategory, pages, page, true),
-          flags: MessageFlags.IsComponentsV2
-        }, { loggerName: 'command:help' });
+        if (msg) {
+          await msg.edit({ components: buildHelpComponents(currentCategory, pages, page, true, interaction.client) });
+        }
       } catch (e) { try { logger && logger.warn && logger.warn('Failed finalizing help view after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging help finalization failure', le && (le.stack || le)); } catch (ignored) {} } }
     });
   },
