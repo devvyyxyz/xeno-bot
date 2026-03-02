@@ -9,7 +9,13 @@ const cmd = getCommandConfig('ping') || { name: 'ping', description: 'Replies wi
 
 function buildPingPayload(interaction, customId, includeButton = true, footerText = null) {
   const botLatency = Date.now() - Number(interaction.createdTimestamp || Date.now());
-  const apiLatency = Number(interaction.client?.ws?.ping || 0);
+  // Try multiple ways to get API latency for Discord.js v14 compatibility
+  const apiLatency = Number(
+    interaction.client?.ws?.ping || 
+    interaction.client?.ping || 
+    interaction.client?.rest?.ping ||
+    0
+  );
   const header = new TextDisplayBuilder().setContent('## Pong!');
   const latency = new TextDisplayBuilder().setContent(`Bot: ${botLatency}ms • API: ${apiLatency}ms`);
   const footer = footerText ? new TextDisplayBuilder().setContent(`_${footerText}_`) : null;
