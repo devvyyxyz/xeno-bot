@@ -255,22 +255,41 @@ async function startup() {
 // Handle uncaught promise rejections (prevents silent crashes)
 process.on('unhandledRejection', (reason, promise) => {
   try {
-    const msg = reason && (reason.stack || String(reason)) || String(promise);
-    baseLogger.error('Unhandled promise rejection', { reason: msg, promise: String(promise) });
+    const reasonStr = reason instanceof Error 
+      ? reason.stack || reason.message 
+      : typeof reason === 'object' 
+        ? JSON.stringify(reason)
+        : String(reason);
+    
+    baseLogger.error('Unhandled promise rejection', { 
+      reason: reasonStr,
+      reasonType: reason?.constructor?.name || typeof reason,
+      promiseState: promise?.state || 'unknown',
+      stack: reason instanceof Error ? reason.stack : undefined
+    });
   } catch (e) {
-    console.error('Unhandled rejection (logger failed)', reason, promise);
+    console.error('Unhandled rejection (logger failed):', reason, promise);
+    console.error('Logger error:', e);
   }
 });
 
 // Handle uncaught exceptions as last resort
 process.on('uncaughtException', (error) => {
   try {
-    baseLogger.error('Uncaught exception', { error: error && (error.stack || error) });
+    baseLogger.error('Uncaught exception', { 
+      error: error && (error.stack || error.message || String(error)),
+      type: error?.constructor?.name || 'Unknown'
+    });
   } catch (e) {
-    console.error('Uncaught exception (logger failed)', error);
+    console.error('Uncaught exception (logger failed):', error);
+    console.error('Logger error:', e);
   }
   // Restart after brief delay to avoid rapid restart loops
-  baseLogger.info('Process will exit in 5s to prevent restart loops');
+  try {
+    baseLogger.info('Process will exit in 5s to prevent restart loops');
+  } catch (e) {
+    console.error('Will exit in 5s to prevent restart loops');
+  }
   setTimeout(() => process.exit(1), 5000);
 });
 

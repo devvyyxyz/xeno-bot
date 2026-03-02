@@ -239,6 +239,7 @@ function scheduleNext(guildId) {
   if (timers.has(guildId)) {
     clearTimeout(timers.get(guildId));
   }
+  // Wrap async IIFE with error handler to prevent unhandled rejections
   (async () => {
     // If there are active eggs and a reschedule was requested, wait until cleared
     const activeMap = activeEggs.get(guildId);
@@ -285,7 +286,13 @@ function scheduleNext(guildId) {
     } catch (e) {
       logger.debug('Scheduled next spawn', { guildId, in_ms: delay, scheduled_at: scheduledAt });
     }
-  })();
+  })().catch(err => {
+    try {
+      logger.error('scheduleNext async error', { guildId, error: err && (err.stack || err) });
+    } catch (logErr) {
+      try { fallbackLogger.error('scheduleNext error (fallback logger)', { guildId, error: String(err), logError: String(logErr) }); } catch (ignored) {}
+    }
+  });
 }
 
 function requestReschedule(guildId) {
