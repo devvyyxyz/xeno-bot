@@ -25,7 +25,7 @@ const { addV2TitleWithBotThumbnail, addV2TitleWithImageThumbnail } = require('..
 const safeReply = require('../../utils/safeReply');
 const logger = require('../../utils/logger').get('command:hunt');
 
-const HOSTS_PER_PAGE = 10;
+const HOSTS_PER_PAGE = 4;
 
 function isValidEmoji(emoji) {
   if (!emoji || typeof emoji !== 'string') return false;
@@ -192,7 +192,7 @@ function buildStatsPage({ userId, allHosts, cfgHosts, emojis = {}, client = null
     rarityMap[rarity].push(h.host_type);
 
     const rarityOrder = { 'common': 0, 'rare': 1, 'very_rare': 2 };
-    if ((rarityOrder[rarity] || 0) > (rarityOrder[rarestRarity] || 0)) {
+    if ((rarityOrder[rarity] || 0) >= (rarityOrder[rarestRarity] || 0)) {
       rarest = getHostDisplay(h.host_type, cfgHosts, emojis);
       rarestHostType = h.host_type;
       rarestRarity = rarity;
