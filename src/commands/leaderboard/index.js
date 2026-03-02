@@ -6,6 +6,7 @@ const eggTypes = require('../../../config/eggTypes.json');
 const fallbackLogger = require('../../utils/fallbackLogger');
 const createInteractionCollector = require('../../utils/collectorHelper');
 const safeReply = require('../../utils/safeReply');
+const { addV2TitleWithGuildThumbnail } = require('../../utils/componentsV2');
 
 const cmd = getCommandConfig('leaderboard') || {
   name: 'leaderboard',
@@ -20,13 +21,13 @@ function buildLeaderboardV2Components({
   selectedSort,
   showEggType = false,
   eggTypeChoices = [],
-  expired = false
+  expired = false,
+  guildAvatarUrl = null
 }) {
   const container = new ContainerBuilder();
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`## ${String(title || 'Leaderboard')}`),
-    new TextDisplayBuilder().setContent(description && String(description).trim().length ? String(description) : 'No data.')
-  );
+  addV2TitleWithGuildThumbnail({ container, title: String(title || 'Leaderboard'), guildAvatarUrl });
+
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(description && String(description).trim().length ? String(description) : 'No data.'));
 
   if (!expired) {
     container.addSeparatorComponents(
@@ -262,15 +263,17 @@ module.exports = {
       }));
       const sortLabel = ({ eggs: 'Total Eggs', rarity: 'Egg Rarity', fastest: 'Fastest Catch', slowest: 'Slowest Catch' }[sortOpt] || (sortOpt.startsWith('eggtype_') ? `Egg Type ${sortOpt.replace('eggtype_','')}` : sortOpt));
       const footer = `This server: #${rank} / ${totalServers} — ${currentTotal} ${sortLabel ? `(${sortLabel})` : ''}`;
+      const guildAvatarUrl = interaction.guild && typeof interaction.guild.iconURL === 'function' ? interaction.guild.iconURL({ size: 256 }) : null;
       const components = buildLeaderboardV2Components({
-        title: '🌐 Global Leaderboard',
+        title: 'Leaderboard',
         description: desc || 'No server data.',
         footer,
         sortChoices,
         selectedSort: sortOpt,
         showEggType: sortOpt === 'eggs',
         eggTypeChoices,
-        expired: false
+        expired: false,
+        guildAvatarUrl
       });
 
       if (interaction.isStringSelectMenu && interaction.isStringSelectMenu()) {
@@ -297,20 +300,21 @@ module.exports = {
       });
       collector.on('end', async () => {
         try {
-          await safeReply(interaction, {
-            components: buildLeaderboardV2Components({
-              title: '🌐 Global Leaderboard',
-              description: desc || 'No server data.',
-              footer,
-              sortChoices,
-              selectedSort: sortOpt,
-              showEggType: false,
-              eggTypeChoices,
-              expired: true
-            }),
-            flags: MessageFlags.IsComponentsV2,
-            ephemeral: cmd.ephemeral === true
-          }, { loggerName: 'command:leaderboard' });
+          if (msg) {
+            await msg.edit({
+              components: buildLeaderboardV2Components({
+                title: 'Leaderboard',
+                description: desc || 'No server data.',
+                footer,
+                sortChoices,
+                selectedSort: sortOpt,
+                showEggType: sortOpt === 'eggs',
+                eggTypeChoices,
+                expired: true,
+                guildAvatarUrl
+              })
+            });
+          }
         } catch (e) { try { require('../../utils/logger').get('command:leaderboard').warn('Failed finalizing global leaderboard view after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed finalizing global leaderboard view after collector end', le && (le.stack || le)); } catch (ignored) {} } }
       });
       return;
@@ -385,15 +389,17 @@ module.exports = {
       value: `eggtype_${e.id}`.length > 25 ? `eggtype_${e.id}`.slice(0, 22) + '...' : `eggtype_${e.id}`
     }));
     const footer = `Sorted by: ${sortChoices.concat(eggTypeChoices).find(c => c.value === sort)?.label || sort}`;
+    const guildAvatarUrl = interaction.guild && typeof interaction.guild.iconURL === 'function' ? interaction.guild.iconURL({ size: 256 }) : null;
     const components = buildLeaderboardV2Components({
-      title: '🏆 Leaderboard',
+      title: 'Leaderboard',
       description: desc || 'No data.',
       footer,
       sortChoices,
       selectedSort: sort,
       showEggType: sort === 'eggs',
       eggTypeChoices,
-      expired: false
+      expired: false,
+      guildAvatarUrl
     });
 
     if (interaction.isStringSelectMenu && interaction.isStringSelectMenu()) {
@@ -419,20 +425,21 @@ module.exports = {
       });
       collector.on('end', async () => {
         try {
-          await safeReply(interaction, {
-            components: buildLeaderboardV2Components({
-              title: '🏆 Leaderboard',
-              description: desc || 'No data.',
-              footer,
-              sortChoices,
-              selectedSort: sort,
-              showEggType: false,
-              eggTypeChoices,
-              expired: true
-            }),
-            flags: MessageFlags.IsComponentsV2,
-            ephemeral: cmd.ephemeral === true
-          }, { loggerName: 'command:leaderboard' });
+          if (msg) {
+            await msg.edit({
+              components: buildLeaderboardV2Components({
+                title: 'Leaderboard',
+                description: desc || 'No data.',
+                footer,
+                sortChoices,
+                selectedSort: sort,
+                showEggType: false,
+                eggTypeChoices,
+                expired: true,
+                guildAvatarUrl
+              })
+            });
+          }
         } catch (e) { try { logger && logger.warn && logger.warn('Failed finalizing leaderboard view after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard finalization failure', le && (le.stack || le)); } catch (ignored) {} } }
       });
     }

@@ -118,9 +118,38 @@ function buildNoticeV2Payload({
   };
 }
 
+function addV2TitleWithGuildThumbnail({ container, title, guildAvatarUrl }) {
+  const safeTitle = String(title || 'Title').trim();
+  const text = safeTitle.startsWith('##') ? safeTitle : `## ${safeTitle}`;
+
+  if (!guildAvatarUrl) {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+    return;
+  }
+
+  try {
+    const section = new SectionBuilder();
+    if (typeof section.setThumbnailAccessory !== 'function') {
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+      return;
+    }
+
+    section
+      .setThumbnailAccessory((thumbnail) => {
+        if (thumbnail && typeof thumbnail.setURL === 'function') thumbnail.setURL(guildAvatarUrl);
+        return thumbnail;
+      })
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+    container.addSectionComponents(section);
+  } catch (_) {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(text));
+  }
+}
+
 module.exports = {
   buildStatsV2Payload,
   buildNoticeV2Payload,
   classifyNoticeTone,
-  addV2TitleWithBotThumbnail
+  addV2TitleWithBotThumbnail,
+  addV2TitleWithGuildThumbnail
 };
