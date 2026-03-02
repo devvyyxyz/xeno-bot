@@ -17,6 +17,8 @@ const createInteractionCollector = require('../../utils/collectorHelper');
 const { getCommandConfig, commands: commandsConfig } = require('../../utils/commandsConfig');
 const { DiscordAPIError } = require('discord.js');
 const eggTypes = require('../../../config/eggTypes.json');
+const hostsCfg = require('../../../config/hosts.json');
+const emojisCfg = require('../../../config/emojis.json');
 const userModel = require('../../models/user');
 const hostModel = require('../../models/host');
 const xenoModel = require('../../models/xenomorph');
@@ -25,6 +27,14 @@ const safeReply = require('../../utils/safeReply');
 const cmd = getCommandConfig('inventory') || { name: 'inventory', description: 'Show your egg inventory or another user\'s.' };
 const shopConfig = require('../../../config/shop.json');
 const PAGE_SIZE = 12;
+
+function getHostDisplay(hostType, cfgHosts, emojis) {
+  const hostInfo = cfgHosts[hostType] || {};
+  const display = hostInfo.display || hostType;
+  const emojiKey = hostInfo.emoji;
+  const emoji = emojiKey && emojis[emojiKey] ? emojis[emojiKey] : '';
+  return emoji ? `${emoji} ${display}` : display;
+}
 
 function chunkPages(fields) {
   const pages = [];
@@ -169,7 +179,7 @@ module.exports = {
         try {
           const rows = await hostModel.listHostsByOwner(target.id);
           for (const r of rows) {
-            const label = `${r.host_type} [${r.id}]`;
+            const label = `${getHostDisplay(r.host_type, hostsCfg.hosts || {}, emojisCfg)} [${r.id}]`;
             out.push({ name: label, value: `Found ${new Date(Number(r.found_at || r.created_at)).toLocaleString()}`, inline: false });
           }
         } catch (e) {

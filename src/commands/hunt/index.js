@@ -2,7 +2,16 @@ const { EmbedBuilder } = require('discord.js');
 const hostModel = require('../../models/host');
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const hostsCfg = require('../../../config/hosts.json');
+const emojisCfg = require('../../../config/emojis.json');
 const createInteractionCollector = require('../../utils/collectorHelper');
+
+function getHostDisplay(hostType, cfgHosts, emojis) {
+  const hostInfo = cfgHosts[hostType] || {};
+  const display = hostInfo.display || hostType;
+  const emojiKey = hostInfo.emoji;
+  const emoji = emojiKey && emojis[emojiKey] ? emojis[emojiKey] : '';
+  return emoji ? `${emoji} ${display}` : display;
+}
 
 const cmd = getCommandConfig('hunt') || { name: 'hunt', description: 'Hunt for hosts to use in evolutions' };
 
@@ -43,9 +52,9 @@ module.exports = {
           if (pick < weights[i]) { chosenKey = hostKeys[i]; break; }
           pick -= weights[i];
         }
-        const hostType = cfgHosts[chosenKey].display || chosenKey;
+        const hostDisplay = getHostDisplay(chosenKey, cfgHosts, emojisCfg);
         const host = await hostModel.addHostForUser(userId, chosenKey);
-        const embed = new EmbedBuilder().setTitle('Hunt Success').setDescription(`You found a host: **${hostType}** (ID: ${host.id}).`).setTimestamp();
+        const embed = new EmbedBuilder().setTitle('Hunt Success').setDescription(`You found a host: **${hostDisplay}** (ID: ${host.id}).`).setTimestamp();
         return safeReply(interaction, { embeds: [embed], ephemeral: true });
       } catch (e) {
         return safeReply(interaction, { content: `Hunt failed: ${e && (e.message || e)}`, ephemeral: true });
@@ -58,7 +67,7 @@ module.exports = {
         if (!rows || rows.length === 0) return safeReply(interaction, { content: 'You have no hunted hosts. Use `/hunt go` to search.', ephemeral: true });
 
         // Build select menu options (max 25)
-        const options = rows.slice(0, 25).map(r => ({ label: `${cfgHosts[r.host_type] ? cfgHosts[r.host_type].display : r.host_type} [${r.id}]`, value: String(r.id), description: `Found ${new Date(r.created_at).toLocaleString()}` }));
+        const options = rows.slice(0, 25).map(r => ({ label: `${getHostDisplay(r.host_type, cfgHosts, emojisCfg)} [${r.id}]`, value: String(r.id), description: `Found ${new Date(r.created_at).toLocaleString()}` }));
         const row = { type: 1, components: [ { type: 3, custom_id: 'hunt-select-host', placeholder: 'Select a host to view details', min_values: 1, max_values: 1, options } ] };
 
         const embed = new EmbedBuilder().setTitle(`${interaction.user.username}'s Hosts`).setDescription('Select a host from the dropdown to view details.').setTimestamp();
@@ -78,8 +87,9 @@ module.exports = {
             const host = rows.find(r => String(r.id) === String(selected));
             if (!host) { await i.reply({ content: 'Selected host not found.', ephemeral: true }); return; }
             const info = cfgHosts[host.host_type] || {};
+            const hostDisplay = getHostDisplay(host.host_type, cfgHosts, emojisCfg);
             const detail = new EmbedBuilder()
-              .setTitle(`${info.display || host.host_type} [${host.id}]`)
+              .setTitle(`${hostDisplay} [${host.id}]`)
               .setDescription(info.description || '')
               .addFields(
                 { name: 'Host Type', value: String(host.host_type), inline: true },

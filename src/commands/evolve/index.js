@@ -15,7 +15,17 @@ const userModel = require('../../models/user');
 const db = require('../../db');
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const safeReply = require('../../utils/safeReply');
+const hostsCfg = require('../../../config/hosts.json');
+const emojisCfg = require('../../../config/emojis.json');
 const cmd = { name: 'evolve', description: 'Evolve your xenomorphs' };
+
+function getHostDisplay(hostType, cfgHosts, emojis) {
+  const hostInfo = cfgHosts[hostType] || {};
+  const display = hostInfo.display || hostType;
+  const emojiKey = hostInfo.emoji;
+  const emoji = emojiKey && emojis[emojiKey] ? emojis[emojiKey] : '';
+  return emoji ? `${emoji} ${display}` : display;
+}
 
 async function hydrateLegacyFacehuggers(userId, guildId) {
   try {
@@ -436,7 +446,7 @@ module.exports = {
       if (sub === 'start' && focusedName === 'host') {
         try {
           const rows = await hostModel.listHostsByOwner(String(userId));
-          const items = rows.slice(0, 25).map(r => ({ id: String(r.id), name: `#${r.id} ${r.host_type}` }));
+          const items = rows.slice(0, 25).map(r => ({ id: String(r.id), name: `#${r.id} ${getHostDisplay(r.host_type, hostsCfg.hosts || {}, emojisCfg)}` }));
           return autocomplete(interaction, items, { map: it => ({ name: it.name, value: Number(it.id) }), max: 25 });
         } catch (e) { try { await interaction.respond([]); } catch (_) {} return; }
       }
