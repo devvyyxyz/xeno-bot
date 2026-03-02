@@ -271,6 +271,7 @@ module.exports = {
     const respond = (payload) => safeReply(interaction, payload, { loggerName: 'command:evolve' });
     try {
       const userId = String(interaction.user.id);
+      const guildId = interaction.guildId;
       const hydrated = await hydrateLegacyFacehuggers(userId, interaction.guildId);
       const loadXenos = async () => await xenoModel.listByOwner(userId);
       const loadJobs = async () => await db.knex('evolution_queue').where({ user_id: userId, status: 'queued' }).orderBy('id', 'asc');
@@ -334,13 +335,12 @@ module.exports = {
 
               if (!hostValidationFailed) {
                 const defaults = { cost_jelly: Number(stepReq.cost_jelly || 0), time_ms: 1000 * 60 * 60 };
-                const resRow = await db.knex('user_resources').where({ user_id: userId }).first();
-                const jelly = resRow ? Number(resRow.royal_jelly || 0) : 0;
+                const jelly = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
                 if (jelly < defaults.cost_jelly) {
                   await respond({ components: buildEvolveView({ screen: 'result', message: `Insufficient royal jelly. Need ${defaults.cost_jelly}.`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
                 } else {
                   if (defaults.cost_jelly > 0) {
-                    await db.knex('user_resources').where({ user_id: userId }).update({ royal_jelly: Math.max(0, jelly - defaults.cost_jelly), updated_at: db.knex.fn.now() });
+                    await userModel.modifyCurrencyForGuild(String(userId), guildId, 'royal_jelly', -defaults.cost_jelly);
                   }
                   const now = Date.now();
                   const finishes = now + defaults.time_ms;
