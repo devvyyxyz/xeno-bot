@@ -16,8 +16,15 @@ function buildPingPayload(interaction, customId, includeButton = true, footerTex
     interaction.client?.rest?.ping ||
     0
   );
+  
+  // Get shard info if available
+  const shardInfo = interaction.guild && interaction.client?.shard 
+    ? `Shard ${interaction.client.shard.ids[0]}/${interaction.client.shard.count}`
+    : 'No shard info';
+  
   const header = new TextDisplayBuilder().setContent('## Pong!');
   const latency = new TextDisplayBuilder().setContent(`Bot: ${botLatency}ms • API: ${apiLatency}ms`);
+  const shard = new TextDisplayBuilder().setContent(`📍 ${shardInfo}`);
   const footer = footerText ? new TextDisplayBuilder().setContent(`_${footerText}_`) : null;
 
   const container = new ContainerBuilder();
@@ -29,10 +36,10 @@ function buildPingPayload(interaction, customId, includeButton = true, footerTex
             .setCustomId(customId)
             .setLabel('Ping Again')
         )
-        .addTextDisplayComponents(header, latency)
+        .addTextDisplayComponents(header, latency, shard)
     );
   } else {
-    container.addTextDisplayComponents(header, latency);
+    container.addTextDisplayComponents(header, latency, shard);
   }
   if (footer) container.addTextDisplayComponents(footer);
 

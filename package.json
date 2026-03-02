@@ -7,6 +7,8 @@
     "start": "NODE_ENV=production node src/index.js",
     "start:dev": "NODE_ENV=development node src/index.js",
     "dev": "NODE_ENV=development nodemon",
+    "start:shards": "NODE_ENV=production node shard.js",
+    "dev:shards": "NODE_ENV=development node shard.js",
     "deploy-dev-commands": "BOT_PROFILE=dev node deploy-commands.js",
     "clear-public-commands": "BOT_PROFILE=public CLEAR_GLOBAL_COMMANDS=true node deploy-commands.js",
     "deploy:public": "BOT_PROFILE=public node deploy-commands.js",
