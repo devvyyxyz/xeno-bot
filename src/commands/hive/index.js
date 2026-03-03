@@ -163,14 +163,18 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
     ? rows.xenos.filter(x => Number(x.hive_id) === Number(hive.id))
     : [];
   const hivePopulation = hiveMembers.length;
-  const snapshotLines = [
-    `**Owner:** <@${targetUser.id}>`,
-    `**Type:** \`${hiveType}\``,
-    `**Capacity:** ${hivePopulation}/${hive.capacity || 0}`,
-    `**Jelly/hour:** ${hive.jelly_production_per_hour || 0}`,
-    `**Queen:** ${hive.queen_xeno_id ? `#${hive.queen_xeno_id}` : 'Unassigned'}`
-  ];
-  container.addTextDisplayComponents(new TextDisplayBuilder().setContent(snapshotLines.join('\n')));
+  
+  // Show snapshot info on all screens except types
+  if (screen !== 'types') {
+    const snapshotLines = [
+      `**Owner:** <@${targetUser.id}>`,
+      `**Type:** \`${hiveType}\``,
+      `**Capacity:** ${hivePopulation}/${hive.capacity || 0}`,
+      `**Jelly/hour:** ${hive.jelly_production_per_hour || 0}`,
+      `**Queen:** ${hive.queen_xeno_id ? `#${hive.queen_xeno_id}` : 'Unassigned'}`
+    ];
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(snapshotLines.join('\n')));
+  }
 
   if (screen === 'stats') {
     const hiveMembers = Array.isArray(rows.xenos)
