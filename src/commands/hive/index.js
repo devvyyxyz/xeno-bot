@@ -19,6 +19,7 @@ const HIVE_DELETE_CANCEL_ID = 'hive-delete-cancel';
 const HIVE_ACTION_REFRESH_ID = 'hive-action-refresh';
 const HIVE_ACTION_UPGRADE_QUEEN_ID = 'hive-action-upgrade-queen';
 const HIVE_ACTION_UPGRADE_MODULE_ID = 'hive-action-upgrade-module';
+const HIVE_ACTION_UPGRADE_CAPACITY_ID = 'hive-action-upgrade-capacity';
 const HIVE_NAV_ASSIGN_QUEEN_ID = 'hive-nav-assign-queen';
 const HIVE_NAV_ADD_XENOS_ID = 'hive-nav-add-xenos';
 const HIVE_NAV_DELETE_ID = 'hive-nav-delete';
@@ -28,6 +29,9 @@ const HIVE_NAV_MEMBERS_ID = 'hive-nav-members';
 const HIVE_MEMBERS_PAGINATION_PREFIX = 'hive-members';
 const HIVE_MEMBERS_PREV_PAGE = `${HIVE_MEMBERS_PAGINATION_PREFIX}-prev-page`;
 const HIVE_MEMBERS_NEXT_PAGE = `${HIVE_MEMBERS_PAGINATION_PREFIX}-next-page`;
+const HIVE_MODULES_PAGINATION_PREFIX = 'hive-modules';
+const HIVE_MODULES_PREV_PAGE = `${HIVE_MODULES_PAGINATION_PREFIX}-prev-page`;
+const HIVE_MODULES_NEXT_PAGE = `${HIVE_MODULES_PAGINATION_PREFIX}-next-page`;
 const HIVE_ASSIGN_QUEEN_SELECT_ID = 'hive-select-assign-queen';
 const HIVE_ADD_XENOS_SELECT_ID = 'hive-select-add-xenos';
 const HIVE_UPGRADE_MODULE_SELECT_ID = 'hive-select-upgrade-module';
@@ -96,6 +100,27 @@ function getUpgradableModules(modulesRows = []) {
   }
   
   return upgradable.sort((a, b) => a.cost - b.cost);
+}
+
+function getCapacityUpgradeInfo(currentCapacity) {
+  const capacityLevels = hiveDefaults.capacityLevels || [];
+  const currentLevel = capacityLevels.find(cl => cl.capacity === currentCapacity);
+  const currentLevelNum = currentLevel ? currentLevel.level : 1;
+  const nextLevel = capacityLevels.find(cl => cl.level === currentLevelNum + 1);
+  
+  if (!nextLevel) return null; // Already at max
+  
+  // Cost formula: base cost of 100 RJ per level
+  const cost = 100 * nextLevel.level;
+  
+  return {
+    currentLevel: currentLevelNum,
+    nextLevel: nextLevel.level,
+    currentCapacity,
+    nextCapacity: nextLevel.capacity,
+    cost,
+    unlockNote: nextLevel.unlock_note || ''
+  };
 }
 
 function buildNavigationRow({ screen, disabled = false }) {
@@ -175,7 +200,7 @@ function toDiscordTimestamp(value, style = 'f') {
   return `<t:${Math.floor(ms / 1000)}:${style}>`;
 }
 
-function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}, expired = false, canAct = true, notice = null, membersPage = 0, client = null }) {
+function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}, expired = false, canAct = true, notice = null, membersPage = 0, modulesPage = 0, client = null }) {
   const container = new ContainerBuilder();
   
   const title = '## Hive Dashboard';
@@ -238,29 +263,69 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
       const level = moduleRow ? Number(moduleRow.level || 0) : (cfg.default_level || 0);
       return level > (cfg.default_level || 0);
     }).length;
+    
+    // Capacity upgrade info
+    const capacityUpgrade = getCapacityUpgradeInfo(hive.capacity);
+    
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Progress:** ${upgradedCount}/${moduleCount} modules upgraded`));
-    container.addActionRowComponents(
-      new ActionRowBuilder().addComponents(
-        new PrimaryButtonBuilder()
-          .setCustomId(HIVE_ACTION_UPGRADE_QUEEN_ID)
-          .setLabel('Queen +1 (50 RJ)')
-          .setDisabled(!canAct || !hasQueen)
-      )
+    
+    // Header buttons: Queen and Capacity upgrades
+    const headerButtons = [];
+    
+    headerButtons.push(
+      new PrimaryButtonBuilder()
+        .setCustomId(HIVE_ACTION_UPGRADE_QUEEN_ID)
+        .setLabel('Queen +1 (50 RJ)')
+        .setDisabled(!canAct || !hasQueen)
     );
     
-    // Display each module with inline upgrade button
-    const upgradable = getUpgradableModules(rows.modules || []);
-    if (upgradable.length === 0) {
-      // No upgradable modules - show all modules as text only
-      for (const k of Object.keys(modulesCfg)) {
-        const cfg = modulesCfg[k];
-        const moduleRow = rows.modules ? rows.modules.find(r => r.module_key === k) : null;
-        const level = moduleRow ? Number(moduleRow.level || 0) : (cfg.default_level || 0);
-        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**${cfg.display}** (${k})\nLevel ${level} — ${cfg.description}`));
-      }
-    } else {
-      // Display upgradable modules with inline section accessory buttons
-      for (const m of upgradable) {
+    if (capacityUpgrade) {
+      headerButtons.push(
+        new PrimaryButtonBuilder()
+          .setCustomId(HIVE_ACTION_UPGRADE_CAPACITY_ID)
+          .setLabel(`Capacity +${capacityUpgrade.nextCapacity - capacityUpgrade.currentCapacity} (${formatNumber(capacityUpgrade.cost)} RJ)`)
+          .setDisabled(!canAct)
+      );
+    }
+    
+    container.addActionRowComponents(
+      new ActionRowBuilder().addComponents(...headerButtons)
+    );
+    
+    // Build combined list of all modules (upgradable and maxed)
+    const allModules = Object.keys(modulesCfg).map(k => {
+      const cfg = modulesCfg[k];
+      const moduleRow = rows.modules ? rows.modules.find(r => r.module_key === k) : null;
+      const level = moduleRow ? Number(moduleRow.level || 0) : (cfg.default_level || 0);
+      const maxLevel = Number(cfg.max_level || 0);
+      const isMaxed = maxLevel > 0 && level >= maxLevel;
+      const cost = isMaxed ? 0 : Math.max(1, Math.floor(Number(cfg.base_cost_jelly || 1) * (level + 1)));
+      
+      return {
+        moduleKey: k,
+        cfg,
+        level,
+        maxLevel,
+        isMaxed,
+        cost
+      };
+    });
+    
+    // Paginate modules
+    const pagination = getPaginationState({
+      items: allModules,
+      pageIdx: Number(modulesPage || 0),
+      pageSize: 5
+    });
+    const pageModules = pagination.pageItems;
+    
+    // Display modules on current page
+    for (const m of pageModules) {
+      if (m.isMaxed) {
+        container.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`**${m.cfg.display}** (${m.moduleKey})\nLevel ${m.level} — _max level_ — ${m.cfg.description}`)
+        );
+      } else {
         const section = new SectionBuilder()
           .setPrimaryButtonAccessory((button) =>
             button
@@ -272,25 +337,25 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
             new TextDisplayBuilder().setContent(`**${m.cfg.display}** (${m.moduleKey})\nLevel ${m.level} — ${m.cfg.description}`)
           );
         container.addSectionComponents(section);
-        container.addSeparatorComponents(
-          new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small)
-        );
       }
       
-      // Show maxed-out modules
-      const maxedModules = Object.keys(modulesCfg).filter(k => !upgradable.some(u => u.moduleKey === k));
-      if (maxedModules.length > 0) {
-        container.addSeparatorComponents(
-          new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
-        );
-        const maxedText = maxedModules.map(k => {
-          const cfg = modulesCfg[k];
-          const moduleRow = rows.modules ? rows.modules.find(r => r.module_key === k) : null;
-          const level = moduleRow ? Number(moduleRow.level || 0) : (cfg.default_level || 0);
-          return `**${cfg.display}** (${k})\nLevel ${level} — _max level_`;
-        }).join('\n\n');
-        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`_Maxed Modules:_\n${maxedText}`));
-      }
+      container.addSeparatorComponents(
+        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small)
+      );
+    }
+    
+    // Add pagination if needed
+    if (pagination.totalPages > 1) {
+      container.addActionRowComponents(
+        buildPaginationRow({
+          prefix: HIVE_MODULES_PAGINATION_PREFIX,
+          pageIdx: pagination.safePageIdx,
+          totalPages: pagination.totalPages,
+          totalItems: pagination.totalItems,
+          prevLabel: 'Previous',
+          nextLabel: 'Next'
+        })
+      );
     }
   } else if (screen === 'milestones') {
     const milestonesCfg = hiveDefaults.milestones || {};
@@ -679,6 +744,7 @@ module.exports = {
 
       let currentScreen = 'stats';
       let currentMembersPage = 0;
+      let currentModulesPage = 0;
 
       const collector = msg.createMessageComponentCollector({
         filter: i => i.user.id === userId,
@@ -695,7 +761,7 @@ module.exports = {
             xenos = await xenomorphModel.getXenosByOwner(String(userId)).catch(() => xenos);
             let rjRefresh = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
             resources = { royal_jelly: rjRefresh };
-            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: 'Refreshed hive data.', client: interaction.client }) });
+            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: 'Refreshed hive data.', membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
             return;
           }
 
@@ -704,7 +770,7 @@ module.exports = {
             let rj = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
             if (rj < cost) {
               resources = { royal_jelly: rj };
-              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Not enough Royal Jelly. Need ${formatNumber(cost)}.`, client: interaction.client }) });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Not enough Royal Jelly. Need ${formatNumber(cost)}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
               return;
             }
             await userModel.modifyCurrencyForGuild(String(userId), guildId, 'royal_jelly', -cost);
@@ -712,7 +778,29 @@ module.exports = {
             viewHive = { ...viewHive, jelly_production_per_hour: Number(viewHive.jelly_production_per_hour || 0) + 1 };
             rj = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
             resources = { royal_jelly: rj };
-            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Queen upgraded. +1 jelly/hour (spent ${formatNumber(cost)} RJ).`, client: interaction.client }) });
+            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Queen upgraded. +1 jelly/hour (spent ${formatNumber(cost)} RJ).`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
+            return;
+          }
+
+          if (i.customId === HIVE_ACTION_UPGRADE_CAPACITY_ID) {
+            const capacityUpgrade = getCapacityUpgradeInfo(viewHive.capacity);
+            if (!capacityUpgrade) {
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: 'Hive capacity is already at maximum level.', membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
+              return;
+            }
+            const cost = capacityUpgrade.cost;
+            let rj = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
+            if (rj < cost) {
+              resources = { royal_jelly: rj };
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Not enough Royal Jelly. Need ${formatNumber(cost)}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
+              return;
+            }
+            await userModel.modifyCurrencyForGuild(String(userId), guildId, 'royal_jelly', -cost);
+            await hiveModel.updateHiveById(viewHive.id, { capacity: capacityUpgrade.nextCapacity });
+            viewHive = { ...viewHive, capacity: capacityUpgrade.nextCapacity };
+            rj = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
+            resources = { royal_jelly: rj };
+            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Capacity upgraded to ${capacityUpgrade.nextCapacity}. ${capacityUpgrade.unlockNote}`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
             return;
           }
 
@@ -731,14 +819,14 @@ module.exports = {
             }
 
             if (!candidate) {
-              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: 'All modules are already at max level.', client: interaction.client }) });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: 'All modules are already at max level.', membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
               return;
             }
 
             let rj = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
             if (rj < candidate.cost) {
               resources = { royal_jelly: rj };
-              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Not enough Royal Jelly for ${candidate.cfg.display}. Need ${formatNumber(candidate.cost)}.`, client: interaction.client }) });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Not enough Royal Jelly for ${candidate.cfg.display}. Need ${formatNumber(candidate.cost)}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
               return;
             }
 
@@ -751,7 +839,7 @@ module.exports = {
             modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => modules);
             let rjAfterModuleUpgrade = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
             resources = { royal_jelly: rjAfterModuleUpgrade };
-            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Upgraded ${candidate.cfg.display} to level ${candidate.level + 1}.`, client: interaction.client }) });
+            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Upgraded ${candidate.cfg.display} to level ${candidate.level + 1}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
             return;
           }
 
@@ -767,7 +855,7 @@ module.exports = {
             let rj = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
             if (rj < moduleToUpgrade.cost) {
               resources = { royal_jelly: rj };
-              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Not enough Royal Jelly for ${moduleToUpgrade.cfg.display}. Need ${formatNumber(moduleToUpgrade.cost)}.`, client: interaction.client }) });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Not enough Royal Jelly for ${moduleToUpgrade.cfg.display}. Need ${formatNumber(moduleToUpgrade.cost)}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
               return;
             }
 
@@ -780,7 +868,7 @@ module.exports = {
             modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => modules);
             let rjAfter = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
             resources = { royal_jelly: rjAfter };
-            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Upgraded ${moduleToUpgrade.cfg.display} to level ${moduleToUpgrade.level + 1}.`, client: interaction.client }) });
+            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Upgraded ${moduleToUpgrade.cfg.display} to level ${moduleToUpgrade.level + 1}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
             return;
           }
 
@@ -805,7 +893,7 @@ module.exports = {
 
             viewHive = { ...viewHive, queen_xeno_id: queenId };
             xenos = await xenomorphModel.getXenosByOwner(String(userId)).catch(() => xenos);
-            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Assigned xenomorph #${queenId} as hive queen.`, client: interaction.client }) });
+            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Assigned xenomorph #${queenId} as hive queen.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
             return;
           }
 
@@ -830,12 +918,12 @@ module.exports = {
             const xenosToAdd = finalIds.slice(0, remainingCapacity);
 
             if (remainingCapacity <= 0) {
-              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Your hive is at capacity (${currentMembers.length}/${capacity}).`, client: interaction.client }) });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Your hive is at capacity (${currentMembers.length}/${capacity}).`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
               return;
             }
 
             if (xenosToAdd.length < finalIds.length) {
-              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Only ${remainingCapacity} slot(s) available. Adding first ${xenosToAdd.length} xenomorph(s).`, client: interaction.client }) });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Only ${remainingCapacity} slot(s) available. Adding first ${xenosToAdd.length} xenomorph(s).`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
               return;
             }
 
@@ -851,12 +939,15 @@ module.exports = {
               });
 
             xenos = await xenomorphModel.getXenosByOwner(String(userId)).catch(() => xenos);
-            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Added ${formatNumber(updatedCount || xenosToAdd.length)} xenomorph(s) to this hive.`, client: interaction.client }) });
+            await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Added ${formatNumber(updatedCount || xenosToAdd.length)} xenomorph(s) to this hive.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
             return;
           }
 
           if (i.customId === 'hive-nav-stats') currentScreen = 'stats';
-          else if (i.customId === 'hive-nav-modules') currentScreen = 'modules';
+          else if (i.customId === 'hive-nav-modules') {
+            currentScreen = 'modules';
+            currentModulesPage = 0;
+          }
           else if (i.customId === 'hive-nav-milestones') currentScreen = 'milestones';
           else if (i.customId === 'hive-nav-queen') currentScreen = 'queen';
           else if (i.customId === 'hive-nav-types') currentScreen = 'types';
@@ -880,6 +971,24 @@ module.exports = {
             await i.update({ components: buildHiveScreen({ screen: 'members', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, membersPage: currentMembersPage, client: interaction.client }) });
             return;
           }
+          else if (i.customId === HIVE_MODULES_PREV_PAGE) {
+            const modulesCfg = hiveDefaults.modules || {};
+            const allModules = Object.keys(modulesCfg);
+            const pagination = getPaginationState({ items: allModules, pageIdx: currentModulesPage, pageSize: 5 });
+            const maxPage = Math.max(1, pagination.totalPages);
+            currentModulesPage = Math.max(0, Math.min(maxPage - 1, currentModulesPage - 1));
+            await i.update({ components: buildHiveScreen({ screen: 'modules', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, modulesPage: currentModulesPage, client: interaction.client }) });
+            return;
+          }
+          else if (i.customId === HIVE_MODULES_NEXT_PAGE) {
+            const modulesCfg = hiveDefaults.modules || {};
+            const allModules = Object.keys(modulesCfg);
+            const pagination = getPaginationState({ items: allModules, pageIdx: currentModulesPage, pageSize: 5 });
+            const maxPage = Math.max(1, pagination.totalPages);
+            currentModulesPage = Math.max(0, Math.min(maxPage - 1, currentModulesPage + 1));
+            await i.update({ components: buildHiveScreen({ screen: 'modules', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, modulesPage: currentModulesPage, client: interaction.client }) });
+            return;
+          }
           else if (i.customId === HIVE_NAV_ASSIGN_QUEEN_ID) currentScreen = 'assign-queen';
           else if (i.customId === HIVE_NAV_ADD_XENOS_ID) currentScreen = 'add-xenos';
           else if (i.customId === HIVE_NAV_DELETE_ID) {
@@ -901,14 +1010,14 @@ module.exports = {
             return;
           }
 
-          await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, membersPage: currentMembersPage, client: interaction.client }) });
+          await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
         } catch (err) {
           try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hive' }); } catch (_) {}
         }
       });
 
       collector.on('end', () => {
-        try { msg.edit({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: true, canAct, client: interaction.client }) }).catch(() => {}); } catch (_) {}
+        try { msg.edit({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: true, canAct, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) }).catch(() => {}); } catch (_) {}
       });
       return;
     } catch (e) {
