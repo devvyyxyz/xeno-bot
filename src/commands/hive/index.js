@@ -20,6 +20,8 @@ const HIVE_ACTION_UPGRADE_MODULE_ID = 'hive-action-upgrade-module';
 const HIVE_NAV_ASSIGN_QUEEN_ID = 'hive-nav-assign-queen';
 const HIVE_NAV_ADD_XENOS_ID = 'hive-nav-add-xenos';
 const HIVE_NAV_DELETE_ID = 'hive-nav-delete';
+const HIVE_DELETE_BACK_ID = 'hive-delete-back';
+const HIVE_CREATE_VIEW_ID = 'hive-create-view';
 const HIVE_ASSIGN_QUEEN_SELECT_ID = 'hive-select-assign-queen';
 const HIVE_ADD_XENOS_SELECT_ID = 'hive-select-add-xenos';
 const HIVE_UPGRADE_MODULE_SELECT_ID = 'hive-select-upgrade-module';
@@ -407,20 +409,31 @@ function buildHiveDeleteV2Payload({ hiveName, hiveId, state = 'confirm', include
     new TextDisplayBuilder().setContent(bodyMap[state] || bodyMap.confirm)
   );
 
-  container.addActionRowComponents(
-    new ActionRowBuilder().addComponents(
-      new DangerButtonBuilder()
-        .setLabel('Delete')
-        .setCustomId(HIVE_DELETE_CONFIRM_ID)
-        .setDisabled(disableButtons),
+  const buttonComponents = [
+    new DangerButtonBuilder()
+      .setLabel('Delete')
+      .setCustomId(HIVE_DELETE_CONFIRM_ID)
+      .setDisabled(disableButtons),
+    new SecondaryButtonBuilder()
+      .setLabel('Cancel')
+      .setCustomId(HIVE_DELETE_CANCEL_ID)
+      .setDisabled(disableButtons)
+  ];
+  
+  if (state !== 'confirm') {
+    buttonComponents.push(
       new SecondaryButtonBuilder()
-        .setLabel('Cancel')
-        .setCustomId(HIVE_DELETE_CANCEL_ID)
-        .setDisabled(disableButtons)
-    )
+        .setLabel('Back to Hive')
+        .setCustomId(HIVE_DELETE_BACK_ID)
+    );
+  }
+
+  container.addActionRowComponents(
+    new ActionRowBuilder().addComponents(...buttonComponents)
   );
 
   const payload = {
+    content: ' ',
     components: [container]
   };
   if (includeFlags) payload.flags = MessageFlags.IsComponentsV2;
@@ -459,13 +472,37 @@ module.exports = {
         if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
 
         const collector = msg.createMessageComponentCollector({
-          filter: i => i.user.id === userId && i.customId === 'hive-create-prompt',
-          time: 60_000,
-          max: 1
+          filter: i => i.user.id === userId && (i.customId === 'hive-create-prompt' || i.customId === HIVE_CREATE_VIEW_ID),
+          time: 60_000
         });
 
         collector.on('collect', async i => {
           try {
+            // Handle view hive button
+            if (i.customId === HIVE_CREATE_VIEW_ID) {
+              const viewHive = await hiveModel.getHiveByUser(userId, guildId);
+              if (!viewHive) {
+                await i.reply({ content: 'Hive not found.', ephemeral: true });
+                return;
+              }
+
+              let modules = [];
+              let milestones = [];
+              let xenos = [];
+              let resources = {};
+              try {
+                modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => []);
+                milestones = await db.knex('hive_milestones').where({ hive_id: viewHive.id }).select('*').catch(() => []);
+                xenos = await xenomorphModel.getXenosByOwner(String(userId)).catch(() => []);
+                resources = { royal_jelly: await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly') };
+              } catch (e) {}
+
+              await i.update({ components: buildHiveScreen({ screen: 'stats', hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct: true, client: interaction.client }) });
+              collector.stop();
+              return;
+            }
+
+            // Handle create hive button
             let xenos = [];
             try { xenos = await xenomorphModel.getXenosByOwner(userId); } catch (e) { xenos = []; }
             const hasEvolved = Array.isArray(xenos) && xenos.some(x => (x.role && x.role !== 'egg') || (x.stage && x.stage !== 'egg'));
@@ -509,7 +546,7 @@ module.exports = {
             );
             container.addActionRowComponents(
               new ActionRowBuilder().addComponents(
-                new PrimaryButtonBuilder().setLabel('Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
+                new PrimaryButtonBuilder().setLabel('View Hive').setCustomId(HIVE_CREATE_VIEW_ID)
               )
             );
             await i.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
@@ -711,12 +748,13 @@ module.exports = {
             const xenosToAdd = finalIds.slice(0, remainingCapacity);
 
             if (remainingCapacity <= 0) {
-              await i.reply({ content: `Your hive is at capacity (${currentMembers.length}/${capacity}).`, ephemeral: true });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Your hive is at capacity (${currentMembers.length}/${capacity}).`, client: interaction.client }) });
               return;
             }
 
             if (xenosToAdd.length < finalIds.length) {
-              await i.reply({ content: `Only ${remainingCapacity} slot(s) available. Adding first ${xenosToAdd.length} xenomorph(s).`, ephemeral: true });
+              await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Only ${remainingCapacity} slot(s) available. Adding first ${xenosToAdd.length} xenomorph(s).`, client: interaction.client }) });
+              return;
             }
 
             const updatedCount = await db.knex('xenomorphs')
@@ -754,7 +792,10 @@ module.exports = {
           }
           else if (i.customId === HIVE_DELETE_CANCEL_ID) {
             await i.update(buildHiveDeleteV2Payload({ hiveName: viewHive.name || 'your hive', hiveId: viewHive.id, state: 'cancelled', includeFlags: false, client: interaction.client }));
-            collector.stop('cancelled');
+            return;
+          }
+          else if (i.customId === HIVE_DELETE_BACK_ID) {
+            await i.update({ components: buildHiveScreen({ screen: 'stats', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, client: interaction.client }) });
             return;
           }
 
