@@ -211,12 +211,41 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
     }).length;
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Progress:** ${upgradedCount}/${moduleCount} modules upgraded`));
     
-    // Display each module with its info for later button attachment
-    for (const k of Object.keys(modulesCfg)) {
-      const cfg = modulesCfg[k];
-      const moduleRow = rows.modules ? rows.modules.find(r => r.module_key === k) : null;
-      const level = moduleRow ? Number(moduleRow.level || 0) : (cfg.default_level || 0);
-      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**${cfg.display}** (${k})\nLevel ${level} — ${cfg.description}`));
+    // Display each module with inline upgrade button
+    const upgradable = getUpgradableModules(rows.modules || []);
+    if (upgradable.length === 0) {
+      // No upgradable modules - show all modules as text only
+      for (const k of Object.keys(modulesCfg)) {
+        const cfg = modulesCfg[k];
+        const moduleRow = rows.modules ? rows.modules.find(r => r.module_key === k) : null;
+        const level = moduleRow ? Number(moduleRow.level || 0) : (cfg.default_level || 0);
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**${cfg.display}** (${k})\nLevel ${level} — ${cfg.description}`));
+      }
+    } else {
+      // Display upgradable modules with buttons, then show maxed modules
+      for (const m of upgradable) {
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**${m.cfg.display}** (${m.moduleKey})\nLevel ${m.level} — ${m.cfg.description}`));
+        container.addActionRowComponents(
+          new ActionRowBuilder().addComponents(
+            new PrimaryButtonBuilder()
+              .setCustomId(`hive-upgrade-module-${m.moduleKey}`)
+              .setLabel(`Upgrade (${formatNumber(m.cost)} RJ)`)
+              .setDisabled(!canAct)
+          )
+        );
+      }
+      
+      // Show maxed-out modules
+      const maxedModules = Object.keys(modulesCfg).filter(k => !upgradable.some(u => u.moduleKey === k));
+      if (maxedModules.length > 0) {
+        const maxedText = maxedModules.map(k => {
+          const cfg = modulesCfg[k];
+          const moduleRow = rows.modules ? rows.modules.find(r => r.module_key === k) : null;
+          const level = moduleRow ? Number(moduleRow.level || 0) : (cfg.default_level || 0);
+          return `**${cfg.display}** (${k})\nLevel ${level} — _max level_`;
+        }).join('\n\n');
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`_Maxed Modules:_\n${maxedText}`));
+      }
     }
   } else if (screen === 'milestones') {
     const milestonesCfg = hiveDefaults.milestones || {};
