@@ -36,11 +36,12 @@ function buildPaginationRow({
   const safeTotalPages = Math.max(1, Number(totalPages) || 1);
   const safePageIdx = Math.max(0, Math.min(Number(pageIdx) || 0, safeTotalPages - 1));
 
-  if (safePageIdx > 0) {
-    row.addComponents(
-      new SecondaryButtonBuilder().setCustomId(`${prefix}-prev-page`).setLabel(prevLabel)
-    );
-  }
+  row.addComponents(
+    new SecondaryButtonBuilder()
+      .setCustomId(`${prefix}-prev-page`)
+      .setLabel(prevLabel)
+      .setDisabled(safePageIdx === 0)
+  );
 
   const pageInfo = showPageInfo && safeTotalPages > 1 ? ` (${safePageIdx + 1}/${safeTotalPages})` : '';
   row.addComponents(
@@ -50,11 +51,12 @@ function buildPaginationRow({
       .setDisabled(true)
   );
 
-  if (safePageIdx < safeTotalPages - 1) {
-    row.addComponents(
-      new SecondaryButtonBuilder().setCustomId(`${prefix}-next-page`).setLabel(nextLabel)
-    );
-  }
+  row.addComponents(
+    new SecondaryButtonBuilder()
+      .setCustomId(`${prefix}-next-page`)
+      .setLabel(nextLabel)
+      .setDisabled(safePageIdx >= safeTotalPages - 1)
+  );
 
   return row;
 }
