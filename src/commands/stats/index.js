@@ -1,6 +1,13 @@
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const userModel = require('../../models/user');
-const { EmbedBuilder } = require('discord.js');
+const {
+  ContainerBuilder,
+  TextDisplayBuilder,
+  ThumbnailBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  MessageFlags
+} = require('discord.js');
 const fallbackLogger = require('../../utils/fallbackLogger');
 const db = require('../../db');
 const safeReply = require('../../utils/safeReply');
@@ -125,20 +132,93 @@ module.exports = {
       const daysSince = firstCatchAt ? Math.max((now - firstCatchAt.getTime()) / 86400000, 1/24) : Math.max((Date.now() - (global._softUptimeStart || Date.now())) / 86400000, 1/24);
       const fmtRate = (n) => `${(n / daysSince).toFixed(2)}/day`;
 
-      const embed = new EmbedBuilder()
-        .setTitle(`${target.username}#${target.discriminator} — Game Stats`)
-        .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
-        .setThumbnail(typeof target.displayAvatarURL === 'function' ? target.displayAvatarURL({ size: 512, extension: 'png' }) : null)
-        .addFields(
-          { name: 'Performance', value: `Catches: ${formatNumber(stats.catches || 0)}\nAvg: ${msToHuman(stats.avg || null)}\nFastest: ${msToHuman(stats.fastest || null)}\nSlowest: ${msToHuman(stats.slowest || null)}\nLeaderboard: ${rankInfo}`, inline: false },
-          { name: 'Inventory', value: `(this server) Eggs: ${formatNumber(totalEggs)} | Items: ${formatNumber(totalItems)}\n(global) Eggs: ${formatNumber(globalEggs)} | Items: ${formatNumber(globalItems)}`, inline: false },
-          { name: 'Top Eggs', value: `(this server) ${topEggsGuild.length ? topEggsGuild.map(e => `${e.k}: ${formatNumber(e.v)} (${fmtRate(e.v)})`).join('\n') : 'none'}\n(global) ${topEggs.length ? topEggs.map(e => `${e.k}: ${formatNumber(e.v)} (${fmtRate(e.v)})`).join('\n') : 'none'}`, inline: false },
-          { name: 'Currency', value: `(this server) ${guildCurrencyLines.length ? guildCurrencyLines.map(c => `${c.k}: ${formatNumber(c.v)}`).join(', ') : `royal_jelly: ${formatNumber(royal || 0)}`}\n(global) ${globalCurrencyLines.length ? globalCurrencyLines.map(c => `${c.k}: ${formatNumber(c.v)}`).join(', ') : 'none'}`, inline: false },
-          { name: 'Misc', value: `Account created: ${accountCreated}\nUser ID: ${target.id}`, inline: false }
-        )
-        .setFooter({ text: 'Game stats' });
+      const container = new ContainerBuilder();
 
-      await safeReply(interaction, { embeds: [embed] }, { loggerName: 'command:stats' });
+      // Title with username
+      const displayName = target.discriminator && target.discriminator !== '0' 
+        ? `${target.username}#${target.discriminator}` 
+        : target.username;
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(`## ${displayName} — Game Stats`)
+      );
+
+      // User avatar thumbnail
+      try {
+        const avatarUrl = typeof target.displayAvatarURL === 'function' 
+          ? target.displayAvatarURL({ size: 512, extension: 'png' }) 
+          : null;
+        if (avatarUrl) {
+          container.addThumbnailComponents(
+            new ThumbnailBuilder().setImageURL(avatarUrl)
+          );
+        }
+      } catch (e) {
+        try { require('../../utils/logger').get('command:stats').warn('Failed adding avatar thumbnail', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging avatar thumbnail error', le && (le.stack || le)); } catch (ignored) {} }
+      }
+
+      // Performance section
+      container.addSeparatorComponents(
+        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false)
+      );
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          `**Performance**\nCatches: ${formatNumber(stats.catches || 0)}\nAvg: ${msToHuman(stats.avg || null)}\nFastest: ${msToHuman(stats.fastest || null)}\nSlowest: ${msToHuman(stats.slowest || null)}\nLeaderboard: ${rankInfo}`
+        )
+      );
+
+      // Inventory section
+      container.addSeparatorComponents(
+        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false)
+      );
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          `**Inventory**\n(this server) Eggs: ${formatNumber(totalEggs)} | Items: ${formatNumber(totalItems)}\n(global) Eggs: ${formatNumber(globalEggs)} | Items: ${formatNumber(globalItems)}`
+        )
+      );
+
+      // Top Eggs section
+      container.addSeparatorComponents(
+        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false)
+      );
+      const topEggsServerText = topEggsGuild.length ? topEggsGuild.map(e => `${e.k}: ${formatNumber(e.v)} (${fmtRate(e.v)})`).join('\n') : 'none';
+      const topEggsGlobalText = topEggs.length ? topEggs.map(e => `${e.k}: ${formatNumber(e.v)} (${fmtRate(e.v)})`).join('\n') : 'none';
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          `**Top Eggs**\n(this server)\n${topEggsServerText}\n\n(global)\n${topEggsGlobalText}`
+        )
+      );
+
+      // Currency section
+      container.addSeparatorComponents(
+        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false)
+      );
+      const guildCurrencyText = guildCurrencyLines.length ? guildCurrencyLines.map(c => `${c.k}: ${formatNumber(c.v)}`).join(', ') : `royal_jelly: ${formatNumber(royal || 0)}`;
+      const globalCurrencyText = globalCurrencyLines.length ? globalCurrencyLines.map(c => `${c.k}: ${formatNumber(c.v)}`).join(', ') : 'none';
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          `**Currency**\n(this server) ${guildCurrencyText}\n(global) ${globalCurrencyText}`
+        )
+      );
+
+      // Misc section
+      container.addSeparatorComponents(
+        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false)
+      );
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          `**Misc**\nAccount created: ${accountCreated}\nUser ID: ${target.id}`
+        )
+      );
+
+      // Footer text
+      container.addSeparatorComponents(
+        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+      );
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(`_Game stats_`)
+      );
+
+      await safeReply(interaction, { components: [container], flags: MessageFlags.IsComponentsV2 }, { loggerName: 'command:stats' });
     } catch (err) {
       try {
         await safeReply(interaction, { content: 'Failed to fetch stats or interaction expired.' }, { loggerName: 'command:stats' });
