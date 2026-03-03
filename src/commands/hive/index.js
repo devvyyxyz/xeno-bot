@@ -1,4 +1,4 @@
-const { ContainerBuilder, TextDisplayBuilder, MessageFlags, SeparatorBuilder, SeparatorSpacingSize } = require('discord.js');
+const { ContainerBuilder, TextDisplayBuilder, MessageFlags, SeparatorBuilder, SeparatorSpacingSize, SectionBuilder, ThumbnailBuilder } = require('discord.js');
 const { ActionRowBuilder, SecondaryButtonBuilder, PrimaryButtonBuilder, DangerButtonBuilder, StringSelectMenuBuilder } = require('@discordjs/builders');
 const hiveModel = require('../../models/hive');
 const xenomorphModel = require('../../models/xenomorph');
@@ -42,6 +42,20 @@ function toXenoOption(x) {
   const descriptor = [x?.pathway ? `Path: ${x.pathway}` : null, `Lv ${Number(x?.level || 1)}`].filter(Boolean).join(' • ');
   const description = descriptor.slice(0, 100);
   return { label, value: String(x.id), description };
+}
+
+function getEmojiForMember(member) {
+  const key = String(member?.role || member?.stage || 'unknown').toLowerCase();
+  return emojis[key] || '⬜';
+}
+
+function getEmojiThumbnailUrl(emojiValue) {
+  const match = String(emojiValue || '').match(/^<(a?):[^:]+:(\d+)>$/);
+  if (!match) return null;
+  const isAnimated = Boolean(match[1]);
+  const emojiId = match[2];
+  const ext = isAnimated ? 'gif' : 'png';
+  return `https://cdn.discordapp.com/emojis/${emojiId}.${ext}?size=64&quality=lossless`;
 }
 
 function getAssignableQueenXenos(xenos, hiveId) {
@@ -159,7 +173,7 @@ function toDiscordTimestamp(value, style = 'f') {
   return `<t:${Math.floor(ms / 1000)}:${style}>`;
 }
 
-function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}, expired = false, canAct = true, notice = null, client = null }) {
+function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}, expired = false, canAct = true, notice = null, membersPage = 0, client = null }) {
   const container = new ContainerBuilder();
   
   const title = '## Hive Dashboard';
@@ -314,7 +328,7 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
   } else if (screen === 'members') {
     const members = Array.isArray(rows.xenos) ? rows.xenos.filter(x => Number(x.hive_id) === Number(hive.id)) : [];
     const pageSize = 10;
-    const currentPage = Math.max(0, (notice && notice.includes('Page') ? parseInt(notice.match(/Page (\d+)/)?.[1]) : 1) - 1) || 0;
+    const currentPage = Math.max(0, Number(membersPage || 0));
     const maxPage = Math.max(1, Math.ceil(members.length / pageSize));
     const safeCurrentPage = Math.min(currentPage, maxPage - 1);
     const start = safeCurrentPage * pageSize;
@@ -323,17 +337,20 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
     if (members.length === 0) {
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent('No members in this hive yet.'));
     } else {
-      const memberLines = pageMembers.map(m => {
-        let typeEmoji = emojis[String(m.role || m.stage || 'unknown').toLowerCase()] || '⬜';
-        if (String(typeEmoji).startsWith('<:')) {
-          // It's a custom emoji, use as is
-          return `${typeEmoji} #${m.id} — ${String(m.role || m.stage).padEnd(12)} (Path: ${m.pathway || 'unknown'}, Lv ${m.level || 1})`;
-        } else {
-          // Extract just the emoji character if it's a default emoji
-          return `${typeEmoji} #${m.id} — ${String(m.role || m.stage).padEnd(12)} (Path: ${m.pathway || 'unknown'}, Lv ${m.level || 1})`;
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Members (${start + 1}-${Math.min(start + pageSize, members.length)} of ${members.length}):**`));
+      
+      for (const m of pageMembers) {
+        const typeEmoji = getEmojiForMember(m);
+        const thumbnailUrl = getEmojiThumbnailUrl(typeEmoji);
+        const section = new SectionBuilder();
+        if (thumbnailUrl) {
+          section.setThumbnailAccessory(new ThumbnailBuilder().setURL(thumbnailUrl));
         }
-      }).join('\n');
-      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Members (${start + 1}-${Math.min(start + pageSize, members.length)} of ${members.length}):**\n${memberLines}`));
+        section.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(`${typeEmoji} #${m.id} — ${String(m.role || m.stage).padEnd(12)} (Path: ${m.pathway || 'unknown'}, Lv ${m.level || 1})`)
+        );
+        container.addSectionComponents(section);
+      }
       
       if (maxPage > 1) {
         container.addActionRowComponents(
@@ -656,6 +673,7 @@ module.exports = {
       if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
 
       let currentScreen = 'stats';
+      let currentMembersPage = 0;
 
       const collector = msg.createMessageComponentCollector({
         filter: i => i.user.id === userId,
@@ -837,24 +855,24 @@ module.exports = {
           else if (i.customId === 'hive-nav-milestones') currentScreen = 'milestones';
           else if (i.customId === 'hive-nav-queen') currentScreen = 'queen';
           else if (i.customId === 'hive-nav-types') currentScreen = 'types';
-          else if (i.customId === HIVE_NAV_MEMBERS_ID) currentScreen = 'members';
+          else if (i.customId === HIVE_NAV_MEMBERS_ID) {
+            currentScreen = 'members';
+            currentMembersPage = 0;
+          }
           else if (i.customId === HIVE_MEMBERS_PREV_PAGE) {
             const members = Array.isArray(xenos) ? xenos.filter(x => Number(x.hive_id) === Number(viewHive.id)) : [];
             const pageSize = 10;
-            const currentPage = (Math.max(0, parseInt(notice?.match(/Page (\d+)/)?.[1]) || 1) - 1) || 0;
-            const newPage = Math.max(0, currentPage - 1);
-            const pageNotice = `Page ${newPage + 1}`;
-            await i.update({ components: buildHiveScreen({ screen: 'members', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: pageNotice, client: interaction.client }) });
+            const maxPage = Math.max(1, Math.ceil(members.length / pageSize));
+            currentMembersPage = Math.max(0, Math.min(maxPage - 1, currentMembersPage - 1));
+            await i.update({ components: buildHiveScreen({ screen: 'members', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, membersPage: currentMembersPage, client: interaction.client }) });
             return;
           }
           else if (i.customId === HIVE_MEMBERS_NEXT_PAGE) {
             const members = Array.isArray(xenos) ? xenos.filter(x => Number(x.hive_id) === Number(viewHive.id)) : [];
             const pageSize = 10;
             const maxPage = Math.max(1, Math.ceil(members.length / pageSize));
-            const currentPage = (Math.max(0, parseInt(notice?.match(/Page (\d+)/)?.[1]) || 1) - 1) || 0;
-            const newPage = Math.min(maxPage - 1, currentPage + 1);
-            const pageNotice = `Page ${newPage + 1}`;
-            await i.update({ components: buildHiveScreen({ screen: 'members', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: pageNotice, client: interaction.client }) });
+            currentMembersPage = Math.max(0, Math.min(maxPage - 1, currentMembersPage + 1));
+            await i.update({ components: buildHiveScreen({ screen: 'members', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, membersPage: currentMembersPage, client: interaction.client }) });
             return;
           }
           else if (i.customId === HIVE_NAV_ASSIGN_QUEEN_ID) currentScreen = 'assign-queen';
@@ -878,7 +896,7 @@ module.exports = {
             return;
           }
 
-          await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, client: interaction.client }) });
+          await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, membersPage: currentMembersPage, client: interaction.client }) });
         } catch (err) {
           try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hive' }); } catch (_) {}
         }
