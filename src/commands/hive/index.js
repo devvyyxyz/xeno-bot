@@ -7,6 +7,7 @@ const { getCommandConfig, buildSubcommandOptions } = require('../../utils/comman
 const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const hiveTypes = require('../../../config/hiveTypes.json');
 const hiveDefaults = require('../../../config/hiveDefaults.json');
+const emojis = require('../../../config/emojis.json');
 const db = require('../../db');
 const { formatNumber } = require('../../utils/numberFormat');
 
@@ -22,6 +23,9 @@ const HIVE_NAV_ADD_XENOS_ID = 'hive-nav-add-xenos';
 const HIVE_NAV_DELETE_ID = 'hive-nav-delete';
 const HIVE_DELETE_BACK_ID = 'hive-delete-back';
 const HIVE_CREATE_VIEW_ID = 'hive-create-view';
+const HIVE_NAV_MEMBERS_ID = 'hive-nav-members';
+const HIVE_MEMBERS_PREV_PAGE = 'hive-members-prev';
+const HIVE_MEMBERS_NEXT_PAGE = 'hive-members-next';
 const HIVE_ASSIGN_QUEEN_SELECT_ID = 'hive-select-assign-queen';
 const HIVE_ADD_XENOS_SELECT_ID = 'hive-select-add-xenos';
 const HIVE_UPGRADE_MODULE_SELECT_ID = 'hive-select-upgrade-module';
@@ -79,13 +83,18 @@ function getUpgradableModules(modulesRows = []) {
 }
 
 function buildNavigationRow({ screen, disabled = false }) {
-  return new ActionRowBuilder().addComponents(
-    new SecondaryButtonBuilder().setCustomId('hive-nav-stats').setLabel('Stats').setDisabled(screen === 'stats' || disabled),
-    new SecondaryButtonBuilder().setCustomId('hive-nav-modules').setLabel('Modules').setDisabled(screen === 'modules' || disabled),
-    new SecondaryButtonBuilder().setCustomId('hive-nav-milestones').setLabel('Milestones').setDisabled(screen === 'milestones' || disabled),
-    new SecondaryButtonBuilder().setCustomId('hive-nav-queen').setLabel('Queen').setDisabled(screen === 'queen' || disabled),
-    new SecondaryButtonBuilder().setCustomId('hive-nav-types').setLabel('Types').setDisabled(screen === 'types' || disabled)
-  );
+  return [
+    new ActionRowBuilder().addComponents(
+      new SecondaryButtonBuilder().setCustomId('hive-nav-stats').setLabel('Stats').setDisabled(screen === 'stats' || disabled),
+      new SecondaryButtonBuilder().setCustomId('hive-nav-modules').setLabel('Modules').setDisabled(screen === 'modules' || disabled),
+      new SecondaryButtonBuilder().setCustomId('hive-nav-milestones').setLabel('Milestones').setDisabled(screen === 'milestones' || disabled),
+      new SecondaryButtonBuilder().setCustomId('hive-nav-queen').setLabel('Queen').setDisabled(screen === 'queen' || disabled),
+      new SecondaryButtonBuilder().setCustomId('hive-nav-types').setLabel('Types').setDisabled(screen === 'types' || disabled)
+    ),
+    new ActionRowBuilder().addComponents(
+      new SecondaryButtonBuilder().setCustomId(HIVE_NAV_MEMBERS_ID).setLabel('Members').setDisabled(screen === 'members' || disabled)
+    )
+  ];
 }
 
 function buildManagementRow({ screen, disabled = false, canAct = true }) {
@@ -164,8 +173,8 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
     : [];
   const hivePopulation = hiveMembers.length;
   
-  // Show snapshot info on all screens except types
-  if (screen !== 'types') {
+  // Show snapshot info on stats and queen screens only
+  if (screen !== 'types' && screen !== 'members') {
     const snapshotLines = [
       `**Owner:** <@${targetUser.id}>`,
       `**Type:** \`${hiveType}\``,
@@ -302,6 +311,45 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
       .join('\n\n');
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(typeLines || 'No hive types found'));
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`_Current hive type: \`${currentType}\`_`));
+  } else if (screen === 'members') {
+    const members = Array.isArray(rows.xenos) ? rows.xenos.filter(x => Number(x.hive_id) === Number(hive.id)) : [];
+    const pageSize = 10;
+    const currentPage = Math.max(0, (notice && notice.includes('Page') ? parseInt(notice.match(/Page (\d+)/)?.[1]) : 1) - 1) || 0;
+    const maxPage = Math.max(1, Math.ceil(members.length / pageSize));
+    const safeCurrentPage = Math.min(currentPage, maxPage - 1);
+    const start = safeCurrentPage * pageSize;
+    const pageMembers = members.slice(start, start + pageSize);
+    
+    if (members.length === 0) {
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent('No members in this hive yet.'));
+    } else {
+      const memberLines = pageMembers.map(m => {
+        let typeEmoji = emojis[String(m.role || m.stage || 'unknown').toLowerCase()] || '⬜';
+        if (String(typeEmoji).startsWith('<:')) {
+          // It's a custom emoji, use as is
+          return `${typeEmoji} #${m.id} — ${String(m.role || m.stage).padEnd(12)} (Path: ${m.pathway || 'unknown'}, Lv ${m.level || 1})`;
+        } else {
+          // Extract just the emoji character if it's a default emoji
+          return `${typeEmoji} #${m.id} — ${String(m.role || m.stage).padEnd(12)} (Path: ${m.pathway || 'unknown'}, Lv ${m.level || 1})`;
+        }
+      }).join('\n');
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Members (${start + 1}-${Math.min(start + pageSize, members.length)} of ${members.length}):**\n${memberLines}`));
+      
+      if (maxPage > 1) {
+        container.addActionRowComponents(
+          new ActionRowBuilder().addComponents(
+            new SecondaryButtonBuilder()
+              .setCustomId(HIVE_MEMBERS_PREV_PAGE)
+              .setLabel('Previous')
+              .setDisabled(safeCurrentPage === 0),
+            new SecondaryButtonBuilder()
+              .setCustomId(HIVE_MEMBERS_NEXT_PAGE)
+              .setLabel('Next')
+              .setDisabled(safeCurrentPage >= maxPage - 1)
+          )
+        );
+      }
+    }
   } else if (screen === 'assign-queen') {
     const assignable = getAssignableQueenXenos(rows.xenos || [], hive.id);
     const currentQueen = hive.queen_xeno_id ? `#${hive.queen_xeno_id}` : 'None';
@@ -333,7 +381,8 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
     container.addSeparatorComponents(
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
     );
-    container.addActionRowComponents(buildNavigationRow({ screen, disabled: false }));
+    const navRows = buildNavigationRow({ screen, disabled: false });
+    navRows.forEach(row => container.addActionRowComponents(row));
     container.addActionRowComponents(buildManagementRow({ screen, disabled: false, canAct }));
 
     if (screen === 'assign-queen') {
@@ -788,6 +837,26 @@ module.exports = {
           else if (i.customId === 'hive-nav-milestones') currentScreen = 'milestones';
           else if (i.customId === 'hive-nav-queen') currentScreen = 'queen';
           else if (i.customId === 'hive-nav-types') currentScreen = 'types';
+          else if (i.customId === HIVE_NAV_MEMBERS_ID) currentScreen = 'members';
+          else if (i.customId === HIVE_MEMBERS_PREV_PAGE) {
+            const members = Array.isArray(xenos) ? xenos.filter(x => Number(x.hive_id) === Number(viewHive.id)) : [];
+            const pageSize = 10;
+            const currentPage = (Math.max(0, parseInt(notice?.match(/Page (\d+)/)?.[1]) || 1) - 1) || 0;
+            const newPage = Math.max(0, currentPage - 1);
+            const pageNotice = `Page ${newPage + 1}`;
+            await i.update({ components: buildHiveScreen({ screen: 'members', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: pageNotice, client: interaction.client }) });
+            return;
+          }
+          else if (i.customId === HIVE_MEMBERS_NEXT_PAGE) {
+            const members = Array.isArray(xenos) ? xenos.filter(x => Number(x.hive_id) === Number(viewHive.id)) : [];
+            const pageSize = 10;
+            const maxPage = Math.max(1, Math.ceil(members.length / pageSize));
+            const currentPage = (Math.max(0, parseInt(notice?.match(/Page (\d+)/)?.[1]) || 1) - 1) || 0;
+            const newPage = Math.min(maxPage - 1, currentPage + 1);
+            const pageNotice = `Page ${newPage + 1}`;
+            await i.update({ components: buildHiveScreen({ screen: 'members', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: pageNotice, client: interaction.client }) });
+            return;
+          }
           else if (i.customId === HIVE_NAV_ASSIGN_QUEEN_ID) currentScreen = 'assign-queen';
           else if (i.customId === HIVE_NAV_ADD_XENOS_ID) currentScreen = 'add-xenos';
           else if (i.customId === HIVE_NAV_DELETE_ID) {
