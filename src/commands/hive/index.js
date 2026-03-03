@@ -396,6 +396,9 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
   }
 
   if (!expired) {
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+    );
     const navRows = buildNavigationRow({ screen, disabled: false });
     navRows.forEach(row => container.addActionRowComponents(row));
     container.addActionRowComponents(buildManagementRow({ screen, disabled: false, canAct }));
