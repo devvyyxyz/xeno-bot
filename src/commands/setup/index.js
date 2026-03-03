@@ -96,9 +96,10 @@ module.exports = {
         .setDescription('Set maximum eggs that can spawn at once')
         .addIntegerOptions(opt =>
           opt.setName('number')
-            .setDescription('Maximum eggs')
+            .setDescription('Maximum eggs (max 10)')
             .setRequired(true)
             .setMinValue(1)
+            .setMaxValue(10)
         )
     )
     .addSubcommands((sub) =>
@@ -288,13 +289,28 @@ module.exports = {
         await sendSetupNotice(interaction, `Failed to update hunt cooldown: ${e && (e.message || e)}`, 'error');
       }
     } else if (sub === 'egg-limit') {
-      const num = interaction.options.getInteger('number');
-      await guildModel.upsertGuildConfig(interaction.guildId, { egg_limit: num });
       try {
-        const spawnManager = require('../../spawnManager');
-        if (spawnManager && typeof spawnManager.requestReschedule === 'function') spawnManager.requestReschedule(interaction.guildId);
-      } catch (e) { try { require('../../utils/logger').get('command:setup').warn('Failed to request spawn reschedule', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging requestReschedule error in setup', le && (le.stack || le)); } catch (ignored) {} } }
-      await sendSetupNotice(interaction, `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Egg limit set to ${num}.`, 'info');
+        const num = interaction.options.getInteger('number');
+        // Validate: max 10 eggs per spawn to prevent balance issues
+        if (num > 10) {
+          await sendSetupNotice(interaction, 'Egg limit cannot exceed 10 per spawn to maintain game balance.', 'requirement');
+          return;
+        }
+        if (num < 1) {
+          await sendSetupNotice(interaction, 'Egg limit must be at least 1.', 'requirement');
+          return;
+        }
+        await guildModel.upsertGuildConfig(interaction.guildId, { egg_limit: num });
+        try {
+          const spawnManager = require('../../spawnManager');
+          if (spawnManager && typeof spawnManager.requestReschedule === 'function') spawnManager.requestReschedule(interaction.guildId);
+        } catch (e) { 
+          require('../../utils/logger').get('command:setup').warn('Failed to request spawn reschedule', { error: e && (e.stack || e) }); 
+        }
+        await sendSetupNotice(interaction, `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Egg limit set to ${num}.`, 'info');
+      } catch (e) {
+        await sendSetupNotice(interaction, `Failed to update egg limit: ${e && (e.message || e)}`, 'error');
+      }
     } else {
       if (sub === 'details') {
         try {

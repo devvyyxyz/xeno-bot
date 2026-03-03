@@ -1,6 +1,7 @@
 const db = require('../db');
 const cache = require('../utils/cache');
 const { parseJSON } = require('../utils/jsonParse');
+const logger = require('../utils/logger').get('model:guild');
 
 const CACHE_TTL_MS = Number(process.env.GUILD_CACHE_TTL_MS) || 30_000; // 30s default
 
