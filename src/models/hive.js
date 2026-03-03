@@ -1,6 +1,7 @@
 const db = require('../db');
 const logger = require('../utils/logger').get('models:hive');
 const { parseJSON } = require('../utils/jsonParse');
+const { insertWithReusedId } = require('../utils/idReuse');
 
 let _hiveColumnsChecked = false;
 let _hiveHasOwnerColumn = false;
@@ -44,8 +45,7 @@ async function createHive(ownerDiscordId, guildId = null, type = 'default', init
     if (_hiveHasOwnerColumn) payload.owner_discord_id = String(ownerDiscordId);
     if (_hiveHasHiveTypeColumn) payload.hive_type = type;
     if (_hiveHasTypeColumn) payload.type = type;
-    const inserted = await db.knex('hives').insert(payload);
-    const id = Array.isArray(inserted) ? inserted[0] : inserted;
+    const id = await insertWithReusedId('hives', payload);
     logger.info('Created hive', { ownerDiscordId, id, guildId, type });
     return getHiveById(id);
   } catch (err) {

@@ -1,5 +1,6 @@
 const db = require('../db');
 const { parseJSON } = require('../utils/jsonParse');
+const { insertWithReusedId } = require('../utils/idReuse');
 
 async function getById(id) {
   const row = await db.knex('xenomorphs').where({ id: Number(id) }).first();
@@ -25,8 +26,7 @@ async function createXeno(ownerId, opts = {}) {
     stats: opts.stats ? JSON.stringify(opts.stats) : null,
     data: opts.data ? JSON.stringify(opts.data) : null
   };
-  const inserted = await db.knex('xenomorphs').insert(payload);
-  const id = Array.isArray(inserted) ? inserted[0] : inserted;
+  const id = await insertWithReusedId('xenomorphs', payload);
   return getXenoById(id);
 }
 
