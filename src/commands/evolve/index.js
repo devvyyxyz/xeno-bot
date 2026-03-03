@@ -8,6 +8,7 @@ const {
   ContainerBuilder,
   TextDisplayBuilder,
   MessageFlags,
+  SectionBuilder,
   SeparatorBuilder,
   SeparatorSpacingSize
 } = require('discord.js');
@@ -23,7 +24,7 @@ const safeReply = require('../../utils/safeReply');
 const hostsCfg = require('../../../config/hosts.json');
 const emojisCfg = require('../../../config/emojis.json');
 const cmd = { name: 'evolve', description: 'Evolve your xenomorphs' };
-const EVOLVE_LIST_PAGE_SIZE = 10;
+const EVOLVE_LIST_PAGE_SIZE = 5;
 const EVOLVE_CANCEL_PAGE_SIZE = 10;
 
 function getHostDisplay(hostType, cfgHosts, emojis) {
@@ -123,6 +124,7 @@ function buildEvolveView({
   jobs = [],
   selectedXenoId = null,
   listPage = 0,
+  listTypeFilter = 'all',
   cancelPage = 0,
   message = null,
   expired = false,
@@ -141,17 +143,58 @@ function buildEvolveView({
   addV2TitleWithBotThumbnail({ container, title: titleMap[screen] || 'Evolve', client });
 
   if (screen === 'list') {
-    if (!xenos.length) {
+    const safeFilter = String(listTypeFilter || 'all');
+    const filteredXenos = safeFilter === 'all'
+      ? xenos
+      : xenos.filter(x => String(x.role || x.stage || '').toLowerCase() === safeFilter);
+
+    if (!filteredXenos.length) {
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent('You have no xenomorphs.'));
     } else {
       const pagination = getPaginationState({
-        items: xenos,
+        items: filteredXenos,
         pageIdx: listPage,
         pageSize: EVOLVE_LIST_PAGE_SIZE
       });
-      const lines = pagination.pageItems.map(x => `**#${x.id} ${x.role || x.stage}**\nPath: ${x.pathway || 'standard'}`);
-      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join('\n\n')));
+
+      for (const x of pagination.pageItems) {
+        const section = new SectionBuilder()
+          .setSecondaryButtonAccessory((button) =>
+            button
+              .setLabel('Info')
+              .setCustomId(`evolve-list-info:${x.id}`)
+          )
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`**#${x.id} ${x.role || x.stage}**\nPath: ${x.pathway || 'standard'}`)
+          );
+        container.addSectionComponents(section);
+      }
+
       if (!expired) {
+        const typeValues = [...new Set(xenos.map(x => String(x.role || x.stage || '').toLowerCase()).filter(Boolean))].sort();
+        const MAX_TYPE_OPTIONS = 5; // keep payload under Discord V2 total component limits
+        const slicedTypes = typeValues.slice(0, MAX_TYPE_OPTIONS);
+        if (safeFilter !== 'all' && safeFilter && !slicedTypes.includes(safeFilter) && typeValues.includes(safeFilter)) {
+          slicedTypes[MAX_TYPE_OPTIONS - 1] = safeFilter;
+        }
+
+        const options = [{ label: 'All Types', value: 'all', default: safeFilter === 'all' }].concat(
+          slicedTypes.map(v => ({
+            label: v,
+            value: v,
+            default: v === safeFilter
+          }))
+        );
+
+        container.addActionRowComponents(
+          new ActionRowBuilder().addComponents(
+            new StringSelectMenuBuilder()
+              .setCustomId('evolve-list-type-select')
+              .setPlaceholder('Filter by xenomorph type')
+              .addOptions(...options)
+          )
+        );
+
         container.addActionRowComponents(
           buildPaginationRow({
             prefix: 'evolve-list',
@@ -295,7 +338,7 @@ module.exports = {
       if (sub === 'list') {
         const list = await loadXenos();
         const prefix = hydrated > 0 ? `Converted ${hydrated} legacy facehugger item(s) into xenomorphs.` : null;
-        await respond({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, message: prefix, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+        await respond({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, listTypeFilter: 'all', message: prefix, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
       } else if (sub === 'start') {
         const xenoId = interaction.options.getInteger('xenomorph');
         const hostId = interaction.options.getInteger('host');
@@ -402,22 +445,38 @@ module.exports = {
         time: 120_000
       });
       let currentListPage = 0;
+      let currentListTypeFilter = 'all';
       let currentCancelPage = 0;
 
       collector.on('collect', async i => {
         try {
           const userIdInner = String(i.user.id);
+          if (i.customId === 'evolve-list-type-select') {
+            currentListTypeFilter = i.values && i.values[0] ? String(i.values[0]) : 'all';
+            currentListPage = 0;
+            const list = await xenoModel.listByOwner(userIdInner);
+            await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
+            return;
+          }
+
+          if (String(i.customId).startsWith('evolve-list-info:')) {
+            const selected = String(i.customId).split(':')[1];
+            const list = await xenoModel.listByOwner(userIdInner);
+            await i.update({ components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: selected, client: interaction.client }) });
+            return;
+          }
+
           if (i.customId === 'evolve-list-prev-page' || i.customId === 'evolve-list-next-page') {
             const isPrev = i.customId === 'evolve-list-prev-page';
             currentListPage = isPrev ? currentListPage - 1 : currentListPage + 1;
             const list = await xenoModel.listByOwner(userIdInner);
-            await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, client: interaction.client }) });
+            await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-nav-list') {
             currentListPage = 0;
             const list = await xenoModel.listByOwner(userIdInner);
-            await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, client: interaction.client }) });
+            await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-nav-info') {
