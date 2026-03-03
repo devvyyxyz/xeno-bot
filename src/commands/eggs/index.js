@@ -80,7 +80,7 @@ function buildEggsListPage({ pageIdx = 0, hatches = [], client = null }) {
       if (collected) {
         statusLine = 'Collected: ✅';
       } else if (ready) {
-        const hatched = Number(hatch.created_at) || 0;
+        const hatched = Number(hatch.finishes_at) || Number(hatch.started_at) || Date.now();
         statusLine = `Hatched: <t:${Math.floor(hatched / 1000)}:R>`;
       } else {
         statusLine = `Hatching: <t:${Math.floor(finishes / 1000)}:R>`;
