@@ -43,9 +43,12 @@ function getRarityBadge(rarity) {
   return emojis[emojiKey] || '';
 }
 
-function buildEggsListPage({ pageIdx = 0, hatches = [], client = null }) {
-  // Show all hatches (including collected)
-  const activeHatches = hatches;
+function getVisibleHatches(hatches = []) {
+  return (Array.isArray(hatches) ? hatches : []).filter(h => !h.collected);
+}
+
+function buildEggsListPage({ pageIdx = 0, hatches = [], client = null, showCollected = false }) {
+  const activeHatches = showCollected ? (Array.isArray(hatches) ? hatches : []) : getVisibleHatches(hatches);
 
   const pagination = getPaginationState({
     items: activeHatches,
@@ -257,7 +260,7 @@ function buildEggsStatsPage({ hatches = [], client = null }) {
   return [container];
 }
 
-function buildEggsView({ screen = 'list', hatches = [], pageIdx = 0, content = '', client = null, userEggs = {} }) {
+function buildEggsView({ screen = 'list', hatches = [], pageIdx = 0, content = '', client = null, userEggs = {}, showCollected = false }) {
   if (screen === 'stats') {
     return buildEggsStatsPage({ hatches, client });
   }
@@ -267,7 +270,7 @@ function buildEggsView({ screen = 'list', hatches = [], pageIdx = 0, content = '
   if (screen === 'result') {
     return buildEggsResultPage(content);
   }
-  return buildEggsListPage({ pageIdx, hatches, client });
+  return buildEggsListPage({ pageIdx, hatches, client, showCollected });
 }
 
 module.exports = {
@@ -356,7 +359,7 @@ module.exports = {
             return;
           }
           if (i.customId === 'eggs-next-page') {
-            const totalPages = Math.max(1, Math.ceil(rows.length / HATCHES_PER_PAGE));
+            const totalPages = Math.max(1, Math.ceil(getVisibleHatches(rows).length / HATCHES_PER_PAGE));
             currentPage = Math.min(totalPages - 1, currentPage + 1);
             await i.update({ components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
             return;
@@ -367,7 +370,7 @@ module.exports = {
             await hatchManager.collectHatch(discordId, guildId, hatchId);
             const hatchIndex = rows.findIndex(r => r.id === hatchId);
             if (hatchIndex !== -1) rows[hatchIndex].collected = true;
-            await i.update({ components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+            await i.update({ components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client, showCollected: true }), flags: MessageFlags.IsComponentsV2 });
             return;
           }
 
@@ -453,7 +456,7 @@ module.exports = {
                   return;
                 }
                 if (i.customId === 'eggs-next-page') {
-                  const totalPages = Math.max(1, Math.ceil(rows.length / HATCHES_PER_PAGE));
+                  const totalPages = Math.max(1, Math.ceil(getVisibleHatches(rows).length / HATCHES_PER_PAGE));
                   currentPage = Math.min(totalPages - 1, currentPage + 1);
                   await i.update({ components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
                   return;
@@ -471,7 +474,7 @@ module.exports = {
                   }
 
                   // Update display with the collected hatch shown
-                  await i.update({ components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+                  await i.update({ components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client, showCollected: true }), flags: MessageFlags.IsComponentsV2 });
                   return;
                 }
 
@@ -638,7 +641,7 @@ module.exports = {
                   return;
                 }
                 if (i.customId === 'eggs-next-page') {
-                  const totalPages = Math.max(1, Math.ceil(rows.length / HATCHES_PER_PAGE));
+                  const totalPages = Math.max(1, Math.ceil(getVisibleHatches(rows).length / HATCHES_PER_PAGE));
                   currentPage = Math.min(totalPages - 1, currentPage + 1);
                   await i.update({ components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
                   return;
@@ -651,7 +654,7 @@ module.exports = {
                   if (hatchIndex !== -1) {
                     rows[hatchIndex].collected = true;
                   }
-                  await i.update({ components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+                  await i.update({ components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client, showCollected: true }), flags: MessageFlags.IsComponentsV2 });
                   return;
                 }
                 // View stats
@@ -761,7 +764,7 @@ module.exports = {
                   return;
                 }
                 if (i.customId === 'eggs-next-page') {
-                  const totalPages = Math.max(1, Math.ceil(rows.length / HATCHES_PER_PAGE));
+                  const totalPages = Math.max(1, Math.ceil(getVisibleHatches(rows).length / HATCHES_PER_PAGE));
                   currentPage = Math.min(totalPages - 1, currentPage + 1);
                   await i.update({ components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
                   return;
@@ -774,7 +777,7 @@ module.exports = {
                   if (hatchIndex !== -1) {
                     rows[hatchIndex].collected = true;
                   }
-                  await i.update({ components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+                  await i.update({ components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client, showCollected: true }), flags: MessageFlags.IsComponentsV2 });
                   return;
                 }
                 // View stats
