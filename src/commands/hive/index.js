@@ -118,14 +118,14 @@ function getQuickModuleCandidate(modulesRows = []) {
   return candidate;
 }
 
-function buildQuickActionsRow({ disabled = false, canAct = true, queenCost = 50, moduleCandidate = null }) {
+function buildQuickActionsRow({ disabled = false, canAct = true, hasQueen = false, queenCost = 50, moduleCandidate = null }) {
   const moduleLabel = moduleCandidate ? `Quick Module (${moduleCandidate.cost} RJ)` : 'Quick Module (MAX)';
 
   return new ActionRowBuilder().addComponents(
     new PrimaryButtonBuilder()
       .setCustomId(HIVE_ACTION_UPGRADE_QUEEN_ID)
       .setLabel(`Queen +1 (${queenCost} RJ)`)
-      .setDisabled(disabled || !canAct),
+      .setDisabled(disabled || !canAct || !hasQueen),
     new SecondaryButtonBuilder()
       .setCustomId(HIVE_ACTION_UPGRADE_MODULE_ID)
       .setLabel(moduleLabel)
@@ -289,7 +289,8 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
 
   if (!expired) {
     const moduleCandidate = getQuickModuleCandidate(rows.modules || []);
-    container.addActionRowComponents(buildQuickActionsRow({ disabled: false, canAct, queenCost: 50, moduleCandidate }));
+    const hasQueen = Boolean(hive.queen_xeno_id);
+    container.addActionRowComponents(buildQuickActionsRow({ disabled: false, canAct, hasQueen, queenCost: 50, moduleCandidate }));
     container.addSeparatorComponents(
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
     );
