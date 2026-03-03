@@ -1,19 +1,17 @@
 const db = require('../db');
-const logger = require('../utils/logger').get('models:xenomorph');
+const { parseJSON } = require('../utils/jsonParse');
 
 async function getById(id) {
   const row = await db.knex('xenomorphs').where({ id: Number(id) }).first();
   if (!row) return null;
-  try {
-    row.stats = row.stats ? JSON.parse(row.stats) : {};
-    row.data = row.data ? JSON.parse(row.data) : {};
-  } catch (e) { logger.warn('Failed parsing xeno JSON', { id, error: e && e.message }); }
+  row.stats = parseJSON(row.stats, {}, `xeno:${id}.stats`);
+  row.data = parseJSON(row.data, {}, `xeno:${id}.data`);
   return row;
 }
 
 async function listByOwner(ownerId) {
   const rows = await db.knex('xenomorphs').where({ owner_id: String(ownerId) }).orderBy('id', 'asc');
-  return rows.map(r => ({ ...r, stats: r.stats ? JSON.parse(r.stats) : {}, data: r.data ? JSON.parse(r.data) : {} }));
+  return rows.map(r => ({ ...r, stats: parseJSON(r.stats, {}), data: parseJSON(r.data, {}) }));
 }
 
 async function createXeno(ownerId, opts = {}) {
@@ -35,19 +33,18 @@ async function createXeno(ownerId, opts = {}) {
 async function getXenoById(id) {
   const row = await db.knex('xenomorphs').where({ id }).first();
   if (!row) return null;
-  try {
-    row.stats = row.stats ? JSON.parse(row.stats) : {};
-    row.data = row.data ? JSON.parse(row.data) : {};
-  } catch (e) { logger.warn('Failed parsing xeno JSON', { id, error: e && e.message }); }
+  row.stats = parseJSON(row.stats, {}, `xeno:${id}.stats`);
+  row.data = parseJSON(row.data, {}, `xeno:${id}.data`);
   return row;
 }
 
 async function getXenosByOwner(ownerId) {
   const rows = await db.knex('xenomorphs').where({ owner_id: String(ownerId) }).orderBy('id', 'asc');
-  return rows.map(r => {
-    try { r.stats = r.stats ? JSON.parse(r.stats) : {}; r.data = r.data ? JSON.parse(r.data) : {}; } catch (e) {}
-    return r;
-  });
+  return rows.map(r => ({
+    ...r,
+    stats: parseJSON(r.stats, {}),
+    data: parseJSON(r.data, {})
+  }));
 }
 
 async function deleteXenosByOwner(ownerId) {

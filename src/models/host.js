@@ -1,4 +1,5 @@
 const db = require('../db');
+const { parseJSON } = require('../utils/jsonParse');
 const logger = require('../utils/logger').get('models:host');
 
 async function addHostForUser(ownerId, hostType, data = {}) {
@@ -22,7 +23,7 @@ async function addHostForUser(ownerId, hostType, data = {}) {
 async function listHostsByOwner(ownerId) {
   try {
     const rows = await db.knex('hosts').where({ owner_id: String(ownerId) }).orderBy('id', 'asc');
-    return rows.map(r => ({ ...r, data: r.data ? (typeof r.data === 'string' ? JSON.parse(r.data) : r.data) : {} }));
+    return rows.map(r => ({ ...r, data: parseJSON(r.data, {}) }));
   } catch (e) {
     logger.warn('Failed listing hosts from DB', { error: e && e.message });
     return [];
@@ -43,7 +44,7 @@ async function getHostById(id) {
   try {
     const row = await db.knex('hosts').where({ id: Number(id) }).first();
     if (!row) return null;
-    return { ...row, data: row.data ? (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) : {} };
+    return { ...row, data: parseJSON(row.data, {}) };
   } catch (e) {
     logger.warn('Failed getting host by id', { error: e && e.message });
     return null;

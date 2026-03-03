@@ -1,5 +1,6 @@
 const db = require('../db');
 const logger = require('../utils/logger').get('models:hive');
+const { parseJSON } = require('../utils/jsonParse');
 
 let _hiveColumnsChecked = false;
 let _hiveHasOwnerColumn = false;
@@ -119,7 +120,7 @@ async function getHivesByGuild(guildId) {
     if (!_hiveHasGuildIdColumn) return [];
     const rows = await db.knex('hives').where({ guild_id: guildId }).select('*');
     return Promise.all(rows.map(r => (async () => {
-      const parsed = r.data ? JSON.parse(r.data) : null;
+      const parsed = parseJSON(r.data, null);
       return {
         id: r.id,
         owner_discord_id: r.owner_discord_id,

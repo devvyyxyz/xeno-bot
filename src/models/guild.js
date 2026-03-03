@@ -1,6 +1,6 @@
 const db = require('../db');
-const logger = require('../utils/logger').get('models:guild');
 const cache = require('../utils/cache');
+const { parseJSON } = require('../utils/jsonParse');
 
 const CACHE_TTL_MS = Number(process.env.GUILD_CACHE_TTL_MS) || 30_000; // 30s default
 
@@ -10,25 +10,20 @@ async function getGuildConfig(guildId) {
 
   const row = await db.knex('guild_settings').where({ guild_id: guildId }).first();
   if (!row) return null;
-  try {
-    const data = row.data ? JSON.parse(row.data) : null;
-    return {
-      id: row.id,
-      guild_id: row.guild_id,
-      channel_id: row.channel_id,
-      spawn_min_seconds: row.spawn_min_seconds ?? null,
-      spawn_max_seconds: row.spawn_max_seconds ?? null,
-      egg_limit: row.egg_limit,
-      data,
-      created_at: row.created_at,
-      updated_at: row.updated_at
-    };
-  } catch (err) {
-    logger.error('Failed parsing guild config JSON', { guildId, error: err.stack || err });
-    const result = { id: row.id, guild_id: row.guild_id };
-    cache.set(`guild:${guildId}`, result, CACHE_TTL_MS);
-    return result;
-  }
+  const data = parseJSON(row.data, null, `guild:${guildId}.data`);
+  const result = {
+    id: row.id,
+    guild_id: row.guild_id,
+    channel_id: row.channel_id,
+    spawn_min_seconds: row.spawn_min_seconds ?? null,
+    spawn_max_seconds: row.spawn_max_seconds ?? null,
+    egg_limit: row.egg_limit,
+    data,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
+  cache.set(`guild:${guildId}`, result, CACHE_TTL_MS);
+  return result;
 }
 
 async function upsertGuildConfig(guildId, changes = {}) {

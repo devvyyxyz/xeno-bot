@@ -1,6 +1,6 @@
 const db = require('../db');
-const logger = require('../utils/logger').get('models:user');
 const cache = require('../utils/enhancedCache');
+const { parseJSON } = require('../utils/jsonParse');
 const userDefaults = require('../../config/userDefaults.json');
 
 // Cache users for 2 minutes to reduce database load
@@ -13,13 +13,8 @@ async function getUserByDiscordId(discordId) {
   return await cache.getOrCompute(cacheKey, async () => {
     const row = await db.knex('users').where({ discord_id: discordId }).first();
     if (!row) return null;
-    try {
-      const data = row.data ? JSON.parse(row.data) : null;
-      return { id: row.id, discord_id: row.discord_id, data, created_at: row.created_at, updated_at: row.updated_at };
-    } catch (err) {
-      logger.error('Failed parsing user data JSON', { discordId, error: err.stack || err });
-      return { id: row.id, discord_id: row.discord_id, data: null };
-    }
+    const data = parseJSON(row.data, null, `user:${discordId}.data`);
+    return { id: row.id, discord_id: row.discord_id, data, created_at: row.created_at, updated_at: row.updated_at };
   }, USER_CACHE_TTL);
 }
 
