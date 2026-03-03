@@ -164,6 +164,16 @@ exports.up = async function(knex) {
         }
       });
     }
+    
+    // Index for created_at for cleanup queries (finding old spawns to delete)
+    const hasCreatedAt = await knex.schema.hasColumn('active_spawns', 'created_at');
+    if (hasCreatedAt) {
+      await knex.schema.alterTable('active_spawns', table => {
+        if (client !== 'sqlite3') {
+          table.index(['created_at'], 'idx_active_spawns_created_at');
+        }
+      });
+    }
   }
   
   // Evolution_queue table indexes
@@ -234,6 +244,7 @@ exports.down = async function(knex) {
     { table: 'active_spawns', index: 'idx_active_spawns_guild' },
     { table: 'active_spawns', index: 'idx_active_spawns_channel_msg' },
     { table: 'active_spawns', index: 'idx_active_spawns_spawned_at' },
+    { table: 'active_spawns', index: 'idx_active_spawns_created_at' },
     { table: 'evolution_queue', index: 'idx_evolution_user_status' },
     { table: 'evolution_queue', index: 'idx_evolution_status_finishes' },
     { table: 'user_resources', index: 'idx_user_resources_user_id' }
