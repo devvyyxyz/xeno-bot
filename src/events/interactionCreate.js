@@ -2,11 +2,52 @@ const logger = require('../utils/logger').get('interactionCreate');
 const safeReply = require('../utils/safeReply');
 const fallbackLogger = require('../utils/fallbackLogger');
 const { PermissionsBitField } = require('discord.js');
+const config = require('../../config/config.json');
 
 module.exports = {
   name: 'interactionCreate',
   async execute(interaction, client) {
     try {
+      // Handle bug report resolve button
+      if (typeof interaction.isButton === 'function' && interaction.isButton() && interaction.customId === 'bugreport-mark-resolved') {
+        const forumChannelId = String(config?.bugReports?.forumChannelId || '').trim();
+        const resolvedMessage = String(config?.bugReports?.resolvedMessage || '').trim() || '✅ This bug report has been marked as resolved and the post is now closed.';
+        const channel = interaction.channel;
+        if (!forumChannelId || !channel || !channel.isThread?.() || channel.parentId !== forumChannelId) {
+          await safeReply(interaction, { content: 'This button can only be used in configured bug report posts.', ephemeral: true }, { loggerName: 'interactionCreate' });
+          return;
+        }
+
+        const isThreadOwner = String(channel.ownerId || '') === String(interaction.user.id || '');
+        let guildOwnerId = String(interaction.guild?.ownerId || '').trim();
+        if (!guildOwnerId) {
+          try {
+            const fetchedGuild = await interaction.client.guilds.fetch(interaction.guildId);
+            guildOwnerId = String(fetchedGuild?.ownerId || '').trim();
+          } catch (_) {}
+        }
+        const isGuildOwner = guildOwnerId && String(interaction.user.id || '') === guildOwnerId;
+
+        if (!isThreadOwner && !isGuildOwner) {
+          await safeReply(interaction, { content: 'Only the thread owner or server owner can mark this as resolved.', ephemeral: true }, { loggerName: 'interactionCreate' });
+          return;
+        }
+
+        try {
+          await channel.setLocked(true, `Resolved by ${interaction.user.tag}`);
+        } catch (e) {
+          logger.warn('Failed to lock bug report thread', { threadId: channel.id, error: e && (e.stack || e) });
+        }
+        try {
+          await channel.setArchived(true, `Resolved by ${interaction.user.tag}`);
+        } catch (e) {
+          logger.warn('Failed to archive bug report thread', { threadId: channel.id, error: e && (e.stack || e) });
+        }
+
+        await safeReply(interaction, { content: resolvedMessage, ephemeral: true }, { loggerName: 'interactionCreate' });
+        return;
+      }
+
       // Handle autocomplete interactions separately
       if (typeof interaction.isAutocomplete === 'function' && interaction.isAutocomplete()) {
         const command = client.commands.get(interaction.commandName);
