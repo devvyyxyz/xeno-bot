@@ -2,12 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const ARTICLES_DIR = path.join(__dirname, '..', '..', 'config', 'articles');
 
-let cache = { ts: 0, latest: 0, title: null, lastChecked: 0 };
+let cache = { ts: 0, latest: 0, title: null, latestFile: null, lastChecked: 0 };
 const CACHE_TTL = 30 * 1000; // 30s
 
 function scanLatest() {
   try {
-    if (!fs.existsSync(ARTICLES_DIR)) return { latest: 0, title: null };
+    if (!fs.existsSync(ARTICLES_DIR)) return { latest: 0, title: null, latestFile: null };
     const files = fs.readdirSync(ARTICLES_DIR).filter(f => f.endsWith('.md'));
     let latest = 0;
     let latestFile = null;
@@ -40,9 +40,9 @@ function scanLatest() {
         }
       } catch (e) { /* ignore */ }
     }
-    return { latest, title };
+    return { latest, title, latestFile };
   } catch (e) {
-    return { latest: 0, title: null };
+    return { latest: 0, title: null, latestFile: null };
   }
 }
 
@@ -77,13 +77,34 @@ function scanLatest() {
 
 function getLatestArticleInfo() {
   const now = Date.now();
-  if (now - cache.lastChecked < CACHE_TTL && cache.ts === cache.latest) {
+  const withinTtl = now - cache.lastChecked < CACHE_TTL;
+
+  if (withinTtl && cache.ts === cache.latest) {
+    // If the currently-known latest file was edited, refresh immediately even within TTL.
+    try {
+      if (cache.latestFile) {
+        const st = fs.statSync(path.join(ARTICLES_DIR, cache.latestFile));
+        if (Number(st.mtimeMs || 0) > Number(cache.latest || 0)) {
+          const res = scanLatest();
+          cache.lastChecked = now;
+          cache.latest = res.latest || 0;
+          cache.title = res.title || null;
+          cache.latestFile = res.latestFile || null;
+          cache.ts = cache.latest;
+          return { latest: cache.latest, title: cache.title };
+        }
+      }
+    } catch (_) {
+      // If stat check fails (file moved/deleted), fall through to full rescan.
+    }
+
     return { latest: cache.latest, title: cache.title };
   }
   const res = scanLatest();
   cache.lastChecked = now;
   cache.latest = res.latest || 0;
   cache.title = res.title || null;
+  cache.latestFile = res.latestFile || null;
   cache.ts = cache.latest;
   return { latest: cache.latest, title: cache.title };
 }
