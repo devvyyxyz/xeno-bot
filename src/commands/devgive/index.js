@@ -1,6 +1,7 @@
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const eggTypes = require('../../../config/eggTypes.json');
 const evolutions = require('../../../config/evolutions.json');
+const hostsCfg = require('../../../config/hosts.json');
 const { formatNumber } = require('../../utils/numberFormat');
 
 const cmd = getCommandConfig('devgive') || {name: 'devgive', description: 'Developer-only: give items to users (owner only)', developerOnly: true};
@@ -57,6 +58,7 @@ module.exports = {
           { name: 'Credits', value: 'credits' },
           { name: 'Egg', value: 'egg' },
           { name: 'Xenomorph', value: 'xenomorph' },
+          { name: 'Host', value: 'host' },
           { name: 'Royal Jelly', value: 'royal_jelly' }
         ]
       },
@@ -89,6 +91,13 @@ module.exports = {
       {
         name: 'stage',
         description: 'Evolution stage (required for xenomorph)',
+        type: 3, // STRING
+        required: false,
+        autocomplete: true
+      },
+      {
+        name: 'host_type',
+        description: 'Host type (required for host)',
         type: 3, // STRING
         required: false,
         autocomplete: true
@@ -143,6 +152,22 @@ module.exports = {
             const display = evolutions.roles[s]?.display || s;
             return { name: display, value: s };
           })
+          .slice(0, 25);
+        return interaction.respond(items);
+      }
+
+      if (type === 'host' && focused.name === 'host_type') {
+        const q = String(focused.value || '').toLowerCase();
+        const hostEntries = Object.entries((hostsCfg && hostsCfg.hosts) || {});
+        const items = hostEntries
+          .filter(([hostKey, hostInfo]) => {
+            const display = String(hostInfo?.display || hostKey).toLowerCase();
+            return !q || hostKey.toLowerCase().includes(q) || display.includes(q);
+          })
+          .map(([hostKey, hostInfo]) => ({
+            name: `${hostInfo?.display || hostKey} (${hostKey})`,
+            value: hostKey
+          }))
           .slice(0, 25);
         return interaction.respond(items);
       }
@@ -240,6 +265,37 @@ module.exports = {
         }
         
         await safeReply(interaction, { content: `Gave ${stageEmoji} ${stageDisplay} (${pathway} pathway) x${amount} to ${target}.`, ephemeral: true }, { loggerName: 'command:devgive' });
+        return;
+      }
+
+      if (type === 'host') {
+        const hostType = interaction.options.getString('host_type');
+        const amount = Math.max(1, Math.floor(Number(interaction.options.getNumber('amount') || 1)));
+
+        if (!target || !hostType) {
+          await safeReply(interaction, { content: 'User and host_type are required for hosts.', ephemeral: true }, { loggerName: 'command:devgive' });
+          return;
+        }
+
+        const hostInfo = (hostsCfg && hostsCfg.hosts) ? hostsCfg.hosts[hostType] : null;
+        if (!hostInfo) {
+          await safeReply(interaction, { content: 'Invalid host type.', ephemeral: true }, { loggerName: 'command:devgive' });
+          return;
+        }
+
+        const hostModel = require('../../models/host');
+        const emojis = require('../../utils/emojis');
+        const hostDisplay = hostInfo.display || hostType;
+        const hostEmoji = hostInfo.emoji ? (emojis.get(hostInfo.emoji) || '') : '';
+
+        for (let i = 0; i < amount; i++) {
+          await hostModel.addHostForUser(String(target.id), hostType, {
+            grantedBy: interaction.user.id,
+            source: 'devgive'
+          });
+        }
+
+        await safeReply(interaction, { content: `Gave ${hostEmoji} ${hostDisplay} x${amount} to ${target}.`, ephemeral: true }, { loggerName: 'command:devgive' });
         return;
       }
       
