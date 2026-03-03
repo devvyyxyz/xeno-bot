@@ -143,29 +143,33 @@ const rest = new REST({ version: '10' }).setToken(token);
     }
 
     logger.info('Refreshing application (/) commands...');
-    // Priority: if GUILD_ID is set, register to that guild first for fast testing.
-    // Also allow the profile file to specify a default guildId (useful for dev profile).
-    // IMPORTANT SAFETY: dev profile should NEVER register global commands.
-    const targetGuild = process.env.GUILD_ID || (profileCfg && profileCfg.guildId);
+    // IMPORTANT: Prevent double-registration by using different registration strategies per profile:
+    // - Dev profile: ONLY guild commands (never global) for safety
+    // - Public profile: ONLY global commands (never guild) to avoid dev server conflicts
     const isDevProfile = profile === 'dev';
-      if (targetGuild) {
-      logger.info('Registering guild commands', { clientId, guildId: targetGuild, profile });
-      await rest.put(Routes.applicationGuildCommands(clientId, targetGuild), { body: commands });
-        logger.info('Successfully registered guild commands.');
-    } else if (isDevProfile) {
-      logger.warn('Dev profile selected but no GUILD_ID configured; skipping registration to avoid global registration', { profile });
-    }
+    const isPublicProfile = !isDevProfile;
 
-    // Only attempt global registration for non-dev profiles and only when explicitly allowed.
-    if (!isDevProfile) {
+    if (isDevProfile) {
+      // Dev profile: register to dev guild ONLY
+      const targetGuild = process.env.GUILD_ID || (profileCfg && profileCfg.guildId);
+      if (!targetGuild) {
+        logger.warn('Dev profile selected but no GUILD_ID configured; skipping registration to avoid global registration', { profile });
+      } else {
+        logger.info('Registering dev guild commands', { clientId, guildId: targetGuild, profile });
+        await rest.put(Routes.applicationGuildCommands(clientId, targetGuild), { body: commands });
+        logger.info('Successfully registered dev guild commands.');
+      }
+    } else if (isPublicProfile) {
+      // Public profile: register ONLY globally, NEVER to any guild
+      // This prevents the public bot from registering to the dev guild
       try {
         const allowGlobal = process.env.ALLOW_GLOBAL_REGISTRATION === 'true';
         if (!allowGlobal) {
           logger.info('Global registration disabled by default; set ALLOW_GLOBAL_REGISTRATION=true to enable', { profile });
         } else {
-          logger.info('Registering global commands (best-effort)', { clientId, profile });
+          logger.info('Registering public global commands (best-effort)', { clientId, profile });
           await rest.put(Routes.applicationCommands(clientId), { body: commands });
-          logger.info('Successfully registered global commands.');
+          logger.info('Successfully registered public global commands.');
         }
       } catch (globalErr) {
         logger.warn('Global command registration failed (best-effort)', { error: globalErr && (globalErr.stack || globalErr) });
