@@ -86,7 +86,11 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
   }
 
   if (!page || page.length === 0) {
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('No hosts on this page.'));
+    if (!rows || rows.length === 0) {
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent('You have no hunted hosts yet. Use **Hunt** to search.'));
+    } else {
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent('No hosts on this page.'));
+    }
   } else {
     for (const host of page) {
       const display = getHostDisplay(host.host_type, cfgHosts, emojis);
@@ -217,10 +221,6 @@ module.exports = {
 
     try {
       let rows = await hostModel.listHostsByOwner(userId);
-
-      if (!rows || rows.length === 0) {
-        return safeReply(interaction, { content: 'You have no hunted hosts. Use `/hunt` to search.', ephemeral: true }, { loggerName: 'command:hunt-list' });
-      }
 
       await safeReply(
         interaction,
