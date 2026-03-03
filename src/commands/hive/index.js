@@ -202,12 +202,6 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('_Upgrade modules and queens to increase production._'));
   } else if (screen === 'modules') {
     const modulesCfg = hiveDefaults.modules || {};
-    const moduleLines = Object.keys(modulesCfg).map(k => {
-      const cfg = modulesCfg[k];
-      const moduleRow = rows.modules ? rows.modules.find(r => r.module_key === k) : null;
-      const level = moduleRow ? Number(moduleRow.level || 0) : (cfg.default_level || 0);
-      return `**${cfg.display}** (${k})\nLevel ${level} — ${cfg.description}`;
-    }).join('\n\n');
     const moduleCount = Object.keys(modulesCfg).length;
     const upgradedCount = Object.keys(modulesCfg).filter(k => {
       const cfg = modulesCfg[k];
@@ -216,7 +210,14 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
       return level > (cfg.default_level || 0);
     }).length;
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Progress:** ${upgradedCount}/${moduleCount} modules upgraded`));
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(moduleLines || 'No modules found'));
+    
+    // Display each module with its info for later button attachment
+    for (const k of Object.keys(modulesCfg)) {
+      const cfg = modulesCfg[k];
+      const moduleRow = rows.modules ? rows.modules.find(r => r.module_key === k) : null;
+      const level = moduleRow ? Number(moduleRow.level || 0) : (cfg.default_level || 0);
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**${cfg.display}** (${k})\nLevel ${level} — ${cfg.description}`));
+    }
   } else if (screen === 'milestones') {
     const milestonesCfg = hiveDefaults.milestones || {};
     const milestoneKeys = Object.keys(milestonesCfg);
@@ -312,23 +313,7 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
       );
     }
 
-    if (screen === 'modules') {
-      const upgradable = getUpgradableModules(rows.modules || []).slice(0, 25);
-      if (upgradable.length > 0) {
-        for (let i = 0; i < upgradable.length; i += 5) {
-          const batch = upgradable.slice(i, i + 5);
-          const row = new ActionRowBuilder().addComponents(
-            ...batch.map(m => 
-              new PrimaryButtonBuilder()
-                .setCustomId(`hive-upgrade-module-${m.moduleKey}`)
-                .setLabel(`${m.cfg.display} (${formatNumber(m.cost)} RJ)`)
-                .setDisabled(!canAct)
-            )
-          );
-          container.addActionRowComponents(row);
-        }
-      }
-    }
+    // Module buttons are now added inline with module text; skip separate button generation
 
     if (screen === 'add-xenos') {
       const addable = getAddableXenos(rows.xenos || [], hive.id).slice(0, 25);
