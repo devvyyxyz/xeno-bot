@@ -1,5 +1,7 @@
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const eggTypes = require('../../../config/eggTypes.json');
+const evolutions = require('../../../config/evolutions.json');
+const rarities = require('../../../config/rarities.json');
 const fallbackLogger = require('../../utils/fallbackLogger');
 const eggModel = require('../../models/egg');
 const emojis = require('../../utils/emojis');
@@ -104,6 +106,52 @@ module.exports = {
     } catch (e) {
       // ignore host page building errors
     }
+
+    // Build xeno pages from evolutions config + DB counts
+    const xenoPages = [];
+    try {
+      const roleKeys = Object.keys(evolutions.roles || {});
+      const hasXenosTable = await (async () => { try { return await db.knex.schema.hasTable('xenomorphs'); } catch (_) { return false; } })();
+      const xenoCounts = {};
+      
+      if (hasXenosTable) {
+        for (const k of roleKeys) {
+          try {
+            const [row] = await db.knex('xenomorphs').where({ role: k }).count('* as cnt');
+            xenoCounts[k] = row && (row.cnt || row.count || Object.values(row)[0]) ? Number(row.cnt || row.count || Object.values(row)[0]) : 0;
+          } catch (_) { xenoCounts[k] = 0; }
+        }
+      }
+
+      // Function to get rarity emoji based on rarity value
+      const getRarityEmoji = (rarityValue) => {
+        if (!rarityValue) return '';
+        const rarityTier = rarities.find(r => rarityValue >= r.minRarity && rarityValue <= r.maxRarity);
+        return rarityTier ? emojis.get(rarityTier.emoji) : '';
+      };
+
+      // Build pages (9 per page to match eggs/hosts layout)
+      for (let i = 0; i < roleKeys.length; i += eggsPerPage) {
+        const fields = roleKeys.slice(i, i + eggsPerPage).map(k => {
+          const xeno = evolutions.roles[k] || {};
+          const xenoEmoji = xeno.emoji ? emojis.get(xeno.emoji) : '';
+          const rarityEmoji = getRarityEmoji(xeno.rarity);
+          const name = `${xenoEmoji} **${xeno.display || k}**`;
+          const valParts = [];
+          if (xeno.rarity && rarityEmoji) valParts.push(`${rarityEmoji} Rarity: ${xeno.rarity}`);
+          if (xenoCounts[k] !== undefined) valParts.push(`Found: ${xenoCounts[k]}`);
+          let val = valParts.join('\n');
+          if (!val) val = 'No data';
+          if (name.length > 256) name = name.slice(0, 253) + '...';
+          if (val.length > 1024) val = val.slice(0, 1021) + '...';
+          return { name, value: val, inline: true };
+        });
+        xenoPages.push(fields);
+      }
+    } catch (e) {
+      // ignore xeno page building errors
+    }
+
     const getEmbed = (pageIdx) => new EmbedBuilder()
       .setTitle('📚 The Catalogue')
       .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
@@ -113,7 +161,8 @@ module.exports = {
       new SecondaryButtonBuilder().setCustomId('prev').setLabel('Previous').setDisabled(page === 0),
       new SecondaryButtonBuilder().setCustomId('next').setLabel('Next').setDisabled(page === pages.length - 1),
       new SecondaryButtonBuilder().setCustomId('view-eggs').setLabel('Eggs').setDisabled(currentView === 'eggs'),
-      new SecondaryButtonBuilder().setCustomId('view-hosts').setLabel('Hosts').setDisabled(currentView === 'hosts')
+      new SecondaryButtonBuilder().setCustomId('view-hosts').setLabel('Hosts').setDisabled(currentView === 'hosts'),
+      new SecondaryButtonBuilder().setCustomId('view-xenos').setLabel('Xenos').setDisabled(currentView === 'xenos')
     );
     await safeReply(interaction, { embeds: [getEmbed(page)], components: [row] }, { loggerName: 'command:encyclopedia' });
     if (pages.length === 1) return;
@@ -126,12 +175,12 @@ module.exports = {
       if (i.user.id !== interaction.user.id) return safeReply(i, { content: 'Only the command user can change pages.', ephemeral: true }, { loggerName: 'command:encyclopedia' });
       try {
         if (i.customId === 'prev') {
-          if (currentView === 'eggs') { if (page > 0) page--; }
-          else { if (page > 0) page--; }
+          if (page > 0) page--;
         }
         if (i.customId === 'next') {
-          if (currentView === 'eggs') { if (page < pages.length - 1) page++; }
-          else { if (page < hostPages.length - 1) page++; }
+          if (currentView === 'eggs' && page < pages.length - 1) page++;
+          else if (currentView === 'hosts' && page < hostPages.length - 1) page++;
+          else if (currentView === 'xenos' && page < xenoPages.length - 1) page++;
         }
         if (i.customId === 'view-eggs') {
           currentView = 'eggs';
@@ -141,18 +190,39 @@ module.exports = {
           currentView = 'hosts';
           page = 0;
         }
+        if (i.customId === 'view-xenos') {
+          currentView = 'xenos';
+          page = 0;
+        }
 
-        const embedToSend = currentView === 'eggs' ? getEmbed(page) : new EmbedBuilder()
-          .setTitle('📚 Hosts Catalogue')
-          .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
-          .setFooter({ text: `Page ${page + 1} of ${Math.max(1, hostPages.length)}` })
-          .addFields(hostPages[page] || []);
+        let embedToSend;
+        let maxPages = 1;
+        
+        if (currentView === 'eggs') {
+          embedToSend = getEmbed(page);
+          maxPages = pages.length;
+        } else if (currentView === 'hosts') {
+          embedToSend = new EmbedBuilder()
+            .setTitle('📚 Hosts Catalogue')
+            .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
+            .setFooter({ text: `Page ${page + 1} of ${Math.max(1, hostPages.length)}` })
+            .addFields(hostPages[page] || []);
+          maxPages = hostPages.length;
+        } else if (currentView === 'xenos') {
+          embedToSend = new EmbedBuilder()
+            .setTitle('📚 Xenomorphs Catalogue')
+            .setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d)
+            .setFooter({ text: `Page ${page + 1} of ${Math.max(1, xenoPages.length)}` })
+            .addFields(xenoPages[page] || []);
+          maxPages = xenoPages.length;
+        }
 
         const newRow = new ActionRowBuilder().addComponents(
           new SecondaryButtonBuilder().setCustomId('prev').setLabel('Previous').setDisabled(page === 0),
-          new SecondaryButtonBuilder().setCustomId('next').setLabel('Next').setDisabled(currentView === 'eggs' ? page === pages.length - 1 : page === hostPages.length - 1),
+          new SecondaryButtonBuilder().setCustomId('next').setLabel('Next').setDisabled(page >= maxPages - 1),
           new SecondaryButtonBuilder().setCustomId('view-eggs').setLabel('Eggs').setDisabled(currentView === 'eggs'),
-          new SecondaryButtonBuilder().setCustomId('view-hosts').setLabel('Hosts').setDisabled(currentView === 'hosts')
+          new SecondaryButtonBuilder().setCustomId('view-hosts').setLabel('Hosts').setDisabled(currentView === 'hosts'),
+          new SecondaryButtonBuilder().setCustomId('view-xenos').setLabel('Xenos').setDisabled(currentView === 'xenos')
         );
 
         await i.update({ embeds: [embedToSend], components: [newRow] });
