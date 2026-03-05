@@ -93,7 +93,7 @@ function buildEggsListPage({ pageIdx = 0, hatches = [], client = null, showColle
         .setSuccessButtonAccessory((button) =>
           button
             .setLabel(collected ? 'Collected' : 'Collect')
-            .setCustomId(`eggs-collect-one:${hatch.id}`)
+            .setCustomId(`eggs-collect-one:${hatch.id}:${pagination.safePageIdx}`)
             .setDisabled(!ready || collected)
         )
         .addTextDisplayComponents(
@@ -366,7 +366,10 @@ module.exports = {
           }
 
           if (i.customId.startsWith('eggs-collect-one:')) {
-            const hatchId = Number(i.customId.split(':')[1]);
+            const [, hatchIdRaw, pageRaw] = String(i.customId).split(':');
+            const hatchId = Number(hatchIdRaw);
+            const parsedPage = Number(pageRaw);
+            if (!Number.isNaN(parsedPage)) currentPage = Math.max(0, parsedPage);
             await hatchManager.collectHatch(discordId, guildId, hatchId);
             const hatchIndex = rows.findIndex(r => r.id === hatchId);
             if (hatchIndex !== -1) rows[hatchIndex].collected = true;
@@ -464,7 +467,10 @@ module.exports = {
 
                 // Collect single hatch
                 if (i.customId.startsWith('eggs-collect-one:')) {
-                  const hatchId = Number(i.customId.split(':')[1]);
+                  const [, hatchIdRaw, pageRaw] = String(i.customId).split(':');
+                  const hatchId = Number(hatchIdRaw);
+                  const parsedPage = Number(pageRaw);
+                  if (!Number.isNaN(parsedPage)) currentPage = Math.max(0, parsedPage);
                   await hatchManager.collectHatch(discordId, guildId, hatchId);
                   
                   // Mark the hatch as collected in the local array
@@ -648,7 +654,10 @@ module.exports = {
                 }
                 // Collect single hatch
                 if (i.customId.startsWith('eggs-collect-one:')) {
-                  const hatchId = Number(i.customId.split(':')[1]);
+                  const [, hatchIdRaw, pageRaw] = String(i.customId).split(':');
+                  const hatchId = Number(hatchIdRaw);
+                  const parsedPage = Number(pageRaw);
+                  if (!Number.isNaN(parsedPage)) currentPage = Math.max(0, parsedPage);
                   await hatchManager.collectHatch(discordId, guildId, hatchId);
                   const hatchIndex = rows.findIndex(r => r.id === hatchId);
                   if (hatchIndex !== -1) {
@@ -771,7 +780,10 @@ module.exports = {
                 }
                 // Collect single hatch
                 if (i.customId.startsWith('eggs-collect-one:')) {
-                  const hatchId = Number(i.customId.split(':')[1]);
+                  const [, hatchIdRaw, pageRaw] = String(i.customId).split(':');
+                  const hatchId = Number(hatchIdRaw);
+                  const parsedPage = Number(pageRaw);
+                  if (!Number.isNaN(parsedPage)) currentPage = Math.max(0, parsedPage);
                   await hatchManager.collectHatch(discordId, guildId, hatchId);
                   const hatchIndex = rows.findIndex(r => r.id === hatchId);
                   if (hatchIndex !== -1) {

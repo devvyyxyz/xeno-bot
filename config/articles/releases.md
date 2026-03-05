@@ -4,6 +4,16 @@ View the full changelog of xeno-bot's development progress, including all featur
 
 ----
 
+## v1.9.6 — Eggs list claim pagination fix
+
+Date: 2026-03-05
+
+- **Fixed:** `/eggs list` no longer resets to page 1 when claiming/collecting an egg from later pages.
+- **Improved:** Collect actions now preserve the current list page context so users can claim multiple eggs on page 2+ without repeatedly pressing Next.
+- **Technical:** Collect button IDs now carry page context and all eggs-list collectors restore that page before re-rendering.
+
+Commit: post-v1.9.5 fix for eggs list paging state retention.
+
 ## v1.9.5 — Post-1.9.4 gameplay, UX, and data integrity updates
 
 Date: 2026-03-05

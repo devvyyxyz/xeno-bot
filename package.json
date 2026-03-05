@@ -1,6 +1,6 @@
 {
   "name": "xeno-bot",
-  "version": "1.9.5",
+  "version": "1.9.6",
   "description": "Scalable discord.js v14 bot scaffold",
   "main": "src/index.js",
   "scripts": {
