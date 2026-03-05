@@ -4,6 +4,15 @@ View the full changelog of xeno-bot's development progress, including all featur
 
 ----
 
+## v1.9.7 — Hive create-flow interaction fix
+
+Date: 2026-03-05
+
+- **Fixed:** `/hive` no-hive create flow no longer breaks interactions on the same message after creating a hive.
+- **Bug behavior before:** Creating a hive from the no-hive prompt, then using dashboard buttons on that same message, resulted in failed interactions.
+- **Now:** After pressing **View Hive**, the same message is upgraded to the full hive dashboard collector so Stats/Modules/Milestones/Queen/Members and management actions function normally.
+- **Internal:** Refactored hive dashboard collector wiring into a reusable attachment path used by both existing-hive and post-create view flows.
+
 ## v1.9.6 — Eggs list claim pagination fix
 
 Date: 2026-03-05
