@@ -4,6 +4,15 @@ View the full changelog of xeno-bot's development progress, including all featur
 
 ----
 
+## v1.9.9 — New-user egg catch award fix
+
+Date: 2026-03-05
+
+- **Fixed:** Resolved spawn catch failures for first-time users that logged `Failed awarding egg`.
+- **Root cause:** `createUser()` in `user` model referenced an undefined `logger`, causing a runtime error during initial user creation.
+- **Impact:** New users can now catch spawned eggs normally, receive inventory updates, and avoid console award errors.
+- **Internal:** Added the missing user-model logger initialization and kept existing award flow unchanged.
+
 ## v1.9.8 — Inventory xeno list formatting polish
 
 Date: 2026-03-05
