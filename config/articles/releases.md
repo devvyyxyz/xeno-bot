@@ -4,6 +4,15 @@ View the full changelog of xeno-bot's development progress, including all featur
 
 ----
 
+## v1.9.8 — Inventory xeno list formatting polish
+
+Date: 2026-03-05
+
+- **Improved:** `/inventory` xenomorph entries now use host-style formatting for readability and consistency.
+- **Before:** `#663 facehugger: Pathway: standard • Created: ...`
+- **Now:** `<xeno emoji> <xeno display name> [663]: Created ...`
+- **Details:** Xeno labels now use evolution role metadata (display name + configured emoji) and keep a clean timestamp line similar to host entries.
+
 ## v1.9.7 — Hive create-flow interaction fix
 
 Date: 2026-03-05

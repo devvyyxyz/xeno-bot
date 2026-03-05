@@ -18,6 +18,7 @@ const { getCommandConfig, commands: commandsConfig } = require('../../utils/comm
 const { DiscordAPIError } = require('discord.js');
 const eggTypes = require('../../../config/eggTypes.json');
 const hostsCfg = require('../../../config/hosts.json');
+const evolutionsCfg = require('../../../config/evolutions.json');
 const emojisCfg = require('../../../config/emojis.json');
 const userModel = require('../../models/user');
 const hostModel = require('../../models/host');
@@ -33,6 +34,15 @@ function getHostDisplay(hostType, cfgHosts, emojis) {
   const hostInfo = cfgHosts[hostType] || {};
   const display = hostInfo.display || hostType;
   const emojiKey = hostInfo.emoji;
+  const emoji = emojiKey && emojis[emojiKey] ? emojis[emojiKey] : '';
+  return emoji ? `${emoji} ${display}` : display;
+}
+
+function getXenoDisplay(roleOrStage, evolutions, emojis) {
+  const key = String(roleOrStage || '').toLowerCase();
+  const roleInfo = evolutions?.roles?.[key] || {};
+  const display = roleInfo.display || roleOrStage || 'xenomorph';
+  const emojiKey = roleInfo.emoji;
   const emoji = emojiKey && emojis[emojiKey] ? emojis[emojiKey] : '';
   return emoji ? `${emoji} ${display}` : display;
 }
@@ -408,8 +418,9 @@ module.exports = {
           }
           
           for (const x of rows) {
-            const label = `#${x.id} ${x.role || x.stage}`;
-            out.push({ name: label, value: `Pathway: ${x.pathway || 'standard'} • Created: <t:${Math.floor(Number(x.created_at || x.started_at || Date.now()) / 1000)}:f>`, inline: false });
+            const roleOrStage = x.role || x.stage;
+            const label = `${getXenoDisplay(roleOrStage, evolutionsCfg, emojisCfg)} [${x.id}]`;
+            out.push({ name: label, value: `Pathway: ${x.pathway || 'standard'} • Created <t:${Math.floor(Number(x.created_at || x.started_at || Date.now()) / 1000)}:f>`, inline: false });
           }
         } catch (e) {
           // ignore
