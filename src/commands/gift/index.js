@@ -373,8 +373,8 @@ module.exports = {
           return;
         }
 
-        // Transfer ownership
-        await db.knex('xenomorphs').where({ id: xenoId }).update({ owner_id: recipient.id });
+        // Transfer ownership and clear hive assignment to avoid implicit reassignment on return gifts
+        await db.knex('xenomorphs').where({ id: xenoId }).update({ owner_id: recipient.id, hive_id: null });
 
         const pathwayConfig = require('../../../config/evolutions.json');
         const pathway = pathwayConfig.pathways?.[xeno.pathway];
