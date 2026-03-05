@@ -4,6 +4,15 @@ View the full changelog of xeno-bot's development progress, including all featur
 
 ----
 
+## v1.9.10 — Gift xenomorph autocomplete + evolution status fix
+
+Date: 2026-03-05
+
+- **Fixed:** `/gift xenomorph` autocomplete now properly lists giftable xenomorphs owned by the user.
+- **Improved:** Xeno autocomplete labels now include configured xeno emoji + display name, ID, and pathway for easier selection.
+- **Fixed:** Manual `/gift xenomorph` by ID no longer incorrectly blocks gifting due to historical evolution records.
+- **Details:** Gift blocking now only checks active evolution jobs (`queued`/`processing`) instead of any row in `evolution_queue`.
+
 ## v1.9.9 — New-user egg catch award fix
 
 Date: 2026-03-05

@@ -2,6 +2,8 @@ const { getCommandConfig, buildSubcommandOptions } = require('../../utils/comman
 const eggTypes = require('../../../config/eggTypes.json');
 const shopConfig = require('../../../config/shop.json');
 const hostsConfig = require('../../../config/hosts.json');
+const evolutionsConfig = require('../../../config/evolutions.json');
+const emojiMap = require('../../../config/emojis.json');
 const userModel = require('../../models/user');
 const hostModel = require('../../models/host');
 const xenoModel = require('../../models/xenomorph');
@@ -150,16 +152,31 @@ module.exports = {
       // Get user's xenomorphs
       try {
         const xenos = await xenoModel.getXenosByOwner(userId);
-        const pathwayConfig = require('../../../config/evolutions.json');
-        
-        const xenoChoices = xenos.map(x => {
-          const pathway = pathwayConfig.pathways?.[x.pathway];
-          const stageName = pathway?.stages?.[x.stage]?.name || x.stage;
-          return {
-            id: String(x.id),
-            name: `${stageName} - ${x.pathway} (ID: ${x.id})`.substring(0, 100)
-          };
-        });
+
+        let activeEvolutionXenoIds = new Set();
+        try {
+          const activeJobs = await db.knex('evolution_queue')
+            .whereIn('status', ['queued', 'processing'])
+            .select('xeno_id');
+          activeEvolutionXenoIds = new Set((activeJobs || []).map(j => Number(j.xeno_id)).filter(n => Number.isFinite(n)));
+        } catch (_) {
+          activeEvolutionXenoIds = new Set();
+        }
+
+        const xenoChoices = (xenos || [])
+          .filter(x => !activeEvolutionXenoIds.has(Number(x.id)))
+          .map(x => {
+            const roleKey = String(x.role || x.stage || 'xenomorph').toLowerCase();
+            const roleInfo = evolutionsConfig.roles?.[roleKey] || {};
+            const display = roleInfo.display || roleKey;
+            const emojiKey = roleInfo.emoji;
+            const emoji = emojiKey && emojiMap[emojiKey] ? `${emojiMap[emojiKey]} ` : '';
+            const pathway = x.pathway || 'standard';
+            return {
+              id: String(x.id),
+              name: `${emoji}${display} [${x.id}] - ${pathway}`.substring(0, 100)
+            };
+          });
         
         return autocomplete(interaction, xenoChoices, { 
           map: x => ({ name: x.name, value: x.id }), 
@@ -364,7 +381,10 @@ module.exports = {
         }
 
         // Check if xenomorph is in evolution queue
-        const evolutionQueue = await db.knex('evolution_queue').where({ xeno_id: xenoId }).first();
+        const evolutionQueue = await db.knex('evolution_queue')
+          .where({ xeno_id: xenoId })
+          .whereIn('status', ['queued', 'processing'])
+          .first();
         if (evolutionQueue) {
           await safeReply(interaction, { 
             content: 'Cannot gift a xenomorph that is currently evolving!', 
