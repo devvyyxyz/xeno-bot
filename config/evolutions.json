@@ -20,6 +20,10 @@
       "stages": ["bloodburster", "neomorph"],
       "description": "Neomorph pathway unlocked by rare eggs/hosts"
     }
+    ,"space_jockey": {
+      "stages": ["facehugger", "drone", "space_jockey"],
+      "description": "Space Jockey pathway producing the Space Jockey Xeno"
+    }
   },
   "eggPathways": {
     "classic": "standard",
@@ -46,11 +50,12 @@
 
     "neomorph": "neomorph",
 
+
     "predalien": "king",
     "ultramorph": "king",
     "synthetic": "king",
     "android": "king",
-    "spacejockey": "king",
+    "spacejockey": "space_jockey",
     "engineer": "king",
     "weyland": "king",
     "giant": "king"
@@ -74,6 +79,9 @@
       "knight": { "to": "grand_duke", "cost_jelly": 50 },
       "grand_duke": { "to": "prince", "cost_jelly": 75 },
       "prince": { "to": "king", "cost_jelly": 120 }
+    },
+    "space_jockey": {
+      "drone": { "to": "space_jockey", "cost_jelly": 1000, "requires_host_types": ["space_jockey"] }
     },
     "deacon": {
       "hammerpede": { "to": "trilobite", "cost_jelly": 15 },
@@ -106,5 +114,6 @@
     "deacon": { "display": "Deacon", "emoji": "deacon", "rarity": 9 },
     "bloodburster": { "display": "Bloodburster", "emoji": "bloodburster", "rarity": 8 },
     "neomorph": { "display": "Neomorph", "emoji": "neomorph", "rarity": 9 }
+    ,"space_jockey": { "display": "Space Jockey Xeno", "emoji": "space_jockey_xeno", "rarity": 10 }
   }
 }

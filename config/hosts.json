@@ -7,5 +7,6 @@
     "predator": { "display": "Predator", "emoji": "predator", "rarity": "very_rare", "weight": 2, "description": "A rare Predator host used for elite hybrid pathways." },
     "neomorph_candidate": { "display": "Neomorph Candidate", "emoji": "xenomorph_queen_sprite", "rarity": "rare", "weight": 3, "description": "A rare host that can lead to Neomorph evolutions." },
     "colonial_marine": { "display": "Colonial Marine", "emoji": "colonial_marine", "rarity": "very_rare", "weight": 2, "description": "A trained USCM soldier host for tactical xenomorph hybrids." }
+    ,"space_jockey": { "display": "Space Jockey", "emoji": "space_jockey", "rarity": "very_rare", "weight": 1, "description": "A mysterious ancient host tied to Space Jockey lore; extremely rare." }
   }
 }

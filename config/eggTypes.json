@@ -217,7 +217,7 @@
     "price": 100000,
     "sell": 5,
     "hatch": 600,
-    "next_stage": "king_facehugger"
+    "next_stage": "facehugger"
   },
   {
     "id": "engineer",
