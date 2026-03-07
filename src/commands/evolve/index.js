@@ -502,16 +502,18 @@ module.exports = {
       try { msg = await interaction.fetchReply(); } catch (_) {}
       if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
 
-      const collector = msg.createMessageComponentCollector({
-        filter: i => i.user.id === interaction.user.id && String(i.customId || '').startsWith('evolve-'),
-        time: 120_000
-      });
+      const collector = msg.createMessageComponentCollector({ filter: () => true, time: 120_000 });
       let currentListPage = 0;
       let currentListTypeFilter = 'all';
       let currentCancelPage = 0;
 
       collector.on('collect', async i => {
         try {
+          if (i.user.id !== interaction.user.id) {
+            try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:evolve' }); } catch (_) {}
+            return;
+          }
+
           const userIdInner = String(i.user.id);
           if (i.customId === 'evolve-list-type-select') {
             currentListTypeFilter = i.values && i.values[0] ? String(i.values[0]) : 'all';

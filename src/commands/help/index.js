@@ -332,13 +332,14 @@ module.exports = {
       return;
     }
 
-    const collector = msg.createMessageComponentCollector({
-      filter: i => i.user.id === interaction.user.id && ['help-category', 'help-prev', 'help-next'].includes(i.customId),
-      time: 120_000
-    });
+    const collector = msg.createMessageComponentCollector({ filter: () => true, time: 120_000 });
 
     collector.on('collect', async i => {
       try {
+        if (i.user.id !== interaction.user.id) {
+          try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:help' }); } catch (e) {}
+          return;
+        }
 
         if (i.customId === 'help-category') {
           const cat = i.values[0];

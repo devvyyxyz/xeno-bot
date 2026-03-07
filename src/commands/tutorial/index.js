@@ -238,13 +238,15 @@ module.exports = {
       try { msg = await interaction.fetchReply(); } catch (_) {}
       if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
 
-      const collector = msg.createMessageComponentCollector({
-        filter: i => i.user.id === interaction.user.id && ['tutorial-category', 'tutorial-prev', 'tutorial-next'].includes(i.customId),
-        time: 300_000
-      });
+      const collector = msg.createMessageComponentCollector({ filter: () => true, time: 300_000 });
 
       collector.on('collect', async i => {
         try {
+          if (i.user.id !== interaction.user.id) {
+            try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:tutorial' }); } catch (_) {}
+            return;
+          }
+
           if (i.customId === 'tutorial-category') {
             currentCategory = i.values[0] || CATEGORY_ORDER[0];
             currentPage = 0;

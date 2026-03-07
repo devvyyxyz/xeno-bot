@@ -81,13 +81,14 @@ module.exports = {
     let message = null;
     try { message = await interaction.fetchReply(); } catch (_) { return; }
     if (!message || typeof message.createMessageComponentCollector !== 'function') return;
-    const collector = message.createMessageComponentCollector({
-      filter: i => i.user.id === interaction.user.id && i.customId === customId,
-      time: 60_000
-    });
+    const collector = message.createMessageComponentCollector({ filter: () => true, time: 60_000 });
 
     collector.on('collect', async i => {
       try {
+        if (i.user.id !== interaction.user.id) {
+          try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }); } catch (_) {}
+          return;
+        }
         await i.update(buildPingPayload(i, customId));
       } catch (e) {
         logger.warn('Ping refresh update failed', { error: e && (e.stack || e) });
