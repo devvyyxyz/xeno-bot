@@ -51,6 +51,10 @@ async function init(botClient) {
   } catch (e) {
     logger.error('Failed initializing hatch manager', { error: e && (e.stack || e) });
   }
+  try {
+    const systemMonitor = require('./utils/systemMonitor');
+    systemMonitor.registerSystem('hatchManager', { name: 'Hatch Manager', shutdown: shutdown });
+  } catch (e) { logger.warn('Failed registering hatchManager with systemMonitor', { error: e && (e.stack || e) }); }
 }
 
 function scheduleTimer(hatchId, delay) {

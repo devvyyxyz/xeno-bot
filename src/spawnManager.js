@@ -245,6 +245,10 @@ async function init(botClient) {
       scheduleNext(row.guild_id);
     }
     logger.info('Spawn manager initialized', { shardGuilds: shardGuildIds.length, configuredGuilds: rows.length, chunkSize: inChunkSize, maxConcurrentSpawns });
+    try {
+      const systemMonitor = require('./utils/systemMonitor');
+      systemMonitor.registerSystem('spawnManager', { name: 'Spawn Manager', shutdown: shutdown });
+    } catch (e) { logger.warn('Failed registering spawnManager with systemMonitor', { error: e && (e.stack || e) }); }
   } catch (err) {
     logger.error('Failed initializing spawn manager', { error: err.stack || err });
   }

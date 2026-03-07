@@ -20,6 +20,7 @@
     "displayShard": true,
     "customActivities": []
   },
+  "statusChannelId": "1477947458737672294",
   "bugReports": {
     "forumChannelId": "1477929560564564088",
     "introMessage": "Thanks for opening a bug report. Please include steps to reproduce, expected result, actual result, and screenshots/logs if possible.\n\nWhen this is fixed, click **Mark Resolved** below.",

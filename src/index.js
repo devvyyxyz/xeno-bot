@@ -290,7 +290,12 @@ process.on('uncaughtException', (error) => {
   } catch (e) {
     console.error('Will exit in 5s to prevent restart loops');
   }
-  setTimeout(() => process.exit(1), 5000);
+  // Attempt graceful shutdown so status message is updated
+  try {
+    gracefulShutdown('uncaughtException');
+  } catch (_) {
+    setTimeout(() => process.exit(1), 5000);
+  }
 });
 
 // Create client BEFORE startup so it's available in startup()
@@ -298,6 +303,17 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
   partials: [Partials.Channel]
 });
+
+// System monitor: post status to designated channel when modules fail
+try {
+  const systemMonitor = require('./utils/systemMonitor');
+  client.once('clientReady', () => {
+    try {
+      // Channel ID provided by user
+      systemMonitor.init(client, config.statusChannelId).catch(() => {});
+    } catch (e) { logger.warn('Failed initializing systemMonitor', { error: e && (e.stack || e) }); }
+  });
+} catch (e) { logger.warn('systemMonitor module not available', { error: e && (e.stack || e) }); }
 
 startMemoryWatchdog();
 
@@ -358,7 +374,11 @@ if (fs.existsSync(eventsPath)) {
 process.on('uncaughtException', (err) => {
   baseLogger.error('Uncaught Exception', { error: err.stack || err });
   if (baseLogger.sentry) baseLogger.sentry.captureException(err);
-  process.exit(1);
+  try {
+    gracefulShutdown('uncaughtException');
+  } catch (e) {
+    process.exit(1);
+  }
 });
 
 process.on('unhandledRejection', (reason) => {
@@ -371,6 +391,26 @@ process.on('unhandledRejection', (reason) => {
 async function gracefulShutdown(reason) {
   try {
     logger.info('Graceful shutdown starting', { reason });
+    try {
+      const systemMonitor = require('./utils/systemMonitor');
+      if (systemMonitor) {
+        logger.info('Invoking systemMonitor to mark systems down', { reason });
+        try {
+          if (typeof systemMonitor.markAllDown === 'function') {
+            await systemMonitor.markAllDown(reason);
+          } else if (typeof systemMonitor.markDown === 'function') {
+            await systemMonitor.markDown('bot', reason);
+          }
+          // give Discord API a short moment to process edits
+          await new Promise(res => setTimeout(res, 500));
+          logger.info('systemMonitor mark down complete');
+        } catch (smErr) {
+          logger.warn('systemMonitor mark down failed during shutdown', { error: smErr && (smErr.stack || smErr) });
+        }
+      }
+    } catch (e) {
+      logger.warn('systemMonitor not available during graceful shutdown', { error: e && (e.stack || e) });
+    }
     // call optional shutdown hooks if modules expose them
     try {
       const spawnManager = require('./spawnManager');

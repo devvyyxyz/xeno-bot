@@ -77,6 +77,20 @@ async function start(client, opts = {}) {
     processDueJobs(client).catch(e => logger.error('Worker failed', { error: e && (e.stack || e) }));
   }, pollMs);
   logger.info('Evolution worker started', { pollMs });
+  try {
+    const systemMonitor = require('./utils/systemMonitor');
+    systemMonitor.registerSystem('evolutionWorker', { name: 'Evolution Worker', shutdown: stop });
+  } catch (e) { logger.warn('Failed registering evolutionWorker with systemMonitor', { error: e && (e.stack || e) }); }
 }
 
-module.exports = { start, processDueJobs };
+async function stop() {
+  try {
+    if (_interval) clearInterval(_interval);
+    _interval = null;
+    logger.info('Evolution worker stopped');
+  } catch (e) {
+    logger.warn('Failed stopping evolution worker', { error: e && (e.stack || e) });
+  }
+}
+
+module.exports = { start, processDueJobs, stop };
