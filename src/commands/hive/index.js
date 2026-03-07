@@ -1023,18 +1023,85 @@ module.exports = {
               return;
             }
 
-            const newHive = await hiveModel.createHiveForUser(userId, guildId, { type: 'default', name: `${interaction.user.username}'s Hive` });
-            const container = new ContainerBuilder();
-            container.addTextDisplayComponents(
-              new TextDisplayBuilder().setContent('## Hive Created'),
-              new TextDisplayBuilder().setContent(`Hive created (ID: ${newHive.id}).`)
-            );
-            container.addActionRowComponents(
-              new ActionRowBuilder().addComponents(
-                new PrimaryButtonBuilder().setLabel('View Hive').setCustomId(HIVE_CREATE_VIEW_ID)
-              )
-            );
-            await i.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
+            // Present hive type selection (only allow 'default' and 'pathogen' currently)
+            const hasPathogenQueen = Array.isArray(xenos) && xenos.some(x => {
+              const role = String(x?.role || '').toLowerCase();
+              const pathway = String(x?.pathway || '').toLowerCase();
+              return (role.includes('queen') && (pathway === 'pathogen' || role.includes('pathogen')));
+            });
+
+            const typeSelectContainer = new ContainerBuilder();
+            typeSelectContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent('## Select Hive Type'));
+            typeSelectContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent('Choose which type of hive to create.'));
+
+            const typeSelect = new StringSelectMenuBuilder()
+              .setCustomId('hive-create-type')
+              .setPlaceholder('Select hive type')
+              .addOptions(
+                { label: 'Default', value: 'default', description: 'Standard hive (requires an evolved xenomorph).', default: true },
+                { label: 'Pathogen', value: 'pathogen', description: 'Pathogen hive (requires at least one Pathogen Queen).', disabled: !hasPathogenQueen }
+              );
+
+            typeSelectContainer.addActionRowComponents(new ActionRowBuilder().addComponents(typeSelect));
+
+            // If pathogen is disabled, explain requirement
+            if (!hasPathogenQueen) {
+              typeSelectContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent('_Pathogen hive requires at least one Pathogen Queen in your collection._'));
+            }
+
+            await i.update({ components: [typeSelectContainer], flags: MessageFlags.IsComponentsV2 });
+
+            // Create a short-lived collector for the select menu
+            try {
+              const selMsg = i.message;
+              if (selMsg && typeof selMsg.createMessageComponentCollector === 'function') {
+                const selCollector = selMsg.createMessageComponentCollector({ filter: s => s.user.id === userId && s.customId === 'hive-create-type', time: 60_000, max: 1 });
+                selCollector.on('collect', async s => {
+                  try {
+                    const choice = Array.isArray(s.values) ? s.values[0] : null;
+                    if (!choice) {
+                      await s.reply({ content: 'No hive type selected.', ephemeral: true });
+                      return;
+                    }
+
+                    if (choice === 'default') {
+                      const newHive = await hiveModel.createHiveForUser(userId, guildId, { type: 'default', name: `${interaction.user.username}'s Hive` });
+                      const container = new ContainerBuilder();
+                      container.addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent('## Hive Created'),
+                        new TextDisplayBuilder().setContent(`Hive created (ID: ${newHive.id}).`)
+                      );
+                      container.addActionRowComponents(new ActionRowBuilder().addComponents(new PrimaryButtonBuilder().setLabel('View Hive').setCustomId(HIVE_CREATE_VIEW_ID)));
+                      await s.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
+                      selCollector.stop();
+                      return;
+                    }
+
+                    if (choice === 'pathogen') {
+                      if (!hasPathogenQueen) {
+                        await s.reply({ content: 'You need at least one Pathogen Queen to create a Pathogen hive.', ephemeral: true });
+                        return;
+                      }
+                      const newHive = await hiveModel.createHiveForUser(userId, guildId, { type: 'pathogen', name: `${interaction.user.username}'s Pathogen Hive` });
+                      const container = new ContainerBuilder();
+                      container.addTextDisplayComponents(
+                        new TextDisplayBuilder().setContent('## Pathogen Hive Created'),
+                        new TextDisplayBuilder().setContent(`Pathogen hive created (ID: ${newHive.id}).`)
+                      );
+                      container.addActionRowComponents(new ActionRowBuilder().addComponents(new PrimaryButtonBuilder().setLabel('View Hive').setCustomId(HIVE_CREATE_VIEW_ID)));
+                      await s.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
+                      selCollector.stop();
+                      return;
+                    }
+                  } catch (err) {
+                    try { await s.reply({ content: `Error creating hive: ${err && err.message}`, ephemeral: true }); } catch (_) {}
+                  }
+                });
+              }
+            } catch (e) {
+              logger.warn('Failed to attach hive-create-type collector', { error: e && e.message });
+            }
+            return;
           } catch (err) {
             const container = new ContainerBuilder();
             container.addTextDisplayComponents(
