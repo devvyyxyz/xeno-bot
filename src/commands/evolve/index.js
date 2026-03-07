@@ -10,7 +10,10 @@ const {
   MessageFlags,
   SectionBuilder,
   SeparatorBuilder,
-  SeparatorSpacingSize
+    SeparatorSpacingSize,
+    ModalBuilder,
+    TextInputBuilder,
+    TextInputStyle
 } = require('discord.js');
 const xenoModel = require('../../models/xenomorph');
 const hostModel = require('../../models/host');
@@ -193,6 +196,17 @@ function buildEvolveView({
   };
 
   addV2TitleWithBotThumbnail({ container, title: titleMap[screen] || 'Evolve', client });
+  // Short descriptive text explaining the current view
+  const screenDescriptions = {
+    list: 'Shows your xenomorphs. Use Info to inspect, Start to begin an evolution, or Cancel to stop queued jobs.',
+    info: 'Details for the selected xenomorph: pathway, current stage, and configured evolution times.',
+    cancel: 'Shows your queued evolution jobs (can cancel jobs here). Resources are not refunded on cancel.',
+    'start-help': 'Start an evolution by choosing a xenomorph, the next stage, and an optional host (required for some pathways).',
+    result: ''
+  };
+  if (screenDescriptions[screen]) {
+    try { container.addTextDisplayComponents(new TextDisplayBuilder().setContent(screenDescriptions[screen])); } catch (_) {}
+  }
 
   if (screen === 'list') {
     const safeFilter = String(listTypeFilter || 'all');
@@ -225,19 +239,20 @@ function buildEvolveView({
       }
 
       const typeValues = [...new Set(xenos.map(x => String(x.role || x.stage || '').toLowerCase()).filter(Boolean))].sort();
-      const MAX_TYPE_OPTIONS = 5; // keep payload under Discord V2 total component limits
+      const MAX_TYPE_OPTIONS = 25; // increase to show more types (Discord limit ~25 options)
       const slicedTypes = typeValues.slice(0, MAX_TYPE_OPTIONS);
       if (safeFilter !== 'all' && safeFilter && !slicedTypes.includes(safeFilter) && typeValues.includes(safeFilter)) {
         slicedTypes[MAX_TYPE_OPTIONS - 1] = safeFilter;
       }
 
-      const options = [{ label: 'All Types', value: 'all', default: safeFilter === 'all' }].concat(
-        slicedTypes.map(v => ({
-          label: v,
-          value: v,
-          default: v === safeFilter
-        }))
-      );
+      // If there are more types than the max, reserve the last option for "More..." which opens a modal search
+      const baseOptions = slicedTypes.map(v => ({ label: v, value: v, default: v === safeFilter }));
+      let options = [{ label: 'All Types', value: 'all', default: safeFilter === 'all' }].concat(baseOptions);
+      if (typeValues.length > MAX_TYPE_OPTIONS) {
+        // replace last option with More...
+        if (options.length >= MAX_TYPE_OPTIONS) options = options.slice(0, MAX_TYPE_OPTIONS - 1);
+        options.push({ label: 'More...', value: 'more', default: false });
+      }
 
       container.addActionRowComponents(
         new ActionRowBuilder().addComponents(
@@ -540,10 +555,60 @@ module.exports = {
 
           const userIdInner = String(i.user.id);
           if (i.customId === 'evolve-list-type-select') {
-            currentListTypeFilter = i.values && i.values[0] ? String(i.values[0]) : 'all';
-            currentListPage = 0;
-            const list = await xenoModel.listByOwner(userIdInner);
-            await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
+            const chosen = i.values && i.values[0] ? String(i.values[0]) : 'all';
+            if (chosen === 'more') {
+              // show modal to get substring
+              try {
+                const modal = new ModalBuilder().setCustomId('evolve-type-search-modal').setTitle('Search Xenomorph Types');
+                const input = new TextInputBuilder().setCustomId('evolve-type-search-input').setLabel('Enter substring to search').setStyle(TextInputStyle.Short).setRequired(true);
+                const row = new ActionRowBuilder().addComponents(input);
+                modal.addComponents(row);
+                await i.showModal(modal);
+                // register a one-time handler for the modal submit
+                const client = interaction.client;
+                const modalHandler = async (modalInteraction) => {
+                  try {
+                    if (!modalInteraction.isModalSubmit || !modalInteraction.isModalSubmit()) return;
+                    if (modalInteraction.customId !== 'evolve-type-search-modal') return;
+                    if (String(modalInteraction.user.id) !== String(interaction.user.id)) {
+                      await modalInteraction.reply({ content: 'This search modal is not for you.', ephemeral: true });
+                      return;
+                    }
+                    const term = String(modalInteraction.fields.getTextInputValue('evolve-type-search-input') || '').toLowerCase().trim();
+                    await modalInteraction.reply({ content: `Searching for "${term}"...`, ephemeral: true });
+                    // build type list and find matches
+                    const allXenos = await xenoModel.listByOwner(userIdInner);
+                    const allTypes = [...new Set(allXenos.map(x => String(x.role || x.stage || '').toLowerCase()).filter(Boolean))].sort();
+                    const matches = allTypes.filter(t => t.includes(term));
+                    if (!matches || matches.length === 0) {
+                      await modalInteraction.followUp({ content: `No matching types found for "${term}".`, ephemeral: true });
+                    } else if (matches.length === 1) {
+                      // update the list view to filter to this type
+                      currentListTypeFilter = matches[0];
+                      currentListPage = 0;
+                      const list = allXenos;
+                      try { await msg.edit({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) {}
+                      await modalInteraction.followUp({ content: `Filtered to type: ${matches[0]}`, ephemeral: true });
+                    } else {
+                      const sample = matches.slice(0, 10).map((m, idx) => `${idx + 1}. ${m}`).join('\n');
+                      await modalInteraction.followUp({ content: `Found ${matches.length} matches. First results:\n${sample}\nPlease refine your search or pick one exact type from the list.`, ephemeral: true });
+                    }
+                  } catch (e) {
+                    try { await modalInteraction.reply({ content: `Search failed: ${e && (e.message || e)}`, ephemeral: true }); } catch (_) {}
+                  } finally {
+                    client.removeListener('interactionCreate', modalHandler);
+                  }
+                };
+                interaction.client.on('interactionCreate', modalHandler);
+              } catch (e) {
+                try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) {}
+              }
+            } else {
+              currentListTypeFilter = chosen;
+              currentListPage = 0;
+              const list = await xenoModel.listByOwner(userIdInner);
+              await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
+            }
             return;
           }
 
