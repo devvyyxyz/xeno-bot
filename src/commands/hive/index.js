@@ -422,27 +422,38 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
       pageSize: HIVE_MEMBERS_PAGE_SIZE
     });
     const pageMembers = pagination.pageItems;
-    
+
     if (members.length === 0) {
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent('No members in this hive yet.'));
     } else {
+      const total = pagination.totalItems || 0;
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Members (${pagination.start + 1}-${Math.min(pagination.end, pagination.totalItems)} of ${pagination.totalItems}):**`));
-      
-      for (const m of pageMembers) {
-        const typeEmoji = getEmojiForMember(m);
-        const thumbnailUrl = getEmojiThumbnailUrl(typeEmoji);
-        const section = new SectionBuilder();
-        if (thumbnailUrl) {
-          section.setThumbnailAccessory(new ThumbnailBuilder().setURL(thumbnailUrl));
+
+      // If the hive has many members, render a compact text-only view to avoid hitting
+      // Discord's components limit (thumbnails/sections consume more components).
+      const compactThreshold = 12;
+      if (total > compactThreshold) {
+        const lines = pageMembers.map(m => {
+          const typeEmoji = getEmojiForMember(m);
+          return `${typeEmoji} #${m.id} — ${String(m.role || m.stage).padEnd(12)} (Path: ${m.pathway || 'unknown'}, Lv ${m.level || 1})`;
+        }).join('\n');
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines || 'No members on this page.'));
+      } else {
+        for (const m of pageMembers) {
+          const typeEmoji = getEmojiForMember(m);
+          const thumbnailUrl = getEmojiThumbnailUrl(typeEmoji);
+          const section = new SectionBuilder();
+          if (thumbnailUrl) {
+            section.setThumbnailAccessory(new ThumbnailBuilder().setURL(thumbnailUrl));
+          }
+          section.addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(`${typeEmoji} #${m.id} — ${String(m.role || m.stage).padEnd(12)} (Path: ${m.pathway || 'unknown'}, Lv ${m.level || 1})`)
+          );
+          container.addSectionComponents(section);
         }
-        section.addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(`${typeEmoji} #${m.id} — ${String(m.role || m.stage).padEnd(12)} (Path: ${m.pathway || 'unknown'}, Lv ${m.level || 1})`)
-        );
-        container.addSectionComponents(section);
       }
 
-      // Instead of adding a separate button per member (which can exceed component limits),
-      // render a single select menu allowing removal of members shown on this page.
+      // Single select for removing members on this page
       if (canAct && pageMembers.length > 0) {
         const removeOptions = pageMembers.map(toXenoOption);
         container.addActionRowComponents(
@@ -456,7 +467,7 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
           )
         );
       }
-      
+    }
       if (pagination.totalPages > 1) {
         container.addActionRowComponents(
           buildPaginationRow({
