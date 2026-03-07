@@ -1,6 +1,5 @@
 const db = require('../db');
 const { parseJSON } = require('../utils/jsonParse');
-const { insertWithReusedId } = require('../utils/idReuse');
 const logger = require('../utils/logger').get('models:host');
 
 async function addHostForUser(ownerId, hostType, data = {}) {
@@ -11,7 +10,8 @@ async function addHostForUser(ownerId, hostType, data = {}) {
     data: Object.keys(data).length ? JSON.stringify(data) : null
   };
   try {
-    const id = await insertWithReusedId('hosts', payload);
+    const res = await db.knex('hosts').insert(payload);
+    const id = Array.isArray(res) ? res[0] : res;
     const row = await db.knex('hosts').where({ id }).first();
     return row;
   } catch (e) {

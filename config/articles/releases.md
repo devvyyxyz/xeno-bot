@@ -4,6 +4,16 @@ View the full changelog of xeno-bot's development progress, including all featur
 
 ----
 
+## v1.9.13 — Fix: prevent duplicate host insertions
+
+Date: 2026-03-07
+
+- **Fixed:** Prevented intermittent `Duplicate entry` errors when running `/hunt` under concurrent load. The error occurred when the code attempted to manually reuse deleted `hosts.id` values and two concurrent requests chose the same free ID.
+- **Root cause:** `insertWithReusedId` could select the same gap ID for multiple concurrent inserts, causing primary key collisions on MySQL.
+- **Fix:** `hosts` insertion now uses the database's auto-increment behavior (no manual `id` assignment) so the DB reliably assigns unique IDs and avoids race conditions.
+- **Notes:** If ID reuse is still required for other tables, consider implementing transactional locking or a centralized ID allocator to avoid races.
+
+
 ## v1.9.12 — Command option label consistency
 
 Date: 2026-03-05
