@@ -145,7 +145,7 @@
       "group": "Items & Eggs",
       "examples": ["/item use item:boost - Use an item from inventory"],
       "subcommands": {
-        "use": { "name": "item use", "description": "Use an item from your inventory." },
+        "use": { "name": "item use", "description": "Use an item from your inventory.", "options": [ { "name": "item", "description": "The item id to use", "type": 3, "required": true, "autocomplete": true }, { "name": "target", "description": "Optional target id (autocomplete)", "type": 3, "required": false, "autocomplete": true } ] },
         "info": { "name": "item info", "description": "Get detailed item information." },
         "combine": { "name": "item combine", "description": "Combine two items to create something new." }
       }

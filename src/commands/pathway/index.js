@@ -1,6 +1,7 @@
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const evolutions = require('../../../config/evolutions.json');
 const emojis = require('../../../config/emojis.json');
+const shopCfg = require('../../../config/shop.json');
 const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const {
   ActionRowBuilder,
@@ -122,6 +123,16 @@ function buildPathwayDetailView({ pathwayId, client = null }) {
       }
       if (req.requires_host_types && req.requires_host_types.length > 0) {
         reqParts.push(`Host: ${req.requires_host_types.join(', ')}`);
+      }
+      if (req.requires_items && Array.isArray(req.requires_items) && req.requires_items.length) {
+        const itemLabels = req.requires_items.map(itId => {
+          const item = (shopCfg && Array.isArray(shopCfg.items)) ? shopCfg.items.find(i => String(i.id) === String(itId)) : null;
+          const emojiKey = item && item.emoji ? item.emoji : null;
+          const emoji = emojiKey && emojis[emojiKey] ? `${emojis[emojiKey]} ` : '';
+          const name = item && item.name ? item.name : itId;
+          return `${emoji}${name}`.trim();
+        });
+        if (itemLabels.length) reqParts.push(`Items: ${itemLabels.join(', ')}`);
       }
       
       if (reqParts.length > 0) {

@@ -30,6 +30,12 @@
       "description": "Space Jockey pathway producing the Space Jockey Xeno",
       "time": "1w"
     }
+    ,
+    "pathogen": {
+      "stages": ["drone", "pathogen_runner", "pathogen_burster"],
+      "description": "Pathogen pathway unlocked by Pathogen Reagent; mutates Queens into Pathogen variants",
+      "time_ms": 3600000
+    }
   },
   "eggPathways": {
     "classic": "standard",
@@ -97,6 +103,11 @@
     "neomorph": {
       "bloodburster": { "to": "neomorph", "cost_jelly": 35, "requires_host_types": ["human"] }
     }
+    ,
+    "pathogen": {
+      "drone": { "to": "pathogen_runner", "cost_jelly": 5000, "requires_items": ["pathogen"] },
+      "pathogen_runner": { "to": "pathogen_burster", "cost_jelly": 10000, "requires_items": ["pathogen"] }
+    }
   },
   "minStageToCreateHive": "drone",
   "notes": "Eggs map to pathways through eggPathways. requirements defines next-stage transitions, host requirements, and jelly costs.",
@@ -124,5 +135,8 @@
     "bloodburster": { "display": "Bloodburster", "emoji": "bloodburster", "rarity": 8 },
     "neomorph": { "display": "Neomorph", "emoji": "neomorph", "rarity": 9 },
     "space_jockey": { "display": "Space Jockey Xeno", "emoji": "space_jockey_xeno", "rarity": 10 }
+    ,
+    "pathogen_runner": { "display": "Pathogen Runner", "emoji": "pathogen_runner", "rarity": 7 },
+    "pathogen_burster": { "display": "Pathogen Burster", "emoji": "pathogen_burster", "rarity": 8 }
   }
 }

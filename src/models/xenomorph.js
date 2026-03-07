@@ -12,10 +12,15 @@ async function getById(id) {
 
 async function getByIdScoped(id, guildId = null) {
   if (!guildId) return getById(id);
+  // Accept xenomorphs that either have an explicit guild_id matching the guild,
+  // or are attached to a hive whose guild_id matches. This preserves compatibility
+  // with older schemas where xenos may carry guild_id or be linked via hive_id.
   const row = await db.knex('xenomorphs')
     .leftJoin('hives', 'xenomorphs.hive_id', 'hives.id')
     .where('xenomorphs.id', Number(id))
-    .andWhere('hives.guild_id', String(guildId))
+    .andWhere(function () {
+      this.where('xenomorphs.guild_id', String(guildId)).orWhere('hives.guild_id', String(guildId));
+    })
     .first('xenomorphs.*');
   if (!row) return null;
   row.stats = parseJSON(row.stats, {}, `xeno:${id}.stats`);

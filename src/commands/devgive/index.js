@@ -83,6 +83,13 @@ module.exports = {
         autocomplete: true
       },
       {
+        name: 'item',
+        description: 'Item id (required for item)',
+        type: 3, // STRING
+        required: false,
+        autocomplete: true
+      },
+      {
         name: 'pathway',
         description: 'Evolution pathway (required for xenomorph)',
         type: 3, // STRING
@@ -172,6 +179,16 @@ module.exports = {
           .slice(0, 25);
         return interaction.respond(items);
       }
+
+      if (type === 'item' && focused.name === 'item') {
+        const q = String(focused.value || '').toLowerCase();
+        const shop = require('../../../config/shop.json');
+        const items = (shop.items || [])
+          .filter(it => !q || String(it.id).toLowerCase().includes(q) || (it.name || '').toLowerCase().includes(q))
+          .slice(0, 25)
+          .map(it => ({ name: `${it.name} [${it.id}]`, value: it.id }));
+        return interaction.respond(items);
+      }
       
       return interaction.respond([]);
     } catch (e) {
@@ -231,7 +248,7 @@ module.exports = {
       }
 
       if (type === 'item') {
-        const itemId = interaction.options.getString('egg_type') || interaction.options.getString('item_id') || null;
+        const itemId = interaction.options.getString('item') || interaction.options.getString('item_id') || interaction.options.getString('egg_type') || null;
         const amount = Math.max(1, Number(interaction.options.getNumber('amount') || 1));
         if (!target || !itemId) {
           await safeReply(interaction, { content: 'User and item id are required for items.', ephemeral: true }, { loggerName: 'command:devgive' });

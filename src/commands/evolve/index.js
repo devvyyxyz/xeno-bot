@@ -161,7 +161,17 @@ function renderInfoText(xeno, evol) {
         const parsed = require('../../utils/parseDuration')(raw || null);
         if (parsed) stepTimeLabel = ` (time: ${formatDuration(parsed)})`;
       } catch (_) {}
-      out += `${marker} ${s.label}${i === stages.length - 1 ? ' (final)' : ''}${stepTimeLabel}\n`;
+      // Also show requirements for this step: jelly cost, required host types, and required items
+      let reqLabel = '';
+      try {
+        const req = findRequirement(evol, pathwayKey, s.id) || {};
+        const parts = [];
+        if (req.cost_jelly || req.cost_jelly === 0) parts.push(`${req.cost_jelly} RJ`);
+        if (req.requires_host_types && Array.isArray(req.requires_host_types) && req.requires_host_types.length) parts.push(`hosts: ${req.requires_host_types.join(', ')}`);
+        if (req.requires_items && Array.isArray(req.requires_items) && req.requires_items.length) parts.push(`items: ${req.requires_items.join(', ')}`);
+        if (parts.length) reqLabel = ` [requires: ${parts.join('; ')}]`;
+      } catch (_) { reqLabel = ''; }
+      out += `${marker} ${s.label}${i === stages.length - 1 ? ' (final)' : ''}${stepTimeLabel}${reqLabel}\n`;
     }
     const idx = stages.findIndex(s => String(s.id) === String(currentStageId));
     if (idx >= 0 && idx < stages.length - 1) out += `\nNext stage: ${stages[idx + 1].label}`;
@@ -376,11 +386,10 @@ module.exports = {
         {type: 4, name: 'host', description: 'Host to consume (required for some pathways)', required: false, autocomplete: true}
       ]},
       {type: 1, name: 'list', description: 'List your xenomorphs (placeholder)'},
-      {type: 1, name: 'info', description: 'Show evolution info (placeholder)'},
+  
       {type: 1, name: 'cancel', description: 'Cancel an ongoing evolution (placeholder)', options: [{type: 4, name: 'job_id', description: 'Evolution job id', required: false, autocomplete: true}]}
     ])
   },
-
   async executeInteraction(interaction) {
     // Rate limit check for evolution operations
     if (!await checkCommandRateLimit(interaction, 'expensive')) {
@@ -951,4 +960,7 @@ module.exports = {
       try { await interaction.respond([]); } catch (_) {}
     }
   }
+  ,
+  renderInfoText: renderInfoText,
+  findRequirement: findRequirement
 };

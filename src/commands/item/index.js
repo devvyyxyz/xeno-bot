@@ -43,7 +43,7 @@ module.exports = {
     const guildId = interaction.guildId;
     const userId = String(interaction.user.id);
     if (sub === 'info') {
-      const itemId = interaction.options.getString('item_id');
+      const itemId = interaction.options.getString('item');
       const item = findItem(itemId);
       if (!item) return respond({ content: 'Item not found.', ephemeral: true });
       const embed = new EmbedBuilder().setTitle(item.name).setDescription(item.description || '').addFields({ name: 'Price', value: String(item.price || '—') }, { name: 'Rarity', value: String(item.rarity || 'common') }).setColor(require('../../utils/commandsConfig').getCommandsObject().colour || 0xbab25d);
@@ -52,7 +52,7 @@ module.exports = {
 
     if (sub === 'use') {
       await interaction.deferReply({ ephemeral: true });
-      const itemId = interaction.options.getString('item_id');
+      const itemId = interaction.options.getString('item');
       const target = interaction.options.getString('target');
       const item = findItem(itemId);
       if (!item) return respond({ content: 'Item not found.' });
@@ -102,6 +102,10 @@ module.exports = {
               const hiveModel = require('../../models/hive');
               const xeno = await xenoModel.getByIdScoped(xenoId, guildId);
               if (!xeno) throw new Error('Xenomorph not found in this guild.');
+              // Prevent converting a xenomorph that's already on the pathogen pathway
+              if (String(xeno.pathway || '').toLowerCase() === 'pathogen' || String(xeno.role || xeno.stage || '').toLowerCase().includes('pathogen')) {
+                throw new Error('Target xenomorph is already a Pathogen; reagent cannot be applied.');
+              }
               if (String(xeno.owner_id || xeno.owner) !== String(userId)) {
                 throw new Error('You do not own that xenomorph.');
               }
@@ -119,7 +123,8 @@ module.exports = {
               await xenoModel.updateXenoById(xeno.id, { pathway: 'pathogen', role: 'pathogen_queen', stage: 'pathogen_queen', data: newData });
               // If this xeno is hive queen, keep hive.queen_xeno_id as-is; hive semantics may change elsewhere.
               await userModel.updateUserDataRawById(user.id, data);
-              return respond({ content: `Used one ${item.name} on Queen #${xeno.id}. It has been transformed into a Pathogen Queen.` });
+              const PATHOGEN_EMOJI = '<:pathogen_queen:1479910616411148519>';
+              return respond({ content: `Used one ${item.name} on Queen ${PATHOGEN_EMOJI} #${xeno.id}. It has been transformed into a Pathogen Queen.` });
             } catch (err) {
               // restore item if failed
               try { await userModel.addItemForGuild(userId, guildId, item.id, 1); } catch (_) {}
@@ -143,34 +148,6 @@ module.exports = {
         return respond({ content: `Failed to use item: ${e && e.message ? e.message : e}` });
       }
     }
-
-  async autocomplete(interaction) {
-    try {
-      const focused = interaction.options.getFocused ? interaction.options.getFocused(true) : null;
-      if (!focused) return interaction.respond([]);
-      const guildId = interaction.guildId;
-      const discordId = String(interaction.user.id);
-      const u = await userModel.getUserByDiscordId(discordId);
-      let inventoryItems = [];
-      if (u && u.data && u.data.guilds && u.data.guilds[guildId] && u.data.guilds[guildId].items) {
-        inventoryItems = Object.entries(u.data.guilds[guildId].items).map(([id, qty]) => ({ id, qty: Number(qty) })).filter(i => i.qty > 0);
-      }
-      if (!inventoryItems || inventoryItems.length === 0) {
-        // no items -> respond with all shop items (qty 0)
-        const shopItems = (require('../../../config/shop.json').items || []).slice(0, 25).map(it => ({ name: `${it.name} (0)`, value: it.id }));
-        return interaction.respond(shopItems);
-      }
-      const q = String(focused.value || '').toLowerCase();
-      const shop = require('../../../config/shop.json');
-      const mapped = inventoryItems
-        .filter(i => !q || i.id.toLowerCase().includes(q) || (shop.items.find(s => s.id === i.id)?.name || '').toLowerCase().includes(q))
-        .slice(0, 25)
-        .map(i => ({ name: `${(shop.items.find(s => s.id === i.id)?.name) || i.id} (${i.qty})`, value: i.id }));
-      return interaction.respond(mapped);
-    } catch (e) {
-      try { return interaction.respond([]); } catch (_) {}
-    }
-  }
 
     if (sub === 'combine') {
       await interaction.deferReply({ ephemeral: true });
@@ -197,5 +174,81 @@ module.exports = {
       return respond({ content: 'Combine recipe not implemented for those items.' });
     }
     return respond({ content: 'Unknown subcommand.', ephemeral: true });
+  },
+
+  async autocomplete(interaction) {
+    try {
+      const focused = interaction.options.getFocused ? interaction.options.getFocused(true) : null;
+      if (!focused) return interaction.respond([]);
+      const guildId = interaction.guildId;
+      const discordId = String(interaction.user.id);
+      const focusedName = focused.name;
+
+      // Autocomplete for the `item` option: suggest items in the user's inventory first, fallback to shop
+      if (focusedName === 'item') {
+        const u = await userModel.getUserByDiscordId(discordId);
+        let inventoryItems = [];
+        if (u && u.data && u.data.guilds && u.data.guilds[guildId] && u.data.guilds[guildId].items) {
+          inventoryItems = Object.entries(u.data.guilds[guildId].items).map(([id, qty]) => ({ id, qty: Number(qty) })).filter(i => i.qty > 0);
+        }
+        if (!inventoryItems || inventoryItems.length === 0) {
+          const shopItems = (require('../../../config/shop.json').items || []).slice(0, 25).map(it => ({ name: `${it.name} (0)`, value: it.id }));
+          return interaction.respond(shopItems);
+        }
+        const q = String(focused.value || '').toLowerCase();
+        const shop = require('../../../config/shop.json');
+        const mapped = inventoryItems
+          .filter(i => !q || i.id.toLowerCase().includes(q) || (shop.items.find(s => s.id === i.id)?.name || '').toLowerCase().includes(q))
+          .slice(0, 25)
+          .map(i => ({ name: `${(shop.items.find(s => s.id === i.id)?.name) || i.id} (${i.qty})`, value: i.id }));
+        return interaction.respond(mapped);
+      }
+
+      // Autocomplete for `target` option: suggest user's Queen xenomorphs in this guild
+      if (focusedName === 'target') {
+        try {
+          const xenoModel = require('../../models/xenomorph');
+          const hiveModel = require('../../models/hive');
+          const xenos = await xenoModel.getXenosByOwner(discordId, null, true);
+          const hive = await hiveModel.getHiveByUser(discordId, guildId).catch(() => null);
+          const queenId = hive && hive.queen_xeno_id ? Number(hive.queen_xeno_id) : null;
+
+          // Filter to xenos that belong to this guild: either explicit guild_id matches,
+          // or the xeno is attached to a hive whose guild_id matches.
+          const filtered = [];
+          for (const x of (xenos || [])) {
+            // quick queen check
+            const roleStr = String(x.role || x.stage || '').toLowerCase();
+            const looksLikeQueen = roleStr.includes('queen') || (queenId && Number(x.id) === queenId);
+            if (!looksLikeQueen) continue;
+
+            let inGuild = false;
+            if (x.guild_id && String(x.guild_id) === String(guildId)) inGuild = true;
+            else if (x.hive_id) {
+              try {
+                const xHive = await hiveModel.getHiveById(x.hive_id);
+                if (xHive && xHive.guild_id && String(xHive.guild_id) === String(guildId)) inGuild = true;
+              } catch (_) {}
+            }
+            if (inGuild) filtered.push(x);
+            if (filtered.length >= 25) break;
+          }
+
+          const PATHOGEN_EMOJI = '<:pathogen_queen:1479910616411148519>';
+          const candidates = filtered.map(x => {
+            const roleLabel = (x.role || x.stage || x.pathway || 'xeno');
+            const display = String(roleLabel).toLowerCase().includes('pathogen') ? `${PATHOGEN_EMOJI} #${x.id}` : `${roleLabel} #${x.id}`;
+            return { name: display, value: String(x.id) };
+          });
+          return interaction.respond(candidates);
+        } catch (err) {
+          return interaction.respond([]);
+        }
+      }
+
+      return interaction.respond([]);
+    } catch (e) {
+      try { return interaction.respond([]); } catch (_) {}
+    }
   }
 };
