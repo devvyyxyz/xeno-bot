@@ -13,6 +13,7 @@ const {
 } = require('discord.js');
 const fallbackLogger = require('../../utils/fallbackLogger');
 const createInteractionCollector = require('../../utils/collectorHelper');
+const { addV2TitleWithImageThumbnail } = require('../../utils/componentsV2');
 
 const { getCommandConfig, commands: commandsConfig } = require('../../utils/commandsConfig');
 const { DiscordAPIError } = require('discord.js');
@@ -66,9 +67,9 @@ function makeInventoryComponents(target, type, pageIdx, pages, balances = {}, op
   const page = pages[pageIdx] || [];
   const typeLabel = type === 'eggs' ? 'Eggs' : type === 'items' ? 'Items' : type === 'hosts' ? 'Hosts' : type === 'xenos' ? 'Xenos' : 'Currencies';
 
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`## ${target.username}'s Inventory`)
-  );
+  // Title with user's avatar thumbnail
+  const avatarUrl = target && typeof target.displayAvatarURL === 'function' ? target.displayAvatarURL({ size: 256, extension: 'png' }) : null;
+  addV2TitleWithImageThumbnail({ container, title: `${target.username}'s Inventory`, imageUrl: avatarUrl });
   if (!page || page.length === 0) {
     const emptyMessages = {
       eggs: 'You have no eggs in this server.',
@@ -456,14 +457,7 @@ module.exports = {
         itemList.sort((a, b) => a.quantity - b.quantity);
       }
 
-      // only show avatar when there are items to display
-      try {
-        const avatarUrl = target && typeof target.displayAvatarURL === 'function' ? target.displayAvatarURL({ size: 512, extension: 'png' }) : null;
-        const avatarLabel = avatarUrl ? `[View Avatar](${avatarUrl})` : 'Profile picture';
-        out.push({ name: 'Avatar', value: avatarLabel, inline: true });
-      } catch (e) {
-        try { require('../../utils/logger').get('command:inventory').warn('Failed computing avatar URL in inventory getFieldsForType', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging inventory avatar URL error in getFieldsForType', le && (le.stack || le)); } catch (ignored) {} }
-      }
+      // Do not include avatar field in items list; title shows avatar thumbnail already
 
       for (const item of itemList) {
         out.push({ name: item.name, value: item.value, inline: item.inline });
