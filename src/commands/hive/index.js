@@ -70,7 +70,7 @@ function getAssignableQueenXenos(xenos, hiveId, hiveType = 'default') {
   const hiveIdNum = Number(hiveId);
   return (Array.isArray(xenos) ? xenos : []).filter(x => {
     const role = String(x?.role || '').toLowerCase();
-    if (role !== 'queen') return false;
+    if (!role.includes('queen')) return false;
     // For pathogen hives, only allow pathogen queens
     if (String(hiveType || 'default').toLowerCase() === 'pathogen') {
       const pathway = String(x?.pathway || '').toLowerCase();
