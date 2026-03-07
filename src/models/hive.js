@@ -172,6 +172,13 @@ async function updateHiveById(id, changes = {}) {
 
 async function deleteHiveById(id) {
   try {
+    // Unassign any xenomorphs that belonged to this hive first
+    try {
+      await db.knex('xenomorphs').where({ hive_id: id }).update({ hive_id: null, updated_at: db.knex.fn.now() });
+    } catch (e) {
+      logger.warn('Failed unassigning xenomorphs for deleted hive', { id, error: e && (e.stack || e) });
+    }
+
     const deleted = await db.knex('hives').where({ id }).del();
     logger.info('Deleted hive', { id, deleted });
     return deleted > 0;
@@ -185,6 +192,20 @@ async function deleteHiveByOwner(ownerDiscordId) {
   try {
     await ensureHiveColumns();
     let deleted = 0;
+    let hiveRows = [];
+    if (_hiveHasOwnerColumn) {
+      hiveRows = await db.knex('hives').where({ owner_discord_id: String(ownerDiscordId) }).select('id');
+    } else if (_hiveHasUserIdColumn) {
+      hiveRows = await db.knex('hives').where({ user_id: String(ownerDiscordId) }).select('id');
+    }
+    const hiveIds = hiveRows.map(r => r.id).filter(Boolean);
+    if (hiveIds.length > 0) {
+      try {
+        await db.knex('xenomorphs').whereIn('hive_id', hiveIds).update({ hive_id: null, updated_at: db.knex.fn.now() });
+      } catch (e) {
+        logger.warn('Failed unassigning xenomorphs for deleted owner hives', { ownerDiscordId, hiveIds, error: e && (e.stack || e) });
+      }
+    }
     if (_hiveHasOwnerColumn) {
       deleted = await db.knex('hives').where({ owner_discord_id: String(ownerDiscordId) }).del();
     } else if (_hiveHasUserIdColumn) {

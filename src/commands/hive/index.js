@@ -65,20 +65,31 @@ function getEmojiThumbnailUrl(emojiValue) {
   return `https://cdn.discordapp.com/emojis/${emojiId}.${ext}?size=64&quality=lossless`;
 }
 
-function getAssignableQueenXenos(xenos, hiveId) {
+function getAssignableQueenXenos(xenos, hiveId, hiveType = 'default') {
   const hiveIdNum = Number(hiveId);
   return (Array.isArray(xenos) ? xenos : []).filter(x => {
     const role = String(x?.role || '').toLowerCase();
     if (role !== 'queen') return false;
+    // For pathogen hives, only allow pathogen queens
+    if (String(hiveType || 'default').toLowerCase() === 'pathogen') {
+      const pathway = String(x?.pathway || '').toLowerCase();
+      if (!(pathway === 'pathogen' || role.includes('pathogen'))) return false;
+    }
     if (x.hive_id == null) return true;
     return Number(x.hive_id) === hiveIdNum;
   });
 }
 
-function getAddableXenos(xenos, hiveId) {
+function getAddableXenos(xenos, hiveId, hiveType = 'default') {
   const hiveIdNum = Number(hiveId);
   return (Array.isArray(xenos) ? xenos : []).filter(x => {
     if (!isEvolvedXeno(x)) return false;
+    // If hive is pathogen, only allow certain pathways
+    if (String(hiveType || 'default').toLowerCase() === 'pathogen') {
+      const pathway = String(x?.pathway || '').toLowerCase();
+      const allowed = new Set(['pathogen', 'neomorph', 'deacon']);
+      if (!allowed.has(pathway)) return false;
+    }
     if (x.hive_id == null) return true;
     return Number(x.hive_id) !== hiveIdNum;
   });
@@ -445,7 +456,7 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
       }
     }
   } else if (screen === 'assign-queen') {
-    const assignable = getAssignableQueenXenos(rows.xenos || [], hive.id);
+    const assignable = getAssignableQueenXenos(rows.xenos || [], hive.id, hiveType);
     const currentQueen = hive.queen_xeno_id ? `#${hive.queen_xeno_id}` : 'None';
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Current Queen:** ${currentQueen}`));
     if (!canAct) {
@@ -457,7 +468,7 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`**Available Queens (${assignable.length}):**\n${list}`));
     }
   } else if (screen === 'add-xenos') {
-    const addable = getAddableXenos(rows.xenos || [], hive.id);
+    const addable = getAddableXenos(rows.xenos || [], hive.id, hiveType);
     if (!canAct) {
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent('Only the hive owner can add xenos to this hive.'));
     } else if (!addable.length) {
@@ -477,7 +488,7 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
     container.addActionRowComponents(buildManagementRow({ screen, disabled: false, canAct }));
 
     if (screen === 'assign-queen') {
-      const assignable = getAssignableQueenXenos(rows.xenos || [], hive.id).slice(0, 25);
+      const assignable = getAssignableQueenXenos(rows.xenos || [], hive.id, hiveType).slice(0, 25);
       container.addActionRowComponents(
         new ActionRowBuilder().addComponents(
           new StringSelectMenuBuilder()
@@ -494,7 +505,7 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
     // Module buttons are now added inline with module text; skip separate button generation
 
     if (screen === 'add-xenos') {
-      const addable = getAddableXenos(rows.xenos || [], hive.id).slice(0, 25);
+      const addable = getAddableXenos(rows.xenos || [], hive.id, hiveType).slice(0, 25);
       const maxValues = Math.max(1, Math.min(10, addable.length));
       container.addActionRowComponents(
         new ActionRowBuilder().addComponents(
@@ -778,7 +789,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
 
       if (i.customId === HIVE_ASSIGN_QUEEN_SELECT_ID) {
         const queenId = Number(i.values && i.values[0]);
-        const eligible = getAssignableQueenXenos(xenos || [], viewHive.id);
+        const eligible = getAssignableQueenXenos(xenos || [], viewHive.id, viewHive.type || viewHive.hive_type || 'default');
         if (!queenId || !eligible.some(x => Number(x.id) === queenId)) {
           await i.reply({ content: 'That xenomorph is no longer eligible to become queen.', ephemeral: true });
           return;
@@ -808,7 +819,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
           return;
         }
 
-        const eligibleIds = new Set(getAddableXenos(xenos || [], viewHive.id).map(x => Number(x.id)));
+        const eligibleIds = new Set(getAddableXenos(xenos || [], viewHive.id, viewHive.type || viewHive.hive_type || 'default').map(x => Number(x.id)));
         const finalIds = selectedIds.filter(id => eligibleIds.has(id));
         if (!finalIds.length) {
           await i.reply({ content: 'Those xenomorphs are no longer eligible to add.', ephemeral: true });
