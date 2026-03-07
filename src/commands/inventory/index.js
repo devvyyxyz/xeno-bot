@@ -28,7 +28,7 @@ const { formatNumber } = require('../../utils/numberFormat');
 
 const cmd = getCommandConfig('inventory') || { name: 'inventory', description: 'Show your egg inventory or another user\'s.' };
 const shopConfig = require('../../../config/shop.json');
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 25;
 
 function getHostDisplay(hostType, cfgHosts, emojis) {
   const hostInfo = cfgHosts[hostType] || {};

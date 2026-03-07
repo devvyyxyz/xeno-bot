@@ -13,6 +13,15 @@ Date: 2026-03-07
 - **Fix:** `hosts` insertion now uses the database's auto-increment behavior (no manual `id` assignment) so the DB reliably assigns unique IDs and avoids race conditions.
 - **Notes:** If ID reuse is still required for other tables, consider implementing transactional locking or a centralized ID allocator to avoid races.
 
+## v1.9.14 — Fix: inventory egg list truncation
+
+Date: 2026-03-07
+
+- **Fixed:** Inventory view sometimes appeared to omit egg types for users with large egg collections; more egg types are now visible per page.
+- **Root cause:** The inventory V2 view paged egg entries with a small page size which hid many egg types for heavy collectors.
+- **Fix:** Increased the inventory page size so `/inventory` shows more egg entries per page, reducing truncation. Further UI improvements (e.g., a "Show all" option) can be added if desired.
+
+
 
 ## v1.9.12 — Command option label consistency
 
