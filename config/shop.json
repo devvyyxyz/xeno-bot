@@ -1,4 +1,18 @@
 {
-  "categories": [],
-  "items": []
+  "categories": [
+    { "id": "boosts", "name": "Boosts", "description": "Temporary boosts and reagents." }
+  ],
+  "items": [
+    {
+      "id": "pathogen",
+      "name": "Pathogen Reagent",
+      "description": "One-time reagent. Transforms a Queen Xenomorph into a Pathogen Queen.",
+      "category": "boosts",
+      "price": 50000,
+      "sellPrice": 0,
+      "sellable": false,
+      "rarity": "legendary",
+      "emoji": "Black_goo"
+    }
+  ]
 }

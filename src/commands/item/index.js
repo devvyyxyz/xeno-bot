@@ -90,6 +90,42 @@ module.exports = {
           case 'pathogen_liquid':
             data.guilds[guildId].effects.pathogen_liquid = { applied_at: now, applied_by: userId };
             break;
+          case 'pathogen':
+            // Pathogen reagent: must target a queen xenomorph in this guild
+            // Target should be xenomorph id
+            try {
+              const xenoId = Number(target || 0);
+              if (!xenoId) {
+                throw new Error('You must specify a target xenomorph id to use this item.');
+              }
+              const xenoModel = require('../../models/xenomorph');
+              const hiveModel = require('../../models/hive');
+              const xeno = await xenoModel.getByIdScoped(xenoId, guildId);
+              if (!xeno) throw new Error('Xenomorph not found in this guild.');
+              if (String(xeno.owner_id || xeno.owner) !== String(userId)) {
+                throw new Error('You do not own that xenomorph.');
+              }
+              // Verify queen status: either hive queen or stage/role indicates queen
+              const hive = await hiveModel.getHiveByUser(userId, guildId).catch(() => null);
+              const isHiveQueen = hive && Number(hive.queen_xeno_id) === Number(xeno.id);
+              const roleStr = String(xeno.role || xeno.stage || '').toLowerCase();
+              const isQueenRole = roleStr.includes('queen');
+              if (!isHiveQueen && !isQueenRole) {
+                throw new Error('Target xenomorph is not a Queen. This reagent can only be used on a Queen.');
+              }
+
+              // Transform the xeno into pathogen queen
+              const newData = Object.assign({}, xeno.data || {}, { pathogen_transformed_at: now, pathogen_transformed_by: userId });
+              await xenoModel.updateXenoById(xeno.id, { pathway: 'pathogen', role: 'pathogen_queen', stage: 'pathogen_queen', data: newData });
+              // If this xeno is hive queen, keep hive.queen_xeno_id as-is; hive semantics may change elsewhere.
+              await userModel.updateUserDataRawById(user.id, data);
+              return respond({ content: `Used one ${item.name} on Queen #${xeno.id}. It has been transformed into a Pathogen Queen.` });
+            } catch (err) {
+              // restore item if failed
+              try { await userModel.addItemForGuild(userId, guildId, item.id, 1); } catch (_) {}
+              return respond({ content: `Failed to apply ${item.name}: ${err && err.message ? err.message : err}` });
+            }
+            break;
           case 'cyborg_parts':
             data.guilds[guildId].effects.cyborg_parts = { applied_at: now, uses: 1 };
             break;

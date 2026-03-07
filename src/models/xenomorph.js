@@ -95,6 +95,22 @@ async function getXenoById(id) {
   return row;
 }
 
+async function updateXenoById(id, changes = {}) {
+  try {
+    const payload = {};
+    if ('role' in changes) payload.role = changes.role;
+    if ('stage' in changes) payload.stage = changes.stage;
+    if ('pathway' in changes) payload.pathway = changes.pathway;
+    if ('data' in changes) payload.data = JSON.stringify(changes.data);
+    if ('stats' in changes) payload.stats = JSON.stringify(changes.stats);
+    if (Object.keys(payload).length === 0) return getXenoById(id);
+    await db.knex('xenomorphs').where({ id: Number(id) }).update({ ...payload, updated_at: db.knex.fn.now() });
+    return getXenoById(id);
+  } catch (err) {
+    throw err;
+  }
+}
+
 async function getXenosByOwner(ownerId, guildId = null, includeUnassigned = false) {
   // wrapper around listByOwner for compatibility
   return listByOwner(ownerId, guildId, includeUnassigned);
@@ -125,4 +141,6 @@ module.exports = {
   getById,
   getByIdScoped,
   listByOwner
+  ,
+  updateXenoById
 };
