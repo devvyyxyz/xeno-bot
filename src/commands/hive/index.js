@@ -467,7 +467,7 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
           )
         );
       }
-    }
+
       if (pagination.totalPages > 1) {
         container.addActionRowComponents(
           buildPaginationRow({
