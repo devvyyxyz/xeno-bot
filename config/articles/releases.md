@@ -89,6 +89,17 @@ Date: 2026-03-07
 - **Why:** Previously component updates could lose the subcommand context and mix global/server data, producing confusing or incorrect rankings. This change ensures consistent, predictable leaderboard pages.
 
 
+## v1.9.22 — UX: V2 gift responses & leaderboard/server fixes
+
+Date: 2026-03-07
+
+- **Improved:** `/gift` success responses now use Components V2 for clearer, multi-line presentation. Gift payloads show `From`, `To`, `Item/Xenomorph/Host`, and explicit IDs so transfers are easy to read and audit.
+- **Fixed:** Incorrect xenomorph label shown in some `/gift` replies (e.g., message said a different role than the xeno transferred). The display name and emoji are now derived from `config/evolutions.json` role mappings (`roles`) using the xeno's `role` or `stage`, ensuring the text matches the actual xeno given.
+- **Fixed:** `/leaderboard` server view now defaults to server-scoped mode when invoked inside a guild (no subcommand). Component interactions preserve the invoking `guildId`, preventing accidental fallbacks to global aggregates during menu updates.
+- **Misc:** Minor load-time verification and module safety checks added; no behavioral change expected beyond presentation and scoping fixes.
+
+
+
 
 
 

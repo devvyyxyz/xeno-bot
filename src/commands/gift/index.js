@@ -10,6 +10,7 @@ const xenoModel = require('../../models/xenomorph');
 const db = require('../../db');
 const safeReply = require('../../utils/safeReply');
 const fallbackLogger = require('../../utils/fallbackLogger');
+const { buildStatsV2Payload, buildNoticeV2Payload } = require('../../utils/componentsV2');
 
 const cmd = getCommandConfig('gift') || {
   name: 'gift',
@@ -245,9 +246,17 @@ module.exports = {
         // Add to recipient
         await userModel.addEggsForGuild(recipient.id, guildId, amount, eggTypeId);
 
-        await safeReply(interaction, { 
-          content: `🎁 ${interaction.user} gifted ${eggType.emoji} **${eggType.name}** x${amount} to ${recipient}!` 
-        }, { loggerName: 'command:gift' });
+        await safeReply(interaction, buildStatsV2Payload({
+          title: '🎁 Gift Sent',
+          rows: [
+            { label: 'From', value: String(interaction.user) },
+            { label: 'To', value: String(recipient) },
+            { label: 'Item', value: `${eggType.emoji} ${eggType.name}` },
+            { label: 'Amount', value: String(amount) }
+          ],
+          footer: `ID: ${senderId}`,
+          client: interaction.client
+        }), { loggerName: 'command:gift' });
 
         logger.info('Egg gift completed', { sender: senderId, recipient: recipient.id, eggType: eggTypeId, amount, guildId });
       }
@@ -296,9 +305,17 @@ module.exports = {
 
         const emojiMap = require('../../../config/emojis.json');
         const emoji = item.emoji && emojiMap[item.emoji] ? emojiMap[item.emoji] : '';
-        await safeReply(interaction, { 
-          content: `🎁 ${interaction.user} gifted ${emoji} **${item.name}** x${amount} to ${recipient}!` 
-        }, { loggerName: 'command:gift' });
+        await safeReply(interaction, buildStatsV2Payload({
+          title: '🎁 Gift Sent',
+          rows: [
+            { label: 'From', value: String(interaction.user) },
+            { label: 'To', value: String(recipient) },
+            { label: 'Item', value: `${emoji} ${item.name}` },
+            { label: 'Amount', value: String(amount) }
+          ],
+          footer: `ID: ${senderId}`,
+          client: interaction.client
+        }), { loggerName: 'command:gift' });
 
         logger.info('Item gift completed', { sender: senderId, recipient: recipient.id, itemId, amount, guildId });
       }
@@ -342,9 +359,17 @@ module.exports = {
         const emoji = hostType?.emoji && emojiMap[hostType.emoji] ? emojiMap[hostType.emoji] : '';
         const hostName = hostType?.display || host.host_type;
 
-        await safeReply(interaction, { 
-          content: `🎁 ${interaction.user} gifted ${emoji} **${hostName}** (ID: ${hostId}) to ${recipient}!` 
-        }, { loggerName: 'command:gift' });
+        await safeReply(interaction, buildStatsV2Payload({
+          title: '🎁 Host Gifted',
+          rows: [
+            { label: 'From', value: String(interaction.user) },
+            { label: 'To', value: String(recipient) },
+            { label: 'Host', value: `${emoji} ${hostName}` },
+            { label: 'Host ID', value: String(hostId) }
+          ],
+          footer: `Transferred successfully`,
+          client: interaction.client
+        }), { loggerName: 'command:gift' });
 
         logger.info('Host gift completed', { sender: senderId, recipient: recipient.id, hostId, hostType: host.host_type });
       }
@@ -396,13 +421,24 @@ module.exports = {
         // Transfer ownership and clear hive assignment to avoid implicit reassignment on return gifts
         await db.knex('xenomorphs').where({ id: xenoId }).update({ owner_id: recipient.id, hive_id: null });
 
-        const pathwayConfig = require('../../../config/evolutions.json');
-        const pathway = pathwayConfig.pathways?.[xeno.pathway];
-        const stageName = pathway?.stages?.[xeno.stage]?.name || xeno.stage;
+        // Determine display name and emoji for this xenomorph using roles mapping
+        const rolesMap = evolutionsConfig.roles || {};
+        const roleKey = String(xeno.role || xeno.stage || 'xenomorph').toLowerCase();
+        const roleInfo = rolesMap[roleKey] || {};
+        const displayName = roleInfo.display || roleKey;
+        const roleEmoji = roleInfo.emoji && emojiMap[roleInfo.emoji] ? emojiMap[roleInfo.emoji] : '';
 
-        await safeReply(interaction, { 
-          content: `🎁 ${interaction.user} gifted **${stageName}** xenomorph (ID: ${xenoId}) to ${recipient}!` 
-        }, { loggerName: 'command:gift' });
+        await safeReply(interaction, buildStatsV2Payload({
+          title: '🎁 Xenomorph Gifted',
+          rows: [
+            { label: 'From', value: String(interaction.user) },
+            { label: 'To', value: String(recipient) },
+            { label: 'Xenomorph', value: `${roleEmoji} ${displayName}` },
+            { label: 'Xeno ID', value: String(xenoId) }
+          ],
+          footer: `${displayName} transferred on behalf of ${interaction.user.username}`,
+          client: interaction.client
+        }), { loggerName: 'command:gift' });
 
         logger.info('Xenomorph gift completed', { sender: senderId, recipient: recipient.id, xenoId, stage: xeno.stage, pathway: xeno.pathway });
       }
