@@ -438,6 +438,15 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, userId, rows = {}
           new TextDisplayBuilder().setContent(`${typeEmoji} #${m.id} — ${String(m.role || m.stage).padEnd(12)} (Path: ${m.pathway || 'unknown'}, Lv ${m.level || 1})`)
         );
         container.addSectionComponents(section);
+        // Place a Remove button beneath the member text (keeps thumbnail above)
+        container.addActionRowComponents(
+          new ActionRowBuilder().addComponents(
+            new DangerButtonBuilder()
+              .setCustomId(`hive-remove-member-${m.id}`)
+              .setLabel('Remove')
+              .setDisabled(!canAct || Number(m.id) === Number(hive.queen_xeno_id))
+          )
+        );
       }
       
       if (pagination.totalPages > 1) {
@@ -854,6 +863,43 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
 
         xenos = await xenomorphModel.getXenosByOwner(String(userId), guildId).catch(() => xenos);
         await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Added ${formatNumber(updatedCount || xenosToAdd.length)} xenomorph(s) to this hive.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
+        return;
+      }
+
+      // Handle remove member button clicks: unassign the xenomorph from this hive
+      if (i.customId && i.customId.startsWith && i.customId.startsWith('hive-remove-member-')) {
+        const memberId = Number(i.customId.replace('hive-remove-member-', ''));
+        if (!memberId || !Number.isFinite(memberId)) {
+          await i.reply({ content: 'Invalid member id.', ephemeral: true });
+          return;
+        }
+
+        const member = (Array.isArray(xenos) ? xenos : []).find(x => Number(x.id) === Number(memberId) && Number(x.hive_id) === Number(viewHive.id));
+        if (!member) {
+          await i.reply({ content: 'Member not found or no longer in this hive.', ephemeral: true });
+          return;
+        }
+
+        try {
+          await db.knex('xenomorphs')
+            .where({ id: memberId, owner_id: String(userId) })
+            .update({ hive_id: null, updated_at: db.knex.fn.now() })
+            .catch(async () => {
+              return db.knex('xenomorphs').where({ id: memberId, owner_id: String(userId) }).update({ hive_id: null });
+            });
+        } catch (err) {
+          try { await i.reply({ content: `Failed to remove member: ${err && err.message}`, ephemeral: true }); } catch (_) {}
+          return;
+        }
+
+        // If the member was the queen, clear the queen assignment
+        if (Number(viewHive.queen_xeno_id) === Number(memberId)) {
+          await hiveModel.updateHiveById(viewHive.id, { queen_xeno_id: null }).catch(() => {});
+          viewHive = { ...viewHive, queen_xeno_id: null };
+        }
+
+        xenos = await xenomorphModel.getXenosByOwner(String(userId), guildId).catch(() => xenos);
+        await i.update({ components: buildHiveScreen({ screen: 'members', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Removed xenomorph #${memberId} from the hive.`, membersPage: currentMembersPage, client: interaction.client }) });
         return;
       }
 
