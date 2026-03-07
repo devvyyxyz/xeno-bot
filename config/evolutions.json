@@ -116,7 +116,7 @@
     "trilobite": { "display": "Trilobite", "emoji": "trilobite", "rarity": 8 },
     "deacon": { "display": "Deacon", "emoji": "deacon", "rarity": 9 },
     "bloodburster": { "display": "Bloodburster", "emoji": "bloodburster", "rarity": 8 },
-    "neomorph": { "display": "Neomorph", "emoji": "neomorph", "rarity": 9 }
-    ,"space_jockey": { "display": "Space Jockey Xeno", "emoji": "space_jockey_xeno", "rarity": 10 }
+    "neomorph": { "display": "Neomorph", "emoji": "neomorph", "rarity": 9 },
+    "space_jockey": { "display": "Space Jockey Xeno", "emoji": "space_jockey_xeno", "rarity": 10 }
   }
 }

@@ -217,7 +217,7 @@
     "price": 100000,
     "sell": 5,
     "hatch": 604800,
-    "next_stage": "facehugger"
+    "next_stage": "space_jockey_facehugger"
   },
   {
     "id": "engineer",
