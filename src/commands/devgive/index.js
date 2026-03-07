@@ -137,7 +137,8 @@ module.exports = {
           .filter(p => !q || p.toLowerCase().includes(q))
           .map(p => {
             const desc = evolutions.pathways[p]?.description || '';
-            return { name: desc ? `${p} [${p}] - ${desc}` : `${p} [${p}]`, value: p };
+            const label = desc ? `${p} [${p}] - ${desc}` : `${p} [${p}]`;
+            return { name: String(label).substring(0, 100), value: p };
           })
           .slice(0, 25);
         return interaction.respond(items);

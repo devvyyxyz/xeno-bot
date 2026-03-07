@@ -109,22 +109,31 @@ module.exports = {
               if (String(xeno.owner_id || xeno.owner) !== String(userId)) {
                 throw new Error('You do not own that xenomorph.');
               }
-              // Verify queen status: either hive queen or stage/role indicates queen
+              // Allow applying reagent to Queens OR Drones to start the pathogen pathway
               const hive = await hiveModel.getHiveByUser(userId, guildId).catch(() => null);
               const isHiveQueen = hive && Number(hive.queen_xeno_id) === Number(xeno.id);
               const roleStr = String(xeno.role || xeno.stage || '').toLowerCase();
               const isQueenRole = roleStr.includes('queen');
-              if (!isHiveQueen && !isQueenRole) {
-                throw new Error('Target xenomorph is not a Queen. This reagent can only be used on a Queen.');
+              const isDroneRole = roleStr === 'drone' || roleStr.includes('drone');
+
+              if (!isHiveQueen && !isQueenRole && !isDroneRole) {
+                throw new Error('Target xenomorph must be a Queen or a Drone to use this reagent.');
               }
 
-              // Transform the xeno into pathogen queen
+              // Transform the xeno appropriately
               const newData = Object.assign({}, xeno.data || {}, { pathogen_transformed_at: now, pathogen_transformed_by: userId });
-              await xenoModel.updateXenoById(xeno.id, { pathway: 'pathogen', role: 'pathogen_queen', stage: 'pathogen_queen', data: newData });
-              // If this xeno is hive queen, keep hive.queen_xeno_id as-is; hive semantics may change elsewhere.
-              await userModel.updateUserDataRawById(user.id, data);
-              const PATHOGEN_EMOJI = '<:pathogen_queen:1479910616411148519>';
-              return respond({ content: `Used one ${item.name} on Queen ${PATHOGEN_EMOJI} #${xeno.id}. It has been transformed into a Pathogen Queen.` });
+              if (isQueenRole || isHiveQueen) {
+                // Queens become pathogen queens
+                await xenoModel.updateXenoById(xeno.id, { pathway: 'pathogen', role: 'pathogen_queen', stage: 'pathogen_queen', data: newData });
+                await userModel.updateUserDataRawById(user.id, data);
+                const PATHOGEN_EMOJI = '<:pathogen_queen:1479910616411148519>';
+                return respond({ content: `Used one ${item.name} on Queen ${PATHOGEN_EMOJI} #${xeno.id}. It has been transformed into a Pathogen Queen.` });
+              } else {
+                // Drones are switched to the pathogen pathway but retain their drone stage
+                await xenoModel.updateXenoById(xeno.id, { pathway: 'pathogen', role: xeno.role || xeno.stage, stage: xeno.stage || xeno.role, data: newData });
+                await userModel.updateUserDataRawById(user.id, data);
+                return respond({ content: `Used one ${item.name} on Drone #${xeno.id}. It has been moved to the Pathogen pathway.` });
+              }
             } catch (err) {
               // restore item if failed
               try { await userModel.addItemForGuild(userId, guildId, item.id, 1); } catch (_) {}

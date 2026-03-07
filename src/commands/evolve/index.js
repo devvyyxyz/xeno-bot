@@ -18,6 +18,7 @@ const {
 const xenoModel = require('../../models/xenomorph');
 const hostModel = require('../../models/host');
 const userModel = require('../../models/user');
+const shopCfg = require('../../../config/shop.json');
 const db = require('../../db');
 const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
 const { checkCommandRateLimit } = require('../../utils/rateLimiter');
@@ -383,7 +384,8 @@ module.exports = {
       {type: 1, name: 'start', description: 'Start evolution (placeholder)', options: [
         {type: 4, name: 'xenomorph', description: 'Which xenomorph to evolve', required: true, autocomplete: true},
         {type:3, name: 'next_stage', description: 'Next stage to evolve into', required: true, autocomplete: true},
-        {type: 4, name: 'host', description: 'Host to consume (required for some pathways)', required: false, autocomplete: true}
+        {type: 4, name: 'host', description: 'Host to consume (required for some pathways)', required: false, autocomplete: true},
+        {type: 3, name: 'item', description: 'Item to consume (optional)', required: false, autocomplete: true}
       ]},
       {type: 1, name: 'list', description: 'List your xenomorphs (placeholder)'},
   
@@ -485,6 +487,54 @@ module.exports = {
                   cost_jelly: Number(stepReq.cost_jelly || 0),
                   time_ms: Number(resolvedMs)
                 };
+                // Validate required items (if any) and consume optional/provided item
+                const providedItem = interaction.options.getString('item');
+                let itemPart = '';
+                if (Array.isArray(stepReq.requires_items) && stepReq.requires_items.length > 0) {
+                  if (!providedItem) {
+                    await respond({ components: buildEvolveView({ screen: 'result', message: `This evolution requires an item: ${stepReq.requires_items.join(', ')}. Provide the item option.`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                    return;
+                  }
+                  const normalized = String(providedItem).trim();
+                  const matched = stepReq.requires_items.find(r => String(r).toLowerCase() === normalized.toLowerCase());
+                  if (!matched) {
+                    await respond({ components: buildEvolveView({ screen: 'result', message: `Provided item is not valid for this evolution. Required: ${stepReq.requires_items.join(', ')}`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                    return;
+                  }
+                  // check inventory and remove one
+                  try {
+                    const user = await userModel.getUserByDiscordId(String(userId));
+                    const g = (user && user.data && user.data.guilds && user.data.guilds[guildId]) ? user.data.guilds[guildId] : {};
+                    const qty = Number((g.items && g.items[normalized]) || 0);
+                    if (!qty || qty <= 0) {
+                      await respond({ components: buildEvolveView({ screen: 'result', message: `You don't have any ${normalized}.`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                      return;
+                    }
+                    await userModel.removeItemForGuild(String(userId), guildId, normalized, 1);
+                    itemPart = ` Item ${normalized} consumed.`;
+                  } catch (e) {
+                    await respond({ components: buildEvolveView({ screen: 'result', message: `Failed to consume item: ${e && (e.message || e)}`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                    return;
+                  }
+                } else if (providedItem) {
+                  // optional provided item: consume if user has it
+                  try {
+                    const normalized = String(providedItem).trim();
+                    const user = await userModel.getUserByDiscordId(String(userId));
+                    const g = (user && user.data && user.data.guilds && user.data.guilds[guildId]) ? user.data.guilds[guildId] : {};
+                    const qty = Number((g.items && g.items[normalized]) || 0);
+                    if (!qty || qty <= 0) {
+                      await respond({ components: buildEvolveView({ screen: 'result', message: `You don't have any ${normalized}.`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                      return;
+                    }
+                    await userModel.removeItemForGuild(String(userId), guildId, normalized, 1);
+                    itemPart = ` Item ${normalized} consumed.`;
+                  } catch (e) {
+                    await respond({ components: buildEvolveView({ screen: 'result', message: `Failed to consume item: ${e && (e.message || e)}`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                    return;
+                  }
+                }
+
                 const jelly = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
                 if (jelly < defaults.cost_jelly) {
                   await respond({ components: buildEvolveView({ screen: 'result', message: `Insufficient royal jelly. Need ${defaults.cost_jelly}.`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
@@ -515,7 +565,7 @@ module.exports = {
                   const lines = [];
                   lines.push(`Your evolution job [${id}] started`);
                   lines.push(`${fromDisplay} [${xenoId}] → ${toDisplay} [${xenoId}]`);
-                  lines.push(`Cost: ${jellyEmoji} ${defaults.cost_jelly} royal jelly.${hostPart ? ' ' + hostPart : ''}`);
+                  lines.push(`Cost: ${jellyEmoji} ${defaults.cost_jelly} royal jelly.${hostPart ? ' ' + hostPart : ''}${itemPart}`);
                   lines.push(`Finishes: <t:${finishTs}:R> (<t:${finishTs}:F>)`);
 
                   await respond({ components: buildEvolveView({ screen: 'result', message: lines.join('\n\n'), client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
@@ -943,6 +993,27 @@ module.exports = {
             return { id: String(rep), name: `${display} (x${count}) [#${rep}]` };
           });
           return autocomplete(interaction, hostItems, { map: it => ({ name: it.name, value: Number(it.id) }), max: 25 });
+        } catch (e) { try { await interaction.respond([]); } catch (_) {} return; }
+      }
+
+      // START: item autocomplete - suggest items in the user's inventory first, fallback to shop
+      if (sub === 'start' && focusedName === 'item') {
+        try {
+          const u = await userModel.getUserByDiscordId(String(userId));
+          let inventoryItems = [];
+          if (u && u.data && u.data.guilds && u.data.guilds[interaction.guildId] && u.data.guilds[interaction.guildId].items) {
+            inventoryItems = Object.entries(u.data.guilds[interaction.guildId].items).map(([id, qty]) => ({ id, qty: Number(qty) })).filter(i => i.qty > 0);
+          }
+          if (!inventoryItems || inventoryItems.length === 0) {
+            const shopItems = (shopCfg.items || []).slice(0, 25).map(it => ({ name: `${it.name} (0)`, value: it.id }));
+            return autocomplete(interaction, shopItems, { map: it => ({ name: it.name, value: it.value }), max: 25 });
+          }
+          const q = String(focused.value || '').toLowerCase();
+          const mapped = inventoryItems
+            .filter(i => !q || i.id.toLowerCase().includes(q) || (shopCfg.items.find(s => s.id === i.id)?.name || '').toLowerCase().includes(q))
+            .slice(0, 25)
+            .map(i => ({ name: `${(shopCfg.items.find(s => s.id === i.id)?.name) || i.id} (${i.qty})`, value: i.id }));
+          return autocomplete(interaction, mapped, { map: it => ({ name: it.name, value: it.value }), max: 25 });
         } catch (e) { try { await interaction.respond([]); } catch (_) {} return; }
       }
 
