@@ -5,7 +5,7 @@
       "description": "Standard human-host evolution pathway"
     },
     "dog": {
-      "stages": ["facehugger", "runner", "sentry", "crusher", "queen"],
+      "stages": ["dog_facehugger", "runner", "sentry", "crusher", "queen"],
       "description": "Canine-host pathway with different mid roles"
     },
     "king": {
@@ -19,9 +19,9 @@
     "neomorph": {
       "stages": ["bloodburster", "neomorph"],
       "description": "Neomorph pathway unlocked by rare eggs/hosts"
-    }
-    ,"space_jockey": {
-      "stages": ["facehugger", "drone", "space_jockey"],
+    },
+    "space_jockey": {
+      "stages": ["space_jockey_facehugger", "drone", "space_jockey"],
       "description": "Space Jockey pathway producing the Space Jockey Xeno"
     }
   },
@@ -69,7 +69,7 @@
       "praetorian": { "to": "queen", "cost_jelly": 50 }
     },
     "dog": {
-      "facehugger": { "to": "runner", "cost_jelly": 0, "requires_host_types": ["dog", "ox", "bat", "snake"] },
+      "dog_facehugger": { "to": "runner", "cost_jelly": 0, "requires_host_types": ["dog", "ox", "bat", "snake"] },
       "runner": { "to": "sentry", "cost_jelly": 12 },
       "sentry": { "to": "crusher", "cost_jelly": 30 },
       "crusher": { "to": "queen", "cost_jelly": 60 }
@@ -81,6 +81,7 @@
       "prince": { "to": "king", "cost_jelly": 120 }
     },
     "space_jockey": {
+      "space_jockey_facehugger": { "to": "drone", "cost_jelly": 0, "requires_host_types": ["space_jockey"] },
       "drone": { "to": "space_jockey", "cost_jelly": 1000, "requires_host_types": ["space_jockey"] }
     },
     "deacon": {
@@ -96,6 +97,8 @@
   "roles": {
     "egg": { "display": "Egg", "emoji": "egg", "rarity": 1 },
     "facehugger": { "display": "Facehugger", "emoji": "facehugger", "rarity": 1 },
+    "dog_facehugger": { "display": "Dog Facehugger", "emoji": "facehugger", "rarity": 1 },
+    "space_jockey_facehugger": { "display": "Space Jockey Facehugger", "emoji": "facehugger", "rarity": 1 },
     "runner_facehugger": { "display": "Runner Facehugger", "emoji": "facehugger", "rarity": 1 },
     "drone": { "display": "Drone", "emoji": "drone", "rarity": 1 },
     "warrior": { "display": "Warrior", "emoji": "warrior", "rarity": 2 },

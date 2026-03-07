@@ -32,6 +32,16 @@ Date: 2026-03-07
   - excludes xenomorphs that currently have a queued evolution job (status = `queued`).
 - **User impact:** Users will no longer see invalid or busy xenos in the selection list; attempting to start an evolution will only be possible for valid, idle xenos.
 
+## v1.9.16 — Migration: normalize pathway-specific facehugger roles
+
+Date: 2026-03-07
+
+- **Change:** Non-standard pathways that used a generic `facehugger` stage (e.g., `dog`, `space_jockey`) are now normalized to pathway-specific stage identifiers (`dog_facehugger`, `space_jockey_facehugger`) in `config/evolutions.json`.
+- **Migration:** Added a knex migration `20260307123000_migrate_facehugger_roles.js` that updates existing `xenomorphs` rows: any xeno with `role` or `stage` = `facehugger` and a non-`standard` `pathway` will be renamed to `{pathway}_facehugger`.
+- **Why:** This prevents ambiguity where multiple pathways shared the generic `facehugger` label and ensures evolution requirements map to the correct pathway-specific stage.
+- **Rollback:** The migration includes a down-step to revert pathway-specific names back to the generic `facehugger` if needed.
+
+
 
 
 
