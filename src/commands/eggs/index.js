@@ -406,7 +406,7 @@ module.exports = {
               const hatchSeconds = Number(eggConfig.hatch || 60);
               const h = await hatchManager.startHatch(discordId, guildId, selectedEggId, hatchSeconds * 1000);
               rows = await hatchManager.listHatches(discordId, guildId);
-              await i.update({ components: buildEggsView({ screen: 'result', content: `Started hatching ${eggConfig.name}! Hatch ID: ${h.id}. Will finish in ${hatchSeconds}s.` }), flags: MessageFlags.IsComponentsV2 });
+              await i.update({ components: buildEggsView({ screen: 'result', content: `Started hatching ${eggConfig.name}! Hatch ID: ${h.id}. Will finish <t:${Math.floor(h.finishes_at / 1000)}:R>.` }), flags: MessageFlags.IsComponentsV2 });
             } catch (e) {
               await i.update({ components: buildEggsView({ screen: 'result', content: `Failed to start hatch: ${e.message}` }), flags: MessageFlags.IsComponentsV2 });
             }
@@ -521,7 +521,7 @@ module.exports = {
                     
                     // Refresh the list with the new hatch
                     rows = await hatchManager.listHatches(discordId, guildId);
-                    await i.update({ components: buildEggsView({ screen: 'result', content: `Started hatching ${eggConfig.name}! Hatch ID: ${h.id}. Will finish in ${hatchSeconds}s.` }), flags: MessageFlags.IsComponentsV2 });
+                    await i.update({ components: buildEggsView({ screen: 'result', content: `Started hatching ${eggConfig.name}! Hatch ID: ${h.id}. Will finish <t:${Math.floor(h.finishes_at / 1000)}:R>.` }), flags: MessageFlags.IsComponentsV2 });
                   } catch (e) {
                     await i.update({ components: buildEggsView({ screen: 'result', content: `Failed to start hatch: ${e.message}` }), flags: MessageFlags.IsComponentsV2 });
                   }
@@ -696,7 +696,7 @@ module.exports = {
                     const hatchSeconds = Number(eggConfig.hatch || 60);
                     const h = await hatchManager.startHatch(discordId, guildId, selectedEggId, hatchSeconds * 1000);
                     rows = await hatchManager.listHatches(discordId, guildId);
-                    await i.update({ components: buildEggsView({ screen: 'result', content: `Started hatching ${eggConfig.name}! Hatch ID: ${h.id}. Will finish in ${hatchSeconds}s.` }), flags: MessageFlags.IsComponentsV2 });
+                    await i.update({ components: buildEggsView({ screen: 'result', content: `Started hatching ${eggConfig.name}! Hatch ID: ${h.id}. Will finish <t:${Math.floor(h.finishes_at / 1000)}:R>.` }), flags: MessageFlags.IsComponentsV2 });
                   } catch (e) {
                     await i.update({ components: buildEggsView({ screen: 'result', content: `Failed to start hatch: ${e.message}` }), flags: MessageFlags.IsComponentsV2 });
                   }
@@ -738,11 +738,14 @@ module.exports = {
           }
           const hatchSeconds = Number(eggConfig.hatch || 60);
           const created = [];
+          let firstFinishesAt = null;
           for (let i = 0; i < amount; i++) {
             const h = await hatchManager.startHatch(discordId, guildId, eggId, hatchSeconds * 1000);
+            if (firstFinishesAt === null) firstFinishesAt = Number(h.finishes_at);
             created.push(h.id);
           }
-          await safeReply(interaction, { components: buildEggsView({ screen: 'result', content: `Started ${created.length} hatch(es) for ${eggConfig.name}. First hatch id: ${created[0]}. Each will finish in ${hatchSeconds}s.` }), flags: MessageFlags.IsComponentsV2, ephemeral: true }, { loggerName: 'command:eggs' });
+          const finishTs = firstFinishesAt ? Math.floor(firstFinishesAt / 1000) : Math.floor((Date.now() + hatchSeconds * 1000) / 1000);
+          await safeReply(interaction, { components: buildEggsView({ screen: 'result', content: `Started ${created.length} hatch(es) for ${eggConfig.name}. First hatch id: ${created[0]}. Each will finish <t:${finishTs}:R>.` }), flags: MessageFlags.IsComponentsV2, ephemeral: true }, { loggerName: 'command:eggs' });
           
           // Set up collector for "View List" button with full list navigation
           let msg = null;
@@ -822,7 +825,7 @@ module.exports = {
                     const hatchSeconds = Number(eggConfig.hatch || 60);
                     const h = await hatchManager.startHatch(discordId, guildId, selectedEggId, hatchSeconds * 1000);
                     rows = await hatchManager.listHatches(discordId, guildId);
-                    await i.update({ components: buildEggsView({ screen: 'result', content: `Started hatching ${eggConfig.name}! Hatch ID: ${h.id}. Will finish in ${hatchSeconds}s.` }), flags: MessageFlags.IsComponentsV2 });
+                    await i.update({ components: buildEggsView({ screen: 'result', content: `Started hatching ${eggConfig.name}! Hatch ID: ${h.id}. Will finish <t:${Math.floor(h.finishes_at / 1000)}:R>.` }), flags: MessageFlags.IsComponentsV2 });
                   } catch (e) {
                     await i.update({ components: buildEggsView({ screen: 'result', content: `Failed to start hatch: ${e.message}` }), flags: MessageFlags.IsComponentsV2 });
                   }

@@ -174,12 +174,21 @@ async function safeReply(interaction, payload = {}, opts = {}) {
               if (typeof interaction.followUp === 'function') return await interaction.followUp(originalPayload);
             } catch (_) {}
           }
-          logger && logger.error && logger.error('safeReply: all reply strategies failed', {
+            logger && logger.error && logger.error('safeReply: all reply strategies failed', {
             error: e3 && (e3.stack || e3),
             payload: (typeof payload === 'object') ? payload : String(payload),
             originalPayload: (typeof originalPayload === 'object') ? originalPayload : String(originalPayload),
             interaction: dumpInteractionState(interaction)
           });
+          // Final fallback: try sending a plain channel message if possible (handles expired/odd interactions)
+          try {
+            if (interaction && interaction.channel && typeof interaction.channel.send === 'function') {
+              const text = (originalPayload && originalPayload.content) ? originalPayload.content : (typeof originalPayload === 'string' ? originalPayload : 'Unable to deliver reply.');
+              await interaction.channel.send({ content: `*(Fallback message)* ${text}` });
+            }
+          } catch (chErr) {
+            logger && logger.warn && logger.warn('safeReply: channel.send fallback failed', { error: chErr && (chErr.stack || chErr) });
+          }
         }
       }
     }
