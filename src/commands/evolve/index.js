@@ -640,8 +640,8 @@ module.exports = {
                     }
                     const term = String(modalInteraction.fields.getTextInputValue('evolve-type-search-input') || '').toLowerCase().trim();
                     await modalInteraction.reply({ content: `Searching for "${term}"...`, ephemeral: true });
-                    // build type list and find matches
-                    const allXenos = await xenoModel.listByOwner(userIdInner);
+                    // build type list and find matches (scope to current guild)
+                    const allXenos = await xenoModel.listByOwner(userIdInner, interaction.guildId);
                     const allTypes = [...new Set(allXenos.map(x => String(x.role || x.stage || '').toLowerCase()).filter(Boolean))].sort();
                     const matches = allTypes.filter(t => t.includes(term));
                     if (!matches || matches.length === 0) {
@@ -688,12 +688,12 @@ module.exports = {
                 };
                 interaction.client.on('interactionCreate', modalHandler);
               } catch (e) {
-                try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) {}
+                try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) {}
               }
             } else {
               currentListTypeFilter = chosen;
               currentListPage = 0;
-              const list = await xenoModel.listByOwner(userIdInner);
+              const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
               await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
             }
             return;
@@ -701,7 +701,7 @@ module.exports = {
 
           if (String(i.customId).startsWith('evolve-list-info:')) {
             const selected = String(i.customId).split(':')[1];
-            const list = await xenoModel.listByOwner(userIdInner);
+            const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
             await i.update({ components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: selected, client: interaction.client }) });
             return;
           }
@@ -715,17 +715,17 @@ module.exports = {
               currentListPage = 0;
               matchResults = null;
               matchPage = 0;
-              const list = await xenoModel.listByOwner(userIdInner);
+              const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
               try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) {}
             } else {
-              try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) {}
+              try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) {}
             }
             return;
           }
 
           if (i.customId === 'evolve-type-search-prev' || i.customId === 'evolve-type-search-next') {
             if (!matchResults) {
-              try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) {}
+              try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) {}
               return;
             }
             const pageSize = 25;
@@ -746,7 +746,7 @@ module.exports = {
               new SecondaryButtonBuilder().setCustomId('evolve-type-search-next').setLabel('Next').setDisabled(nextDisabled)
             );
             try {
-              const baseComponents = buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client });
+              const baseComponents = buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client });
               await i.update({ components: [...baseComponents, selectRow, navRow] });
             } catch (_) {}
             return;
@@ -805,18 +805,18 @@ module.exports = {
           if (i.customId === 'evolve-list-prev-page' || i.customId === 'evolve-list-next-page') {
             const isPrev = i.customId === 'evolve-list-prev-page';
             currentListPage = isPrev ? currentListPage - 1 : currentListPage + 1;
-            const list = await xenoModel.listByOwner(userIdInner);
+            const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
             await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-nav-list') {
             currentListPage = 0;
-            const list = await xenoModel.listByOwner(userIdInner);
+            const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
             await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-nav-info') {
-            const list = await xenoModel.listByOwner(userIdInner);
+            const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
             const firstId = list.length ? list[0].id : null;
             await i.update({ components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: firstId, client: interaction.client }) });
             return;
@@ -844,7 +844,7 @@ module.exports = {
           }
           if (i.customId === 'evolve-info-select') {
             const selected = i.values && i.values[0] ? i.values[0] : null;
-            const list = await xenoModel.listByOwner(userIdInner);
+            const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
             await i.update({ components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: selected, client: interaction.client }) });
             return;
           }
@@ -868,7 +868,7 @@ module.exports = {
 
       collector.on('end', async () => {
         try {
-          const list = await xenoModel.listByOwner(userId);
+          const list = await xenoModel.listByOwner(userId, guildId);
           if (msg) {
             await msg.edit({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, expired: true, client: interaction.client }) });
           }
