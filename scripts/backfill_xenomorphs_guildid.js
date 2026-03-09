@@ -74,7 +74,7 @@ async function main() {
           }
         }
 
-        // 4) user's saved guilds in users.data — if exactly one guild present, assume xeno belongs there
+        // 4) user's saved guilds in users.data — try a best-guess when multiple guilds exist
         try {
           const userRow = await knex('users').where({ discord_id: String(r.owner_id) }).first();
           if (userRow && userRow.data) {
@@ -90,13 +90,67 @@ async function main() {
                 updatedExamples.push({ id: r.id, method: 'user_guild_single', guild_id: g });
                 continue;
               }
+
+              // More aggressive: score guilds by (eggs count + items count) in user data and pick highest
+              const scores = guildKeys.map(k => {
+                const entry = parsedUser.guilds[k] || {};
+                const eggs = entry.eggs ? Object.values(entry.eggs).reduce((a,b)=>a+Number(b||0),0) : 0;
+                const items = entry.items ? Object.values(entry.items).reduce((a,b)=>a+Number(b||0),0) : 0;
+                return { guild: k, score: eggs + items };
+              }).sort((a,b)=>b.score - a.score);
+              if (scores.length) {
+                // pick the highest-scoring guild even if the score is zero (more aggressive)
+                const pick = scores[0].guild;
+                if (!dryRun) await knex('xenomorphs').where({ id: r.id }).update({ guild_id: String(pick), updated_at: knex.fn.now() });
+                totalUpdated++;
+                updated = true;
+                updatedExamples.push({ id: r.id, method: 'user_guild_bestscore_relaxed', guild_id: pick });
+                continue;
+              }
             }
           }
         } catch (e) {
           // ignore and continue
         }
 
-        // 4) no heuristic matched: leave for manual inspection
+        // 5) hosts table heuristic: parse hosts.data for guild_id or common guild indicators
+        try {
+          const hostRows = await knex('hosts').where({ owner_id: String(r.owner_id) }).select('data').limit(50);
+          for (const hr of hostRows) {
+            if (!hr || !hr.data) continue;
+            try {
+              const parsedHost = JSON.parse(hr.data);
+              const gid = parsedHost && (parsedHost.guild_id || parsedHost.guild || parsedHost.server_id || parsedHost.server);
+              if (gid) {
+                if (!dryRun) await knex('xenomorphs').where({ id: r.id }).update({ guild_id: String(gid), updated_at: knex.fn.now() });
+                totalUpdated++;
+                updated = true;
+                updatedExamples.push({ id: r.id, method: 'host_data_guild', guild_id: gid });
+                break;
+              }
+            } catch (_) {}
+          }
+          if (updated) continue;
+        } catch (_) {}
+
+        // 6) owner xenomorphs heuristic: if this owner already has xenomorphs with a guild_id, use the most common one
+        try {
+          const ownerGuilds = await knex('xenomorphs').where({ owner_id: String(r.owner_id) }).whereNotNull('guild_id').andWhereNot('guild_id', '').select('guild_id');
+          if (ownerGuilds && ownerGuilds.length) {
+            const counts = {};
+            for (const og of ownerGuilds) counts[og.guild_id] = (counts[og.guild_id] || 0) + 1;
+            const pick = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0][0];
+            if (pick) {
+              if (!dryRun) await knex('xenomorphs').where({ id: r.id }).update({ guild_id: String(pick), updated_at: knex.fn.now() });
+              totalUpdated++;
+              updated = true;
+              updatedExamples.push({ id: r.id, method: 'owner_xenos_majority', guild_id: pick });
+              continue;
+            }
+          }
+        } catch (_) {}
+
+        // no heuristic matched: leave for manual inspection
       } catch (e) {
         console.error(`Failed processing xeno ${r.id}: ${e && (e.message || e)}`);
       }
