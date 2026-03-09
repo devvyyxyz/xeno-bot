@@ -2,7 +2,7 @@
   {
     "id": "classic",
     "name": "Classic Egg",
-    "emoji": "<:standard_egg:1480388706270580837>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 80,
     "rarity": 1,
     "price": 10000,
@@ -35,7 +35,7 @@
   {
     "id": "warrior",
     "name": "Warrior Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 3,
     "rarity": 4,
     "price": 40000,
@@ -46,7 +46,7 @@
   {
     "id": "praetorian",
     "name": "Praetorian Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 0.5,
     "rarity": 6,
     "price": 60000,
@@ -57,7 +57,7 @@
   {
     "id": "runner",
     "name": "Runner Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 1,
     "rarity": 5,
     "price": 50000,
@@ -123,7 +123,7 @@
   {
     "id": "ultramorph",
     "name": "Ultramorph Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 0.25,
     "rarity": 9,
     "price": 90000,
@@ -134,7 +134,7 @@
   {
     "id": "crusher",
     "name": "Crusher Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 0.5,
     "rarity": 7,
     "price": 70000,
@@ -145,7 +145,7 @@
   {
     "id": "spitter",
     "name": "Spitter Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 1,
     "rarity": 5,
     "price": 50000,
@@ -156,7 +156,7 @@
   {
     "id": "lurker",
     "name": "Lurker Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 1,
     "rarity": 5,
     "price": 50000,
@@ -167,7 +167,7 @@
   {
     "id": "boiler",
     "name": "Boiler Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 0.5,
     "rarity": 6,
     "price": 6000,
@@ -178,7 +178,7 @@
   {
     "id": "burster",
     "name": "Burster Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 1,
     "rarity": 4,
     "price": 40000,
@@ -189,7 +189,7 @@
   {
     "id": "synthetic",
     "name": "Synthetic Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 0.25,
     "rarity": 9,
     "price": 90000,
@@ -200,7 +200,7 @@
   {
     "id": "android",
     "name": "Android Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 0.25,
     "rarity": 9,
     "price": 90000,
@@ -211,7 +211,7 @@
   {
     "id": "spacejockey",
     "name": "Space Jockey Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 0.25,
     "rarity": 10,
     "price": 100000,
@@ -222,7 +222,7 @@
   {
     "id": "engineer",
     "name": "Engineer Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 0.25,
     "rarity": 10,
     "price": 100000,
@@ -244,7 +244,7 @@
   {
     "id": "colonist",
     "name": "Colonist Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 1,
     "rarity": 6,
     "price": 60000,
@@ -255,7 +255,7 @@
   {
     "id": "dog",
     "name": "Dog Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 1,
     "rarity": 5,
     "price": 50000,
@@ -266,7 +266,7 @@
   {
     "id": "ox",
     "name": "Ox Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 1,
     "rarity": 5,
     "price": 50000,
@@ -277,7 +277,7 @@
   {
     "id": "bat",
     "name": "Bat Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 1,
     "rarity": 5,
     "price": 50000,
@@ -288,7 +288,7 @@
   {
     "id": "snake",
     "name": "Snake Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:standard_egg:1480395293269692446>",
     "weight": 1,
     "rarity": 5,
     "price": 50000,
