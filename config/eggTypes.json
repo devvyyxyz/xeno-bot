@@ -68,7 +68,7 @@
   {
     "id": "predalien",
     "name": "Predalien Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:predalien_egg:1480394720411914414>",
     "weight": 0.25,
     "rarity": 8,
     "price": 80000,
@@ -299,7 +299,7 @@
   {
     "id": "giant",
     "name": "Giant Egg",
-    "emoji": "<:king_egg:1480389732394598551>",
+    "emoji": "<:king_egg:1480395008329908485>",
     "weight": 0.25,
     "rarity": 10,
     "price": 100000,
@@ -310,7 +310,7 @@
   {
     "id": "golden",
     "name": "Golden Egg",
-    "emoji": "<:egg:1476511857958457406>",
+    "emoji": "<:golden_egg:1480394719405019288>",
     "weight": 0,
     "rarity": 69,
     "price": 2000000,

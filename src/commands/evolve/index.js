@@ -955,7 +955,17 @@ module.exports = {
           const xenoId = interaction.options.getInteger('xenomorph');
           let targets = [];
           if (xenoId) {
-            const xeno = await xenoModel.getByIdScoped(xenoId, interaction.guildId);
+            let xeno = await xenoModel.getByIdScoped(xenoId, interaction.guildId);
+            if (!xeno) {
+              // fallback to unscope lookup and owner's list to accommodate legacy rows
+              try { xeno = await xenoModel.getById(xenoId); } catch (_) { xeno = null; }
+            }
+            if (!xeno) {
+              try {
+                const list = await xenoModel.listByOwner(String(userId), interaction.guildId, true);
+                xeno = list.find(l => String(l.id) === String(xenoId)) || null;
+              } catch (_) { xeno = null; }
+            }
             if (xeno) {
               const path = String(xeno.pathway || 'standard');
               const from = String(xeno.role || xeno.stage || '');
