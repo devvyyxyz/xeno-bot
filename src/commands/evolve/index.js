@@ -746,7 +746,7 @@ module.exports = {
               new SecondaryButtonBuilder().setCustomId('evolve-type-search-next').setLabel('Next').setDisabled(nextDisabled)
             );
             try {
-              const baseComponents = buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client });
+                      const baseComponents = buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId, true), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client });
               await i.update({ components: [...baseComponents, selectRow, navRow] });
             } catch (_) {}
             return;
@@ -805,18 +805,18 @@ module.exports = {
           if (i.customId === 'evolve-list-prev-page' || i.customId === 'evolve-list-next-page') {
             const isPrev = i.customId === 'evolve-list-prev-page';
             currentListPage = isPrev ? currentListPage - 1 : currentListPage + 1;
-            const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
+            const list = await xenoModel.listByOwner(userIdInner, interaction.guildId, true);
             await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-nav-list') {
             currentListPage = 0;
-            const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
+            const list = await xenoModel.listByOwner(userIdInner, interaction.guildId, true);
             await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-nav-info') {
-            const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
+            const list = await xenoModel.listByOwner(userIdInner, interaction.guildId, true);
             const firstId = list.length ? list[0].id : null;
             await i.update({ components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: firstId, client: interaction.client }) });
             return;
@@ -844,7 +844,7 @@ module.exports = {
           }
           if (i.customId === 'evolve-info-select') {
             const selected = i.values && i.values[0] ? i.values[0] : null;
-            const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
+            const list = await xenoModel.listByOwner(userIdInner, interaction.guildId, true);
             await i.update({ components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: selected, client: interaction.client }) });
             return;
           }
@@ -868,7 +868,7 @@ module.exports = {
 
       collector.on('end', async () => {
         try {
-          const list = await xenoModel.listByOwner(userId, guildId);
+          const list = await xenoModel.listByOwner(userId, guildId, true);
           if (msg) {
             await msg.edit({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, expired: true, client: interaction.client }) });
           }
@@ -902,7 +902,7 @@ module.exports = {
       // START / INFO: if numeric focused -> suggest xeno ids
       if (sub === 'start' && (focusedName === 'xenomorph' || (!focusedName && isNumeric))) {
         try {
-          const list = await xenoModel.listByOwner(String(userId), interaction.guildId);
+          const list = await xenoModel.listByOwner(String(userId), interaction.guildId, true);
           if (!list || list.length === 0) return autocomplete(interaction, [], { map: it => ({ name: `${it.role || it.stage} [${it.id}]`, value: it.id }), max: 25 });
           // Filter to xenomorphs that have a configured next evolution step and are not already evolving
           const evol = require('../../../config/evolutions.json');
@@ -925,9 +925,11 @@ module.exports = {
             try { await interaction.respond([]); } catch (_) {}
             return;
           }
-          // Group eligible xenos by `role|pathway` and present aggregated choices
+          // If no eligible evolutions found, fall back to showing owned xenos
+          const fallbackList = (eligible && eligible.length) ? eligible : list.filter(x => true);
+          // Group eligible/fallback xenos by `role|pathway` and present aggregated choices
           const groups = new Map();
-          for (const x of eligible) {
+          for (const x of fallbackList) {
             const role = x.role || x.stage || 'unknown';
             const pathway = x.pathway || 'standard';
             const key = `${role}::${pathway}`;
