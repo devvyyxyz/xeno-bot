@@ -406,8 +406,28 @@ module.exports = {
 
       if (viewType === 'xenos') {
         try {
-          let rows = await xenoModel.getXenosByOwner(target.id, guildId);
-          
+          // Fetch xenos but include unassigned/legacy entries so we can conservatively
+          // include records that lack explicit guild scoping (legacy data compatibility).
+          let rows = await xenoModel.getXenosByOwner(target.id, guildId, true);
+          if (guildId) {
+            rows = (rows || []).filter(r => {
+              try {
+                // Prefer explicit column if present
+                if (r.guild_id) return String(r.guild_id) === String(guildId);
+                // If JSON data contains a guild reference, respect it
+                const d = r.data && typeof r.data === 'object' ? r.data : (r.data ? JSON.parse(r.data) : null);
+                const xenoGuild = d && (d.guild_id || d.guildId || d.guild) ? String(d.guild_id || d.guildId || d.guild) : null;
+                if (xenoGuild) return String(xenoGuild) === String(guildId);
+                // If no guild info, include conservatively (legacy local-to-server records)
+                return true;
+              } catch (_) {
+                return true;
+              }
+            });
+          } else {
+            rows = [];
+          }
+
           // Get unique stages for filter options
           const uniqueStages = new Set();
           for (const x of rows) {
@@ -418,12 +438,12 @@ module.exports = {
             filters.push({ label: stage, value: stage });
           }
           filters.sort((a, b) => a.label.localeCompare(b.label));
-          
+
           // Apply filter
           if (filterBy !== 'all') {
             rows = rows.filter(x => (x.role || x.stage) === filterBy);
           }
-          
+
           // Apply sorting
           if (sortBy === 'date_desc') {
             rows.sort((a, b) => Number(b.created_at || b.started_at || 0) - Number(a.created_at || a.started_at || 0));
@@ -442,7 +462,7 @@ module.exports = {
           } else if (sortBy === 'id_desc') {
             rows.sort((a, b) => Number(b.id) - Number(a.id));
           }
-          
+
           for (const x of rows) {
             const roleOrStage = x.role || x.stage;
             const label = `${getXenoDisplay(roleOrStage, evolutionsCfg, emojisCfg)} [${x.id}]`;
