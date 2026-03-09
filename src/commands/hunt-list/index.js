@@ -3,6 +3,7 @@ const {
   ActionRowBuilder,
   SecondaryButtonBuilder,
   PrimaryButtonBuilder,
+  DangerButtonBuilder,
 } = require('@discordjs/builders');
 const {
   ContainerBuilder,
@@ -138,11 +139,12 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
   container.addActionRowComponents(navRow);
 
   // Stats + Hunt Row
-  const actionRow = new ActionRowBuilder()
-    .addComponents(
-      new PrimaryButtonBuilder().setCustomId('hunt-view-stats').setLabel('Stats'),
-      new PrimaryButtonBuilder().setCustomId('hunt-go-now').setLabel('Hunt')
-    );
+  const anyOnPage = Array.isArray(page) && page.length > 0;
+  const actionRow = new ActionRowBuilder().addComponents(
+    new PrimaryButtonBuilder().setCustomId('hunt-view-stats').setLabel('Stats'),
+    new PrimaryButtonBuilder().setCustomId('hunt-go-now').setLabel('Hunt'),
+    new DangerButtonBuilder().setCustomId('hunt-release-all').setLabel('Release All').setDisabled(!anyOnPage)
+  );
   container.addActionRowComponents(actionRow);
 
   return [container];
@@ -267,6 +269,27 @@ module.exports = {
               currentPage = totalPages - 1;
             }
             
+            await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
+            currentViewMode = 'list';
+            return;
+          }
+
+          // Release all hosts on the current page
+          if (i.customId === 'hunt-release-all') {
+            try {
+              const start = currentPage * HOSTS_PER_PAGE;
+              const end = start + HOSTS_PER_PAGE;
+              const pageHosts = rows.slice(start, end) || [];
+              const ids = pageHosts.map(h => h.id).filter(Boolean);
+              if (ids.length) {
+                await hostModel.deleteHostsById(ids);
+                rows = rows.filter(r => !ids.includes(r.id));
+                const totalPages = Math.ceil(rows.length / HOSTS_PER_PAGE);
+                if (currentPage >= totalPages && currentPage > 0) currentPage = totalPages - 1;
+              }
+            } catch (err) {
+              try { await safeReply(i, { content: `Failed releasing hosts: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt-list' }); } catch (_) {}
+            }
             await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
             currentViewMode = 'list';
             return;

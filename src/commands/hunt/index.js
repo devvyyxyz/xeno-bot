@@ -3,6 +3,7 @@ const {
   ActionRowBuilder,
   SecondaryButtonBuilder,
   PrimaryButtonBuilder,
+  DangerButtonBuilder,
 } = require('@discordjs/builders');
 const {
   ContainerBuilder,
@@ -152,17 +153,14 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
     );
 
-    // Stats button
+    // Stats + Release All button
+    const anyOnPage = Array.isArray(page) && page.length > 0;
     container.addActionRowComponents(
-      new ActionRowBuilder()
-        .addComponents(
-          new SecondaryButtonBuilder()
-            .setLabel('Stats')
-            .setCustomId('hunt-view-stats'),
-          new PrimaryButtonBuilder()
-            .setLabel('Hunt')
-            .setCustomId('hunt-go-now')
-        )
+      new ActionRowBuilder().addComponents(
+        new SecondaryButtonBuilder().setLabel('Stats').setCustomId('hunt-view-stats'),
+        new PrimaryButtonBuilder().setLabel('Hunt').setCustomId('hunt-go-now'),
+        new DangerButtonBuilder().setLabel('Release All').setCustomId('hunt-release-all').setDisabled(!anyOnPage)
+      )
     );
   } else if (expired) {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('_Host list view expired_'));
@@ -412,15 +410,40 @@ async function performHunt(interaction, client) {
     try { msg = await interaction.fetchReply(); } catch (_) {}
     if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
 
+    let rows = [];
+    let currentPage = 0;
     const collector = msg.createMessageComponentCollector({
       filter: i => i.user.id === userId,
       time: 300_000
     });
 
     collector.on('collect', async i => {
+      // Show host list from the result view
       if (i.customId === 'hunt-view-list-from-result') {
-        const hostList = await hostModel.getHostsForUser(userId);
-        await i.update({ components: buildHostListPage({ rows: hostList, cfgHosts, emojis: emojisCfg, client }) });
+        rows = await hostModel.getHostsForUser(userId);
+        currentPage = 0;
+        await i.update({ components: buildHostListPage({ rows, cfgHosts, emojis: emojisCfg, client }) });
+        return;
+      }
+
+      // Release all hosts on current page when using the embedded host list
+      if (i.customId === 'hunt-release-all') {
+        try {
+          const start = currentPage * HOSTS_PER_PAGE;
+          const end = start + HOSTS_PER_PAGE;
+          const pageHosts = rows.slice(start, end) || [];
+          const ids = pageHosts.map(h => h.id).filter(Boolean);
+          if (ids.length) {
+            await hostModel.deleteHostsById(ids);
+            rows = rows.filter(r => !ids.includes(r.id));
+            const totalPages = Math.ceil(rows.length / HOSTS_PER_PAGE);
+            if (currentPage >= totalPages && currentPage > 0) currentPage = totalPages - 1;
+          }
+        } catch (err) {
+          try { await safeReply(i, { content: `Failed releasing hosts: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt' }); } catch (_) {}
+        }
+        await i.update({ components: buildHostListPage({ rows, pageIdx: currentPage, cfgHosts, emojis: emojisCfg, client }) });
+        return;
       }
     });
 
