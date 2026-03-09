@@ -3,14 +3,31 @@ const { parseJSON } = require('../utils/jsonParse');
 const logger = require('../utils/logger').get('models:host');
 
 async function addHostForUser(ownerId, hostType, data = {}) {
-  const payload = {
+  const basePayload = {
     owner_id: String(ownerId),
     host_type: String(hostType),
     found_at: Date.now(),
-    // allow callers to pass explicit guild via data.guild_id or data.guildId
-    guild_id: data && (data.guild_id || data.guildId || data.guild) ? String(data.guild_id || data.guildId || data.guild) : null,
     data: Object.keys(data).length ? JSON.stringify(data) : null
   };
+  // If the hosts table has an explicit `guild_id` column, include it; otherwise rely on JSON `data`.
+  let payload = { ...basePayload };
+  try {
+    const hasGuildCol = await db.knex.schema.hasColumn('hosts', 'guild_id');
+    const gid = data && (data.guild_id || data.guildId || data.guild) ? String(data.guild_id || data.guildId || data.guild) : null;
+    if (hasGuildCol) {
+      // Enforce guild association when DB schema supports it
+      if (!gid) throw new Error('guild_id required when creating hosts');
+      payload = { ...basePayload, guild_id: gid };
+    } else {
+      payload = basePayload;
+    }
+  } catch (e) {
+    // If schema check fails for some reason, fall back to base payload and let insert proceed
+    logger.warn('Failed checking hosts.guild_id column existence or missing guild', { error: e && e.message });
+    // If error was missing guild_id, rethrow to let caller handle it
+    if (e && String(e.message).includes('guild_id required')) throw e;
+    payload = basePayload;
+  }
   try {
     const res = await db.knex('hosts').insert(payload);
     const id = Array.isArray(res) ? res[0] : res;
@@ -26,10 +43,17 @@ async function listHostsByOwner(ownerId, guildId = null) {
   // Return only hosts that belong to the specified guild. If no guildId provided, return empty list.
   if (!guildId) return [];
   try {
-    // Fetch rows for owner; include rows with null guild_id so we can inspect legacy JSON data
-    const rows = await db.knex('hosts').where({ owner_id: String(ownerId) }).andWhere(function () {
-      this.where('guild_id', String(guildId)).orWhereNull('guild_id');
-    }).orderBy('id', 'asc');
+    // If the hosts table has a `guild_id` column, use it in the query to reduce rows returned.
+    const hasGuildCol = await db.knex.schema.hasColumn('hosts', 'guild_id');
+    let rows;
+    if (hasGuildCol) {
+      rows = await db.knex('hosts').where({ owner_id: String(ownerId) }).andWhere(function () {
+        this.where('guild_id', String(guildId)).orWhereNull('guild_id');
+      }).orderBy('id', 'asc');
+    } else {
+      // Legacy schema: fetch by owner and filter JSON `data` in JS
+      rows = await db.knex('hosts').where({ owner_id: String(ownerId) }).orderBy('id', 'asc');
+    }
     const parsed = rows.map(r => ({ ...r, data: parseJSON(r.data, {}) }));
     // Filter to only records that either have explicit guild_id matching, or whose JSON data contains a matching guild
     return parsed.filter(r => {

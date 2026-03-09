@@ -19,5 +19,12 @@
     "minRarity": 6,
     "maxRarity": 999,
     "emoji": "very_rare"
+  },
+  {
+    "id": "legendary",
+    "name": "Legendary",
+    "minRarity": 50,
+    "maxRarity": 100,
+    "emoji": "legendary"
   }
 ]

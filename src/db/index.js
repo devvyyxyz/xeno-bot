@@ -448,6 +448,7 @@ async function migrate() {
         table.string('owner_id').notNullable().index();
         table.string('host_type').notNullable();
         table.bigInteger('found_at').notNullable();
+        table.string('guild_id').nullable().index();
         table.json('data');
         table.timestamps(true, true);
       });
@@ -470,7 +471,10 @@ async function migrate() {
                 const owner = p.owner_discord_id || p.owner_id || p.owner || '';
                 const hostType = p.host_type || p.hostType || p.type || p.host || 'human';
                 const created = p.created_at ? Date.parse(p.created_at) : (p.found_at ? Number(p.found_at) : Date.now());
-                return { owner_id: String(owner), host_type: String(hostType), found_at: Number(created) || Date.now(), data: p.data ? JSON.stringify(p.data) : null };
+                // attempt to source guild_id from possible fields or embedded data
+                const fromData = p.data && (p.data.guild_id || p.data.guildId || p.data.guild) ? (p.data.guild_id || p.data.guildId || p.data.guild) : null;
+                const gid = p.guild_id || p.guildId || p.guild || fromData || null;
+                return { owner_id: String(owner), host_type: String(hostType), found_at: Number(created) || Date.now(), guild_id: gid ? String(gid) : null, data: p.data ? JSON.stringify(p.data) : null };
               });
               if (toInsert.length) {
                 try { await knex('hosts').insert(toInsert); logger.info('Imported hosts from data/hosts.json into DB', { count: toInsert.length }); } catch (ie) { logger.warn('Failed importing hosts.json into DB', { error: ie && (ie.stack || ie) }); }

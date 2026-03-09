@@ -13,8 +13,7 @@
       "sellable": false,
       "rarity": "legendary",
       "emoji": "Black_goo"
-    }
-    ,
+    },
     {
       "id": "scrap",
       "name": "Scrap",
@@ -25,14 +24,13 @@
       "sellable": false,
       "rarity": "common",
       "emoji": "<:scrap:1479934663882576053>"
-    }
-  ,
+    },
     {
       "id": "incubation_accelerator",
       "name": "Incubation Accelerator",
       "description": "Reduces hatch time for the next egg by 25-50%.",
       "category": "boosts",
-      "price": 100,
+      "price": 0,
       "sellPrice": 0,
       "sellable": false,
       "rarity": "rare",
