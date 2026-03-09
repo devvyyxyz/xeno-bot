@@ -1116,7 +1116,7 @@ module.exports = {
               .setCustomId('hive-create-type')
               .setPlaceholder('Select hive type')
               .addOptions(
-                { label: 'Default', value: 'default', description: 'Standard hive (requires an evolved xenomorph).', default: true },
+                { label: 'Default', value: 'default', description: 'Standard hive (requires an evolved xenomorph).' },
                 { label: 'Pathogen', value: 'pathogen', description: 'Pathogen hive (requires at least one Pathogen Queen).', disabled: !hasPathogenQueen }
               );
 
