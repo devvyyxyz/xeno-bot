@@ -2,11 +2,8 @@ const { getCommandConfig, buildSubcommandOptions } = require('../../utils/comman
 const userModel = require('../../models/user');
 const hatchManager = require('../../hatchManager');
 const eggTypes = require('../../../config/eggTypes.json');
-const emojis = require('../../../config/emojis.json');
-const rarities = require('../../../config/rarities.json');
 const { formatNumber } = require('../../utils/numberFormat');
 const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
-const { getPaginationState, buildPaginationRow } = require('../../utils/pagination');
 const {
   ActionRowBuilder,
   SecondaryButtonBuilder,
@@ -89,7 +86,7 @@ function buildEggsHatchPage({ userEggs = {}, client = null }) {
   return [container];
 }
 
-function buildEggsListPage({ pageIdx = 0, hatches = [], client = null, showCollected = false, currentSort = null, currentFilter = null, availableFilters = [] }) {
+function buildEggsListPage({ pageIdx = 0, hatches = [], client = null, showCollected = false, availableFilters = [] }) {
   const totalPages = Math.max(1, Math.ceil(getVisibleHatches(hatches, showCollected).length / HATCHES_PER_PAGE));
   const safePageIdx = Math.max(0, Math.min(pageIdx, totalPages - 1));
   const start = safePageIdx * HATCHES_PER_PAGE;
@@ -215,9 +212,7 @@ module.exports = {
   async autocomplete(interaction) {
     try {
       const autocomplete = require('../../utils/autocomplete');
-      // detect subcommand for targeted autocomplete
-      let sub = null;
-      try { sub = interaction.options && interaction.options.getSubcommand ? (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })() : null; } catch (e) { sub = null; }
+      // (no targeted subcommand detection needed for eggs autocomplete)
       const discordId = interaction.user.id;
       const guildId = interaction.guildId;
       const logger = require('../../utils/logger').get('command:eggs');
@@ -259,7 +254,7 @@ module.exports = {
     const discordId = interaction.user.id;
     const attachEggsResultCollector = async () => {
       let msg = null;
-      try { msg = await interaction.fetchReply(); } catch (_) {}
+      try { msg = await interaction.fetchReply(); } catch (_) { /* ignore */ }
       if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
 
       const allRows = await hatchManager.listHatches(discordId, guildId) || [];
@@ -274,7 +269,7 @@ module.exports = {
       collector.on('collect', async i => {
         try {
           if (i.user.id !== discordId) {
-            try { await i.reply({ content: 'Only the command user can interact with this view.', ephemeral: true }); } catch (_) {}
+            try { await i.reply({ content: 'Only the command user can interact with this view.', ephemeral: true }); } catch (_) { /* ignore */ }
             return;
           }
 
@@ -331,7 +326,7 @@ module.exports = {
             const now = Date.now();
             const ready = (rowsDisplayed || []).filter(r => !r.collected && (Number(r.finishes_at) || 0) <= now);
             for (const r of ready) {
-              try { await hatchManager.collectHatch(discordId, guildId, r.id); } catch (_) {}
+              try { await hatchManager.collectHatch(discordId, guildId, r.id); } catch (_) { /* ignore */ }
             }
             const fresh = await hatchManager.listHatches(discordId, guildId);
             allRows.length = 0; allRows.push(...(fresh || []));
@@ -379,7 +374,7 @@ module.exports = {
               }
               const hatchSeconds = Number(eggConfig.hatch || 60);
               const h = await hatchManager.startHatch(discordId, guildId, selectedEggId, hatchSeconds * 1000);
-              rows = await hatchManager.listHatches(discordId, guildId);
+              let rows = await hatchManager.listHatches(discordId, guildId);
               await i.update({ components: buildEggsView({ screen: 'result', content: `Started hatching ${eggConfig.name}! Hatch ID: ${h.id}. Will finish <t:${Math.floor(h.finishes_at / 1000)}:R>.` }), flags: MessageFlags.IsComponentsV2 });
             } catch (e) {
               await i.update({ components: buildEggsView({ screen: 'result', content: `Failed to start hatch: ${e.message}` }), flags: MessageFlags.IsComponentsV2 });
@@ -410,11 +405,17 @@ module.exports = {
             );
 
             let msg = null;
-            try { msg = await interaction.fetchReply(); } catch (_) {}
+            try { msg = await interaction.fetchReply(); } catch (_) { /* ignore */ }
             if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
 
             let currentPage = 0;
             const logger = require('../../utils/logger').get('command:eggs');
+
+            const allRows = await hatchManager.listHatches(discordId, guildId) || [];
+            let rowsDisplayed = allRows.slice();
+            let currentSort = null;
+            let currentFilter = null;
+            const availableFilters = Array.from(new Set((allRows || []).map(r => r.egg_type))).map(t => ({ label: getEggDisplay(t), value: t }));
 
             const collector = msg.createMessageComponentCollector({
               time: 300_000
@@ -423,7 +424,7 @@ module.exports = {
             collector.on('collect', async i => {
               try {
                 if (i.user.id !== discordId) {
-                  try { await i.reply({ content: 'Only the command user can interact with this view.', ephemeral: true }); } catch (_) {}
+                  try { await i.reply({ content: 'Only the command user can interact with this view.', ephemeral: true }); } catch (_) { /* ignore */ }
                   return;
                 }
                 // Pagination
@@ -462,7 +463,7 @@ module.exports = {
                   const now = Date.now();
                   const ready = (rows || []).filter(r => !r.collected && (Number(r.finishes_at) || 0) <= now);
                   for (const r of ready) {
-                    try { await hatchManager.collectHatch(discordId, guildId, r.id); } catch (_) {}
+                    try { await hatchManager.collectHatch(discordId, guildId, r.id); } catch (_) { /* ignore */ }
                     const idx = rows.findIndex(rr => rr.id === r.id);
                     if (idx !== -1) rows[idx].collected = true;
                   }
@@ -475,7 +476,7 @@ module.exports = {
                   const now = Date.now();
                   const ready = (rows || []).filter(r => !r.collected && (Number(r.finishes_at) || 0) <= now);
                   for (const r of ready) {
-                    try { await hatchManager.collectHatch(discordId, guildId, r.id); } catch (_) {}
+                    try { await hatchManager.collectHatch(discordId, guildId, r.id); } catch (_) { /* ignore */ }
                     const idx = rows.findIndex(rr => rr.id === r.id);
                     if (idx !== -1) rows[idx].collected = true;
                   }
@@ -488,7 +489,7 @@ module.exports = {
                   const now = Date.now();
                   const ready = (rows || []).filter(r => !r.collected && (Number(r.finishes_at) || 0) <= now);
                   for (const r of ready) {
-                    try { await hatchManager.collectHatch(discordId, guildId, r.id); } catch (_) {}
+                    try { await hatchManager.collectHatch(discordId, guildId, r.id); } catch (_) { /* ignore */ }
                     const idx = rows.findIndex(rr => rr.id === r.id);
                     if (idx !== -1) rows[idx].collected = true;
                   }
@@ -527,7 +528,7 @@ module.exports = {
                       });
                     }
                   } catch (err) {
-                    try { await i.reply({ content: `Failed to sort hatches: ${err && (err.message || err)}`, ephemeral: true }); } catch (_) {}
+                    try { await i.reply({ content: `Failed to sort hatches: ${err && (err.message || err)}`, ephemeral: true }); } catch (_) { /* ignore */ }
                   }
                   await i.update({ components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rowsDisplayed, client: interaction.client, currentSort, currentFilter, availableFilters }), flags: MessageFlags.IsComponentsV2 });
                   return;
@@ -550,7 +551,7 @@ module.exports = {
                       });
                     }
                   } catch (err) {
-                    try { await i.reply({ content: `Failed to filter hatches: ${err && (err.message || err)}`, ephemeral: true }); } catch (_) {}
+                    try { await i.reply({ content: `Failed to filter hatches: ${err && (err.message || err)}`, ephemeral: true }); } catch (_) { /* ignore */ }
                   }
                   await i.update({ components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rowsDisplayed, client: interaction.client, currentSort, currentFilter, availableFilters }), flags: MessageFlags.IsComponentsV2 });
                   return;
@@ -678,7 +679,7 @@ module.exports = {
           
           // Set up collector for "View List" button with full list navigation
           let msg = null;
-          try { msg = await interaction.fetchReply(); } catch (_) {}
+          try { msg = await interaction.fetchReply(); } catch (_) { /* ignore */ }
           if (msg && typeof msg.createMessageComponentCollector === 'function') {
             let rows = [];
             let currentPage = 0;
@@ -689,7 +690,7 @@ module.exports = {
             collector.on('collect', async i => {
               try {
                 if (i.user.id !== discordId) {
-                  try { await i.reply({ content: 'Only the command user can interact with this view.', ephemeral: true }); } catch (_) {}
+                  try { await i.reply({ content: 'Only the command user can interact with this view.', ephemeral: true }); } catch (_) { /* ignore */ }
                   return;
                 }
                 if (i.customId === 'eggs-view-list') {
@@ -807,7 +808,7 @@ module.exports = {
           
           // Set up collector for "View List" button with full list navigation
           let msg = null;
-          try { msg = await interaction.fetchReply(); } catch (_) {}
+          try { msg = await interaction.fetchReply(); } catch (_) { /* ignore */ }
           if (msg && typeof msg.createMessageComponentCollector === 'function') {
             let rows = [];
             let currentPage = 0;
@@ -818,7 +819,7 @@ module.exports = {
             collector.on('collect', async i => {
               try {
                 if (i.user.id !== discordId) {
-                  try { await i.reply({ content: 'Only the command user can interact with this view.', ephemeral: true }); } catch (_) {}
+                  try { await i.reply({ content: 'Only the command user can interact with this view.', ephemeral: true }); } catch (_) { /* ignore */ }
                   return;
                 }
                 if (i.customId === 'eggs-view-list') {
