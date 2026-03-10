@@ -1,4 +1,3 @@
-const { ChatInputCommandBuilder } = require('@discordjs/builders');
 const {
   ActionRowBuilder,
   StringSelectMenuBuilder,
@@ -46,13 +45,7 @@ function findRequirement(evol, pathwayRaw, fromRaw) {
   return foundKey ? reqByPath[foundKey] : null;
 }
 
-function getHostDisplay(hostType, cfgHosts, emojis) {
-  const hostInfo = cfgHosts[hostType] || {};
-  const display = hostInfo.display || hostType;
-  const emojiKey = hostInfo.emoji;
-  const emoji = emojiKey && emojis[emojiKey] ? emojis[emojiKey] : '';
-  return emoji ? `${emoji} ${display}` : display;
-}
+// getHostDisplay not used — host display resolved inline when needed
 
 function getRoleDisplay(roleId) {
   const key = String(roleId || '').toLowerCase();
@@ -110,7 +103,7 @@ function disableRowComponents(row) {
         }
       }
     }
-  } catch (_) {}
+  } catch (_) { /* ignore */ }
   return row;
 }
 
@@ -146,7 +139,7 @@ function renderInfoText(xeno, evol) {
     const rawPathTime = pathway && (pathway.time || pathway.time_ms);
     const parsed = require('../../utils/parseDuration')(rawPathTime || pathway && pathway.time_ms || null);
     if (parsed) out += `\nDefault evolution time: ${formatDuration(parsed)}`;
-  } catch (_) {}
+  } catch (_) { /* ignore */ }
   if (pathway && Array.isArray(pathway.stages)) {
     const stages = pathway.stages.map(s => ({ id: s, label: (roleMap[s] && roleMap[s].display) ? roleMap[s].display : s }));
     const currentStageId = xeno.role || xeno.stage || null;
@@ -161,7 +154,7 @@ function renderInfoText(xeno, evol) {
         const raw = req && (req.time || req.time_ms);
         const parsed = require('../../utils/parseDuration')(raw || null);
         if (parsed) stepTimeLabel = ` (time: ${formatDuration(parsed)})`;
-      } catch (_) {}
+      } catch (_) { /* ignore */ }
       // Also show requirements for this step: jelly cost, required host types, and required items
       let reqLabel = '';
       try {
@@ -216,7 +209,7 @@ function buildEvolveView({
     result: ''
   };
   if (screenDescriptions[screen]) {
-    try { container.addTextDisplayComponents(new TextDisplayBuilder().setContent(screenDescriptions[screen])); } catch (_) {}
+    try { container.addTextDisplayComponents(new TextDisplayBuilder().setContent(screenDescriptions[screen])); } catch (_) { /* ignore */ }
   }
 
   if (screen === 'list') {
@@ -372,7 +365,6 @@ function buildEvolveView({
 }
 
 module.exports = {
-  name: cmd.name,
   description: cmd.description,
   requiredPermissions: cmd.requiredPermissions,
   hidden: cmd.hidden === true,
@@ -550,14 +542,14 @@ module.exports = {
                   const hostPart = hostId ? `Host #${hostId} consumed.` : '';
                   const evolCfg = require('../../../config/evolutions.json');
                   const emojisUtil = emojisCfg; // already loaded at top
-                  function getRoleDisplayLocal(roleId) {
+                  const getRoleDisplayLocal = (roleId) => {
                     const key = String(roleId || '').toLowerCase();
                     const roleInfo = (evolCfg && evolCfg.roles && evolCfg.roles[key]) ? evolCfg.roles[key] : {};
                     const display = roleInfo.display || roleId || 'Unknown';
                     const emojiKey = roleInfo.emoji;
                     const emoji = emojiKey && emojisUtil[emojiKey] ? `${emojisUtil[emojiKey]} ` : '';
                     return `${emoji}${display}`.trim();
-                  }
+                  };
 
                   const fromDisplay = getRoleDisplayLocal(xeno.role || xeno.stage || '');
                   const toDisplay = getRoleDisplayLocal(target);
@@ -600,7 +592,7 @@ module.exports = {
       }
 
       let msg = null;
-      try { msg = await interaction.fetchReply(); } catch (_) {}
+      try { msg = await interaction.fetchReply(); } catch (_) { /* ignore */ }
       if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
 
       const collector = msg.createMessageComponentCollector({ filter: () => true, time: 120_000 });
@@ -614,7 +606,7 @@ module.exports = {
       collector.on('collect', async i => {
         try {
           if (i.user.id !== interaction.user.id) {
-            try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:evolve' }); } catch (_) {}
+            try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:evolve' }); } catch (_) { /* ignore */ }
             return;
           }
 
@@ -652,7 +644,7 @@ module.exports = {
                       currentListTypeFilter = matches[0];
                       currentListPage = 0;
                       const list = allXenos;
-                      try { await msg.edit({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) {}
+                      try { await msg.edit({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) { /* ignore */ }
                       await modalInteraction.followUp({ content: `Filtered to type: ${matches[0]}`, ephemeral: true });
                     } else {
                       // Present paginated select on the main view so user can pick from matches
@@ -682,14 +674,14 @@ module.exports = {
                       }
                     }
                   } catch (e) {
-                    try { await modalInteraction.reply({ content: `Search failed: ${e && (e.message || e)}`, ephemeral: true }); } catch (_) {}
+                    try { await modalInteraction.reply({ content: `Search failed: ${e && (e.message || e)}`, ephemeral: true }); } catch (_) { /* ignore */ }
                   } finally {
                     client.removeListener('interactionCreate', modalHandler);
                   }
                 };
                 interaction.client.on('interactionCreate', modalHandler);
               } catch (e) {
-                try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) {}
+                try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) { /* ignore */ }
               }
             } else {
               currentListTypeFilter = chosen;
@@ -717,16 +709,16 @@ module.exports = {
               matchResults = null;
               matchPage = 0;
               const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
-              try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) {}
+              try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) { /* ignore */ }
             } else {
-              try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) {}
+              try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) { /* ignore */ }
             }
             return;
           }
 
           if (i.customId === 'evolve-type-search-prev' || i.customId === 'evolve-type-search-next') {
             if (!matchResults) {
-              try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId, true), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) {}
+              try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId, true), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) { /* ignore */ }
               return;
             }
             const pageSize = 25;
@@ -749,14 +741,14 @@ module.exports = {
             try {
                       const baseComponents = buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client });
               await i.update({ components: [...baseComponents, selectRow, navRow] });
-            } catch (_) {}
+            } catch (_) { /* ignore */ }
             return;
           }
 
           if (String(i.customId).startsWith('evolve-cancel-job:')) {
             const jobId = Number(String(i.customId).split(':')[1]);
             if (!jobId) {
-              try { await i.update({ components: buildEvolveView({ screen: 'result', message: 'Invalid job id.', client: interaction.client }) }); } catch (_) {}
+              try { await i.update({ components: buildEvolveView({ screen: 'result', message: 'Invalid job id.', client: interaction.client }) }); } catch (_) { /* ignore */ }
               return;
             }
             // Load job
@@ -793,9 +785,9 @@ module.exports = {
                     new TextDisplayBuilder().setContent(`${getRoleDisplay(fromRole)} [${job.xeno_id}] -> ${getRoleDisplay(job.target_role)} [${job.xeno_id}]`)
                   );
                   await user.send({ components: [container], flags: MessageFlags.IsComponentsV2 });
-                } catch (_) {}
+                } catch (_) { /* ignore */ }
               }
-            } catch (_) {}
+            } catch (_) { /* ignore */ }
 
             // Refresh cancel screen
             const jobs = await loadJobs(userIdInner);
@@ -863,7 +855,7 @@ module.exports = {
             return;
           }
         } catch (err) {
-          try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:evolve' }); } catch (_) {}
+          try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:evolve' }); } catch (_) { /* ignore */ }
         }
       });
 
@@ -873,7 +865,7 @@ module.exports = {
           if (msg) {
             await msg.edit({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, expired: true, client: interaction.client }) });
           }
-        } catch (_) {}
+        } catch (_) { /* ignore */ }
       });
 
       return;
@@ -921,13 +913,13 @@ module.exports = {
                 if (!busySet.has(String(x.id))) eligible.push(x);
               }
             }
-          } catch (err) {
+            } catch (err) {
             // on DB error, fallback to no suggestions
-            try { await interaction.respond([]); } catch (_) {}
+            try { await interaction.respond([]); } catch (_) { /* ignore */ }
             return;
           }
           // If no eligible evolutions found, fall back to showing owned xenos
-          const fallbackList = (eligible && eligible.length) ? eligible : list.filter(x => true);
+          const fallbackList = (eligible && eligible.length) ? eligible : list.slice();
           // Group eligible/fallback xenos by `role|pathway` and present aggregated choices
           const groups = new Map();
           for (const x of fallbackList) {
@@ -946,7 +938,7 @@ module.exports = {
             return { id: String(rep), name: `${roleLabel} • Pathway: ${g.pathway} (x${count}) [#${rep}]` };
           });
           return autocomplete(interaction, grouped, { map: it => ({ name: it.name, value: Number(it.id) }), max: 25 });
-        } catch (e) { try { await interaction.respond([]); } catch (_) {} return; }
+          } catch (e) { try { await interaction.respond([]); } catch (_) { /* ignore */ } return; }
       }
 
       // START: target autocomplete — if non-numeric focused, suggest roles from evolutions config
@@ -972,7 +964,7 @@ module.exports = {
             targets = [];
           }
           return autocomplete(interaction, targets, { map: it => ({ name: it.name, value: it.id }), max: 25 });
-        } catch (e) { try { await interaction.respond([]); } catch (_) {} return; }
+        } catch (e) { try { await interaction.respond([]); } catch (_) { /* ignore */ } return; }
       }
 
       if (sub === 'start' && focusedName === 'host') {
@@ -996,7 +988,7 @@ module.exports = {
             return { id: String(rep), name: `${display} (x${count}) [#${rep}]` };
           });
           return autocomplete(interaction, hostItems, { map: it => ({ name: it.name, value: Number(it.id) }), max: 25 });
-        } catch (e) { try { await interaction.respond([]); } catch (_) {} return; }
+        } catch (e) { try { await interaction.respond([]); } catch (_) { /* ignore */ } return; }
       }
 
       // START: item autocomplete - suggest items in the user's inventory first, fallback to shop
@@ -1017,7 +1009,7 @@ module.exports = {
             .slice(0, 25)
             .map(i => ({ name: `${(shopCfg.items.find(s => s.id === i.id)?.name) || i.id} (${i.qty})`, value: i.id }));
           return autocomplete(interaction, mapped, { map: it => ({ name: it.name, value: it.value }), max: 25 });
-        } catch (e) { try { await interaction.respond([]); } catch (_) {} return; }
+        } catch (e) { try { await interaction.respond([]); } catch (_) { /* ignore */ } return; }
       }
 
       // CANCEL: job_id autocomplete - list queued jobs for this user
@@ -1027,11 +1019,11 @@ module.exports = {
           if (!rows || rows.length === 0) return autocomplete(interaction, [], { map: it => ({ name: it.id, value: it.id }), max: 25 });
           const items = rows.map(r => ({ id: String(r.id), name: `Job [${r.id}] • Xeno [${r.xeno_id}] -> ${r.target_role}` }));
           return autocomplete(interaction, items, { map: it => ({ name: it.name, value: Number(it.id) }), max: 25 });
-        } catch (e) { try { await interaction.respond([]); } catch (_) {} return; }
+        } catch (e) { try { await interaction.respond([]); } catch (_) { /* ignore */ } return; }
       }
-      try { await interaction.respond([]); } catch (_) {}
+      try { await interaction.respond([]); } catch (_) { /* ignore */ }
     } catch (e) {
-      try { await interaction.respond([]); } catch (_) {}
+      try { await interaction.respond([]); } catch (_) { /* ignore */ }
     }
   }
   ,
