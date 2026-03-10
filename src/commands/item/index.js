@@ -1,4 +1,3 @@
-const { ChatInputCommandBuilder } = require('@discordjs/builders');
 const { EmbedBuilder } = require('discord.js');
 const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
 const shopConfig = require('../../../config/shop.json');
@@ -31,13 +30,11 @@ module.exports = {
     const respond = (payload) => safeReply(interaction, payload, { loggerName: 'command:item' });
     const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
     // Lazy-require models so tests can mock `require('../src/models/user')` after module load
-    const userModel = require('../../models/user');
     const subCfg = sub ? (getCommandConfig(`item ${sub}`) || getCommandConfig(`item.${sub}`)) : null;
     if (subCfg && subCfg.developerOnly) {
       const cfg = require('../../../config/config.json');
       const ownerId = (cfg && cfg.owner) ? String(cfg.owner) : null;
       if (!ownerId || interaction.user.id !== ownerId) {
-        const safeReply = require('../../utils/safeReply');
         await safeReply(interaction, { content: 'Only the bot developer/owner can run this subcommand.', ephemeral: true }, { loggerName: 'command:item' });
         return;
       }
@@ -69,11 +66,12 @@ module.exports = {
         data.guilds[guildId].effects = data.guilds[guildId].effects || {};
         const now = Date.now();
         switch (item.id) {
-          case 'incubation_accelerator':
+          case 'incubation_accelerator': {
             // Choose a random multiplier between 0.25 and 0.5 (reduces hatch time to 25-50%)
             const randMul = Math.round(((Math.random() * (0.5 - 0.25)) + 0.25) * 100) / 100;
             data.guilds[guildId].effects.incubation_accelerator = { applied_at: now, multiplier: randMul, expires_at: now + 1000 * 60 * 60 };
             break;
+          }
           case 'jelly_extractor':
             data.guilds[guildId].effects.jelly_extractor = { applied_at: now, multiplier: 2, expires_at: now + 1000 * 60 * 60 * 2 };
             break;
@@ -92,7 +90,7 @@ module.exports = {
           case 'pathogen_liquid':
             data.guilds[guildId].effects.pathogen_liquid = { applied_at: now, applied_by: userId };
             break;
-          case 'pathogen':
+          case 'pathogen': {
             // Pathogen reagent: must target a queen xenomorph in this guild
             // Target should be xenomorph id
             try {
@@ -138,10 +136,10 @@ module.exports = {
               }
             } catch (err) {
               // restore item if failed
-              try { await userModel.addItemForGuild(userId, guildId, item.id, 1); } catch (_) {}
+              try { await userModel.addItemForGuild(userId, guildId, item.id, 1); } catch (_) { /* ignore */ }
               return respond({ content: `Failed to apply ${item.name}: ${err && err.message ? err.message : err}` });
             }
-            break;
+          }
           case 'cyborg_parts':
             data.guilds[guildId].effects.cyborg_parts = { applied_at: now, uses: 1 };
             break;
@@ -242,7 +240,7 @@ module.exports = {
               try {
                 const xHive = await hiveModel.getHiveById(x.hive_id);
                 if (xHive && xHive.guild_id && String(xHive.guild_id) === String(guildId)) inGuild = true;
-              } catch (_) {}
+              } catch (_) { /* ignore */ }
             }
             if (inGuild) filtered.push(x);
             if (filtered.length >= 25) break;
@@ -258,14 +256,14 @@ module.exports = {
             return { name: display, value: String(x.id) };
           });
           return interaction.respond(candidates);
-        } catch (err) {
+          } catch (err) {
           return interaction.respond([]);
         }
       }
 
       return interaction.respond([]);
     } catch (e) {
-      try { return interaction.respond([]); } catch (_) {}
+      try { return interaction.respond([]); } catch (_) { /* ignore */ }
     }
   }
 };
