@@ -20,8 +20,7 @@ coverage/
 # package-lock.json
 
 # github files
-.github/
-
+.github/agents/*
 # temporary files
 tmp/
 
