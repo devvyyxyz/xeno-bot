@@ -1,8 +1,9 @@
 const db = require('../db');
-const cache = require('../utils/enhancedCache');
-const { parseJSON } = require('../utils/jsonParse');
+const utils = require('../utils');
+const cache = utils.enhancedCache;
+const { parseJSON } = utils.jsonParse;
 const userDefaults = require('../../config/userDefaults.json');
-const logger = require('../utils/logger').get('models:user');
+const logger = utils.logger.get('models:user');
 
 // Cache users for 2 minutes to reduce database load
 const USER_CACHE_TTL = 120000;

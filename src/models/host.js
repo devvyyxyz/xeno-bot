@@ -1,6 +1,7 @@
 const db = require('../db');
-const { parseJSON } = require('../utils/jsonParse');
-const logger = require('../utils/logger').get('models:host');
+const utils = require('../utils');
+const { parseJSON } = utils.jsonParse;
+const logger = utils.logger.get('models:host');
 
 async function addHostForUser(ownerId, hostType, data = {}) {
   const basePayload = {

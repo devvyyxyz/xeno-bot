@@ -1,7 +1,8 @@
 const db = require('../db');
-const { parseJSON } = require('../utils/jsonParse');
-const { insertWithReusedId } = require('../utils/idReuse');
-const logger = require('../utils/logger').get('models:xenomorph');
+const utils = require('../utils');
+const { parseJSON } = utils.jsonParse;
+const { insertWithReusedId } = utils.idReuse;
+const logger = utils.logger.get('models:xenomorph');
 
 async function getById(id) {
   const row = await db.knex('xenomorphs').where({ id: Number(id) }).first();

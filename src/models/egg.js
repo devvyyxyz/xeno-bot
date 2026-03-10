@@ -1,5 +1,6 @@
 const db = require('../db');
-const logger = require('../utils/logger').get('models:egg');
+const utils = require('../utils');
+const logger = utils.logger.get('models:egg');
 
 // Ensure all eggs from config are present in the database for all guilds
 async function ensureAllEggsInAllGuilds(eggTypes, knexInstance = db.knex) {

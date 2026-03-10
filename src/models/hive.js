@@ -1,7 +1,8 @@
 const db = require('../db');
-const logger = require('../utils/logger').get('models:hive');
-const { parseJSON } = require('../utils/jsonParse');
-const { insertWithReusedId } = require('../utils/idReuse');
+const utils = require('../utils');
+const logger = utils.logger.get('models:hive');
+const { parseJSON } = utils.jsonParse;
+const { insertWithReusedId } = utils.idReuse;
 
 let _hiveColumnsChecked = false;
 let _hiveHasOwnerColumn = false;
