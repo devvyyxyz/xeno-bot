@@ -8,7 +8,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/devvyyxyz/xeno-bot)](https://github.com/devvyyxyz/xeno-bot/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/devvyyxyz/xeno-bot)](https://github.com/devvyyxyz/xeno-bot/network)
 
-**Xeno Bot** is a scalable Discord bot built with **discord.js v14**, designed for modern Discord servers with a clean architecture, modular commands, and sci-fi inspired features.
+Build your xenomorph hive! Eggs will randomly spawn in a channel. be the first to collect them and hatch your xenos. Grow your hive, trade with friends, and compete to create the ultimate collection.
 
 ---
 
