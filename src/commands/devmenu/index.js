@@ -15,7 +15,7 @@ module.exports = {
   async executeInteraction(interaction) {
     const ownerId = resolveOwnerId();
     if (!ownerId || String(interaction.user.id) !== String(ownerId)) {
-      try { await interaction.reply({ content: 'This command is owner-only.', ephemeral: true }); } catch (_) {}
+      try { await interaction.reply({ content: 'This command is owner-only.', ephemeral: true }); } catch (_) { /* ignore */ }
       return;
     }
 
@@ -28,7 +28,7 @@ module.exports = {
     try {
       await interaction.reply({ content, ephemeral: true });
     } catch (e) {
-      try { await interaction.reply({ content: 'Failed to show dev commands.', ephemeral: true }); } catch (_) {}
+      try { await interaction.reply({ content: 'Failed to show dev commands.', ephemeral: true }); } catch (_) { /* ignore */ }
     }
   }
 };

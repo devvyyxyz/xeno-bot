@@ -121,7 +121,7 @@ module.exports = {
       );
 
       let msg = null;
-      try { msg = await interaction.fetchReply(); } catch (_) {}
+      try { msg = await interaction.fetchReply(); } catch (_) { /* ignore */ }
       if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
 
       let currentPage = 0;
@@ -141,8 +141,8 @@ module.exports = {
             currentPage = Math.min(totalPages - 1, currentPage + 1);
           }
           await i.update({ components: buildEmojiPage({ pageIdx: currentPage, client: interaction.client }) });
-        } catch (err) {
-          try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:emojis' }); } catch (_) {}
+          } catch (err) {
+          try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:emojis' }); } catch (_) { /* ignore */ }
         }
       });
 
@@ -151,14 +151,14 @@ module.exports = {
           if (msg) {
             await msg.edit({ components: buildEmojiPage({ pageIdx: currentPage, expired: true, client: interaction.client }) });
           }
-        } catch (_) {}
+        } catch (_) { /* ignore */ }
       });
 
       return;
     } catch (e) {
       const logger = require('../../utils/logger').get('command:emojis');
       logger.error('Unhandled error in emojis command', { error: e && (e.stack || e) });
-      try { await safeReply(interaction, { content: `Error: ${e && (e.message || e)}`, ephemeral: true }, { loggerName: 'command:emojis' }); } catch (_) {}
+      try { await safeReply(interaction, { content: `Error: ${e && (e.message || e)}`, ephemeral: true }, { loggerName: 'command:emojis' }); } catch (_) { /* ignore */ }
     }
   },
 

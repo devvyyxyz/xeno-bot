@@ -14,13 +14,13 @@ module.exports = {
   async executeMessage(message, args) {
     const ownerId = resolveOwnerId();
     if (!ownerId || String(message.author.id) !== String(ownerId)) {
-      try { await message.reply({ content: 'This command is owner-only.', allowedMentions: { repliedUser: false } }); } catch (e) {}
+      try { await message.reply({ content: 'This command is owner-only.', allowedMentions: { repliedUser: false } }); } catch (e) { /* ignore */ }
       return;
     }
 
     try {
       await message.reply({ content: '🔁 Restarting bot (graceful exit).', allowedMentions: { repliedUser: false } });
-    } catch (e) {}
+    } catch (e) { /* ignore */ }
 
     // Give the message a moment to send, then exit. Rely on external supervisor to restart.
     setTimeout(() => {

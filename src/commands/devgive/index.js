@@ -9,18 +9,18 @@ const cmd = getCommandConfig('devgive') || {name: 'devgive', description: 'Devel
 function resolveOwnerId() {
   try {
     if (process.env.BOT_CONFIG_PATH) {
-      try { const bc = require(process.env.BOT_CONFIG_PATH); if (bc && bc.owner) return String(bc.owner); } catch (e) {}
+      try { const bc = require(process.env.BOT_CONFIG_PATH); if (bc && bc.owner) return String(bc.owner); } catch (e) { /* ignore */ }
     }
-  } catch (e) {}
+  } catch (e) { /* ignore */ }
   return process.env.OWNER || process.env.BOT_OWNER || process.env.OWNER_ID || null;
 }
 
 function resolveTesterRoles() {
   try {
     if (process.env.BOT_CONFIG_PATH) {
-      try { const bc = require(process.env.BOT_CONFIG_PATH); if (bc && Array.isArray(bc.testerRoles)) return bc.testerRoles.map(r => String(r)); } catch (e) {}
+      try { const bc = require(process.env.BOT_CONFIG_PATH); if (bc && Array.isArray(bc.testerRoles)) return bc.testerRoles.map(r => String(r)); } catch (e) { /* ignore */ }
     }
-  } catch (e) {}
+  } catch (e) { /* ignore */ }
   return [];
 }
 
@@ -367,7 +367,7 @@ module.exports = {
   async executeMessage(message, args) {
     const ownerId = resolveOwnerId();
     if (!ownerId || String(message.author.id) !== String(ownerId)) {
-      try { await message.reply({ content: 'This command is owner-only.', allowedMentions: { repliedUser: false } }); } catch (e) {}
+      try { await message.reply({ content: 'This command is owner-only.', allowedMentions: { repliedUser: false } }); } catch (e) { /* ignore */ }
       return;
     }
 
@@ -379,13 +379,13 @@ module.exports = {
     else if (maybeId && /^\d+$/.test(maybeId)) targetId = maybeId;
 
     if (!targetId || !amountArg) {
-      try { await message.reply({ content: 'Usage: !devgive @user <amount>', allowedMentions: { repliedUser: false } }); } catch (e) {}
+      try { await message.reply({ content: 'Usage: !devgive @user <amount>', allowedMentions: { repliedUser: false } }); } catch (e) { /* ignore */ }
       return;
     }
 
     const amt = Number(amountArg);
     if (Number.isNaN(amt) || !Number.isFinite(amt)) {
-      try { await message.reply({ content: 'Amount must be a number.', allowedMentions: { repliedUser: false } }); } catch (e) {}
+      try { await message.reply({ content: 'Amount must be a number.', allowedMentions: { repliedUser: false } }); } catch (e) { /* ignore */ }
       return;
     }
 
@@ -395,7 +395,7 @@ module.exports = {
       const mention = target ? `<@${targetId}>` : `<@${targetId}>`;
       await message.reply({ content: `Gave ${formatNumber(amt)} credits to ${mention}. New balance: ${formatNumber(newBal)}.`, allowedMentions: { repliedUser: false } });
     } catch (err) {
-      try { await message.reply({ content: `Failed to give credits: ${err && (err.message || err)}`, allowedMentions: { repliedUser: false } }); } catch (e) {}
+      try { await message.reply({ content: `Failed to give credits: ${err && (err.message || err)}`, allowedMentions: { repliedUser: false } }); } catch (e) { /* ignore */ }
     }
   }
 };

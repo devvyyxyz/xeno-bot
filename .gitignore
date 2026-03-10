@@ -32,3 +32,4 @@ data/*.json
 *.bak
 *.tmp
 *.backup
+backups/*.json
