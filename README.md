@@ -1,87 +1,203 @@
-# xeno-bot — discord.js v14 scaffold
+Here is a **complete README.md** including everything you requested plus a clean GitHub layout with badges, links, and structured sections.
 
-Scalable, minimal Discord bot project layout using discord.js v14.
+You will just need to **replace the placeholder links** for:
 
-Remote logging transport (Papertrail): set `PAPERTRAIL_HOST` and `PAPERTRAIL_PORT` in `.env` to forward logs to Papertrail. The logger will automatically use the configured transport when present.
+* Invite link
+* Top.gg page
+* Docs
+* Support server
+* Banner image
 
-Quick start
-# xeno-bot — discord.js v14 scaffold
+---
 
-Scalable, minimal Discord bot project layout using discord.js v14.
+![Xeno Bot Banner](https://placehold.co/1280x400?text=Xeno+Bot)
 
-Quick start
+# 👾 Xeno Bot
 
-1. Copy `.env.example` → `.env` and fill values (`TOKEN`, `CLIENT_ID`, optional `GUILD_ID`).
-2. Install dependencies:
+[![Discord.js](https://img.shields.io/badge/discord.js-v14-blue.svg)](https://discord.js.org/)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D18-green.svg)](https://nodejs.org/)
+[![License](https://img.shields.io/github/license/devvyyxyz/xeno-bot)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/devvyyxyz/xeno-bot)](https://github.com/devvyyxyz/xeno-bot/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/devvyyxyz/xeno-bot)](https://github.com/devvyyxyz/xeno-bot/network)
+
+**Xeno Bot** is a scalable Discord bot built with **discord.js v14**, designed for modern Discord servers with a clean architecture, modular commands, and sci-fi inspired features.
+
+---
+
+## 🔗 Links
+
+- 🤖 **Invite Bot** — https://discord.com/oauth2/authorize?client_id=1476427270326583306
+- 🗳 **Top.gg Page** — https://top.gg/bot/1476427270326583306
+- 📚 **Documentation** — https://xeno-bot-docs.devvyy.xyz/
+- 💬 **Support Server** — https://discord.gg/WmFDeMKvzj
+- 🧑‍💻 **GitHub Repository** — https://github.com/devvyyxyz/xeno-bot
+
+---
+
+# ✨ Features
+
+- ⚡ Built with **discord.js v14**
+- 🧩 **Modular command & event system**
+- 🛠 **Developer friendly architecture**
+- 🗄 **SQLite + PostgreSQL support**
+- 📊 **Remote logging support**
+- 🚨 **Optional Sentry error monitoring**
+- 🔧 **Development & production bot profiles**
+- 🌌 **Sci-fi themed bot experience**
+
+---
+
+# 🚀 Getting Started (For Users)
+
+Adding Xeno Bot to your server is quick and easy.
+
+### 1️⃣ Invite the bot
+
+Use the invite link below:
+
+[https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID](https://discord.com/oauth2/authorize?client_id=1476427270326583306)
+
+### 2️⃣ Grant permissions
+
+The bot will request permissions needed to operate commands and respond to interactions.
+
+### 3️⃣ Start using commands
+
+Once invited, you can begin using slash commands such as:
+
+```
+
+/help
+/profile
+/stats
+
+````
+
+More commands and features are documented in the full documentation.
+
+---
+
+# 📚 Documentation
+
+Full documentation for setup, commands, configuration, and development can be found here:
+
+**https://docs.xeno-bot.xyz**
+
+Documentation includes:
+
+- Command reference
+- Configuration guides
+- Self-hosting instructions
+- Development architecture
+
+---
+
+# 🌌 Theming & Lore
+
+Xeno Bot takes inspiration from the **Alien franchise**, bringing a biomechanical sci-fi atmosphere to Discord servers.
+
+The bot’s design and concept revolve around the mysterious **Xenomorph species**, advanced technology, and deep space exploration themes.
+
+Future features may expand on this theme with:
+
+- Alien-inspired commands  
+- Sci-fi economy elements  
+- Interactive lore systems  
+
+---
+
+# 🛠 Self Hosting
+
+If you want to run your own instance of Xeno Bot:
+
+### Requirements
+
+- Node.js **18+**
+- A Discord bot token
+- npm
+
+### Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/devvyyxyz/xeno-bot.git
+cd xeno-bot
+````
+
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-3. (Optional) Deploy slash commands to a guild for fast testing:
+Create your environment file:
 
 ```bash
-npm run deploy-commands
+cp .env.example .env
 ```
 
-4. Run the bot:
+Fill in your bot credentials inside `.env`.
 
-Production (public bot):
+Start the bot:
 
 ```bash
 npm start
 ```
 
-Development (private/dev bot):
+---
 
-```bash
-npm run start:dev
+# 🤝 Contributing
+
+Contributions are welcome and appreciated.
+
+If you'd like to contribute:
+
+1. Fork the repository
+2. Create a new branch
+
+```
+git checkout -b feature/my-feature
 ```
 
-Recommended local alias:
+3. Commit your changes
+4. Push your branch
+5. Open a Pull Request
 
-```bash
-npm run start:local   # same as NODE_ENV=development node src/index.js
-```
+Please open an **issue first** if you're planning a large feature or change.
 
-Environment variables
-- Copy `.env.example` to `.env` and fill secrets (do NOT commit `.env`). Important vars:
-	- `TOKEN` — bot token used by the selected profile (or set profile-specific token env names in `config/bot.*.json`).
-	- `GUILD_ID` — test guild id for fast dev command registration.
-	- `ALLOW_GLOBAL_REGISTRATION` — set to `true` when you intend to register global commands (use on CI/host only).
-	- `DEV_AUTO_DEPLOY` — when `true` and running dev profile, the bot will auto-run `deploy-commands.js` to register guild commands on startup (safe: guild-only).
-	- `AUTO_DEPLOY_PUBLIC` — when `true` and running public profile on the host, the bot will auto-run `deploy-commands.js` with global registration enabled (use with caution).
+---
 
-Scripts (use these to avoid accidental registration):
-- `npm run deploy:public` — explicitly deploy commands for the public bot (sets `BOT_PROFILE=public`).
-- `npm run deploy-dev-commands` — deploy commands for the dev profile.
-- `npm run start:local` — start the bot in local/dev mode (recommended for local testing).
+# 🐛 Issues & Support
 
+If you encounter bugs or problems:
 
-Development
+### GitHub Issues
 
-- `npm run dev` — run with `nodemon` and auto-restart on changes.
-- Commands live in `src/commands` and should export `name`, `description`, `data`, and `executeInteraction` / `executeMessage` handlers.
-- Events live in `src/events` and export `name`, `once` (optional), and `execute`.
+Report bugs or request features here:
 
-Database
+[https://github.com/devvyyxyz/xeno-bot/issues](https://github.com/devvyyxyz/xeno-bot/issues)
 
-- The project uses `knex` as a lightweight DB adapter. By default it will create a local SQLite database at `data/dev.sqlite` for development.
-- To use a remote DB (Postgres), set `DATABASE_URL` in your `.env` (e.g. `postgres://user:pass@host:5432/dbname`). The code will automatically use Postgres when `DATABASE_URL` is present.
-- A basic `users` table is auto-created on startup in non-production via a simple migration.
+### Support Server
 
-Telemetry / Remote Error Reporting
+Join the community support server: https://discord.gg/WmFDeMKvzj
 
-- Optional Sentry integration is available. Set `SENTRY_DSN` in your `.env` to enable Sentry crash reporting and error capture. The bot will automatically send uncaught exceptions and unhandled rejections.
+---
 
-Environment
+# ⭐ Star History
 
-- Increase verbosity in development by setting `LOG_LEVEL=debug` in your environment.
+If you like the project, consider **starring the repository**.
 
-Files of interest
+Star growth over time:
 
-- `src/index.js` — bot entrypoint and loader
-- `deploy-commands.js` — small script to register commands
-- `config/config.json` — simple config (prefix, owner)
- - `config/bot.public.json` — non-secret metadata for the public bot (token read from env `TOKEN`)
- - `config/bot.dev.json` — non-secret metadata for the development bot (token read from env `TOKEN_DEV` by default)
+[![Star History Chart](https://api.star-history.com/svg?repos=devvyyxyz/xeno-bot\&type=Date)](https://star-history.com/#devvyyxyz/xeno-bot&Date)
+
+---
+
+# 📄 License
+
+This project is licensed under the **MIT License**.
+
+See the full license here:
+
+[https://github.com/devvyyxyz/xeno-bot/blob/main/LICENSE](https://github.com/devvyyxyz/xeno-bot/blob/main/LICENSE)
