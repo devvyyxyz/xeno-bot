@@ -1,10 +1,12 @@
 const db = require('../db');
-const logger = require('../utils/logger').get('hatch');
-const fallbackLogger = require('../utils/fallbackLogger');
-const userModel = require('../models/user');
+const utils = require('../utils');
+const logger = utils.logger.get('hatch');
+const fallbackLogger = utils.fallbackLogger;
+const models = require('../models');
+const userModel = models.user;
 const eggTypes = require('../../config/eggTypes.json');
 void eggTypes;
-const xenoModel = require('../models/xenomorph');
+const xenoModel = models.xenomorph;
 
 function getGuildName(guildId) {
   try {
@@ -50,8 +52,7 @@ async function init(botClient) {
     logger.error('Failed initializing hatch manager', { error: e && (e.stack || e) });
   }
   try {
-    const systemMonitor = require('../utils/systemMonitor');
-    systemMonitor.registerSystem('hatchManager', { name: 'Hatch Manager', shutdown: shutdown });
+    utils.systemMonitor.registerSystem('hatchManager', { name: 'Hatch Manager', shutdown: shutdown });
   } catch (e) { logger.warn('Failed registering hatchManager with systemMonitor', { error: e && (e.stack || e) }); }
 }
 
@@ -170,7 +171,7 @@ module.exports = { init, startHatch, skipHatch, collectHatch, listHatches };
 async function shutdown() {
   try {
     for (const [, t] of timers.entries()) {
-      try { clearTimeout(t); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing hatch timer during shutdown', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging timer clear error during hatchManager shutdown', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
+      try { clearTimeout(t); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing hatch timer during shutdown', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger && fallbackLogger.warn && fallbackLogger.warn('Failed logging timer clear error during hatchManager shutdown', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
     }
     timers.clear();
     logger.info('hatchManager shutdown: cleared timers');

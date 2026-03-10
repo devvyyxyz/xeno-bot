@@ -2,8 +2,9 @@ const db = require('./db');
 const utils = require('./utils');
 const baseLogger = utils.logger;
 const logger = baseLogger.get('hiveWorker');
-const userModel = require('./models/user');
-const hiveModel = require('./models/hive');
+const models = require('./models');
+const userModel = models.user;
+const hiveModel = models.hive;
 
 let _interval = null;
 

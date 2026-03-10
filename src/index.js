@@ -104,7 +104,8 @@ if (process.env.SENTRY_DSN) {
 
 // Perform DB migrations and ensure egg stats before starting the bot.
 const eggTypes = require('../config/eggTypes.json');
-const eggModel = require('./models/egg');
+const models = require('./models');
+const eggModel = models.egg;
 const childProcess = require('child_process');
 
 function createStartupProgress(totalSteps) {

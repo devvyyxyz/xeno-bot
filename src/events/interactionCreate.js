@@ -38,7 +38,7 @@ module.exports = {
               await safeReply(interaction, { content: 'No current guild context available; please provide a guild ID.', ephemeral: true }, { loggerName: 'interactionCreate' });
               return;
             }
-            const lbModel = require('../models/leaderboardBlacklist');
+                const lbModel = require('../models').leaderboardBlacklist;
             if (interaction.customId === 'devmenu-blacklist-modal') {
               const ok = await lbModel.add(guildId);
               await safeReply(interaction, { content: ok ? `✅ Guild ${guildId} added to global leaderboard blacklist.` : `❌ Failed to blacklist guild ${guildId}.`, ephemeral: true }, { loggerName: 'interactionCreate' });
@@ -115,15 +115,13 @@ module.exports = {
 
           // News reminder: if there's a newer article than user's last seen, flag interaction so replies can include a reminder.
           try {
-            const articlesUtil = require('../utils/articles');
-            const { getLatestArticleInfo } = articlesUtil;
+            const { getLatestArticleInfo } = utils.articles;
             const latestInfo = getLatestArticleInfo();
             if (latestInfo && latestInfo.latest) {
               // don't set reminder when the user is running the news command itself
               if (interaction.commandName !== 'news') {
                 // Check cache first to avoid DB lookup
-                const newsReminderCache = require('../utils/newsReminderCache');
-                const cachedData = newsReminderCache.get(interaction.user.id);
+                    const cachedData = utils.newsReminderCache.get(interaction.user.id);
 
                 if (cachedData) {
                   // Cache hit - use cached timestamp
@@ -136,12 +134,12 @@ module.exports = {
                   // Cache miss - fetch from DB and update cache
                   // perform DB lookup asynchronously and do not await so we don't block the interaction handling
                   try {
-                    const userModel = require('../models/user');
+                        const userModel = require('../models').user;
                     userModel.getUserByDiscordId(interaction.user.id).then(u => {
                       try {
                         const lastSeen = u?.data?.meta?.lastReadArticleAt || 0;
                         // Update cache with the fetched timestamp
-                        newsReminderCache.set(interaction.user.id, lastSeen);
+                        utils.newsReminderCache.set(interaction.user.id, lastSeen);
                         if (Number(latestInfo.latest) > Number(lastSeen)) {
                           interaction._newsReminder = true;
                           interaction._newsLatest = latestInfo.latest;

@@ -1,5 +1,6 @@
 const db = require('../db');
-const logger = require('../utils/logger').get('evolutionWorker');
+const utils = require('../utils');
+const logger = utils.logger.get('evolutionWorker');
 const { ContainerBuilder, TextDisplayBuilder, MessageFlags } = require('discord.js');
 const evolutionsCfg = require('../../config/evolutions.json');
 const emojisCfg = require('../../config/emojis.json');
@@ -40,7 +41,8 @@ async function processDueJobs(client) {
         const fromRole = currentXeno?.role || currentXeno?.stage || 'unknown';
         let targetRole = job.target_role;
         try {
-          const xenoModel = require('../models/xenomorph');
+          const models = require('../models');
+          const xenoModel = models.xenomorph;
           targetRole = xenoModel.canonicalizeFacehugger(currentXeno?.pathway || 'standard', job.target_role);
         } catch (e) { /* ignore */ void 0; }
         await db.knex('xenomorphs').where({ id: job.xeno_id }).update({ role: targetRole, updated_at: db.knex.fn.now() });
@@ -80,8 +82,7 @@ async function start(client, opts = {}) {
   }, pollMs);
   logger.info('Evolution worker started', { pollMs });
   try {
-    const systemMonitor = require('../utils/systemMonitor');
-    systemMonitor.registerSystem('evolutionWorker', { name: 'Evolution Worker', shutdown: stop });
+    utils.systemMonitor.registerSystem('evolutionWorker', { name: 'Evolution Worker', shutdown: stop });
   } catch (e) { logger.warn('Failed registering evolutionWorker with systemMonitor', { error: e && (e.stack || e) }); }
 }
 

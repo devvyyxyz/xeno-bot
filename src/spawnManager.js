@@ -1,5 +1,6 @@
-const guildModel = require('./models/guild');
-const userModel = require('./models/user');
+const models = require('./models');
+const guildModel = models.guild;
+const userModel = models.user;
 const utils = require('./utils');
 const baseLogger = utils.logger;
 const logger = baseLogger.get('spawn');
@@ -209,11 +210,7 @@ async function init(botClient) {
               continue;
             }
           } catch (valErr) {
-            try {
-              logger.warn('Error validating restored active spawn; removing row', { row: r, error: valErr && (valErr.stack || valErr) });
-            } catch (le) {
-              try { require('./utils/logger').get('spawn').warn('Failed logging validation error restoring active spawn', { error: le && (le.stack || le) }); } catch (lle) { fallbackLogger.warn('Failed logging validation error restoring active spawn fallback', lle && (lle.stack || lle)); }
-            }
+            try { logger.warn('Error validating restored active spawn; removing row', { row: r, error: valErr && (valErr.stack || valErr) }); } catch (le) { try { logger && logger.warn && logger.warn('Failed logging validation error restoring active spawn', { error: le && (le.stack || le) }); } catch (lle) { fallbackLogger && fallbackLogger.warn && fallbackLogger.warn('Failed logging validation error restoring active spawn fallback', lle && (lle.stack || lle)); } }
             await knex('active_spawns').where({ id: r.id }).del();
             continue;
           }
@@ -223,11 +220,11 @@ async function init(botClient) {
           guildMap.set(r.message_id, { messageId: r.message_id, channelId: r.channel_id, spawnedAt: Number(r.spawned_at), numEggs: r.num_eggs, eggType: restoredEggType });
           activeEggs.set(r.guild_id, guildMap);
         } catch (e) {
-          try { logger.warn('Failed restoring active spawn row', { row: r, error: e && (e.stack || e) }); } catch (le) { try { require('./utils/logger').get('spawn').warn('Failed logging restore active spawn error', { error: le && (le.stack || le) }); } catch (lle) { fallbackLogger.warn('Failed logging restore active spawn error fallback', lle && (lle.stack || lle)); } }
+          try { logger.warn('Failed restoring active spawn row', { row: r, error: e && (e.stack || e) }); } catch (le) { try { logger && logger.warn && logger.warn('Failed logging restore active spawn error', { error: le && (le.stack || le) }); } catch (lle) { fallbackLogger && fallbackLogger.warn && fallbackLogger.warn('Failed logging restore active spawn error fallback', lle && (lle.stack || lle)); } }
         }
       }
     } catch (e) {
-      try { logger.warn('Failed loading active_spawns table', { error: e && (e.stack || e) }); } catch (le) { try { require('./utils/logger').get('spawn').warn('Failed logging active_spawns load error', { error: le && (le.stack || le) }); } catch (lle) { fallbackLogger.warn('Failed logging active_spawns load error fallback', lle && (lle.stack || lle)); } }
+      try { logger.warn('Failed loading active_spawns table', { error: e && (e.stack || e) }); } catch (le) { try { logger && logger.warn && logger.warn('Failed logging active_spawns load error', { error: le && (le.stack || le) }); } catch (lle) { fallbackLogger && fallbackLogger.warn && fallbackLogger.warn('Failed logging active_spawns load error fallback', lle && (lle.stack || lle)); } }
     }
 
     for (const row of rows) {

@@ -108,7 +108,7 @@ async function addEggsForGuild(discordId, guildId, eggs, eggTypeId, catchTimeMs 
     }
   } catch (e) {
     // Log but don't block user update if DB fails
-    require('../utils/logger').get('models:user').error('Failed to increment egg caught in DB', { error: e.stack || e });
+    logger.error('Failed to increment egg caught in DB', { error: e.stack || e });
   }
   await updateUserDataRawById(user.id, data);
   return data.guilds[guildId].eggs[eggTypeId];
