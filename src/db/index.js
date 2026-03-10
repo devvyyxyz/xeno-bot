@@ -348,7 +348,7 @@ async function migrate() {
         table.timestamps(true, true);
       });
       // Ensure composite uniqueness per (user_id, guild_id)
-      try { await knex.schema.alterTable('hives', (t) => t.unique(['user_id', 'guild_id'])); } catch (_) {}
+      try { await knex.schema.alterTable('hives', (t) => t.unique(['user_id', 'guild_id'])); } catch (_) { /* ignore */ }
       logger.info('Created `hives` table');
     } else {
       logger.info('`hives` table already exists');
@@ -363,9 +363,9 @@ async function migrate() {
       // Ensure unique constraint is composite (user_id, guild_id). Older schema may have had a unique on user_id alone.
       try {
         await knex.schema.alterTable('hives', (t) => {
-          try { t.dropUnique(['user_id']); } catch (_) {}
+          try { t.dropUnique(['user_id']); } catch (_) { /* ignore */ }
         });
-      } catch (_) {}
+      } catch (_) { /* ignore */ }
       try { await knex.schema.alterTable('hives', (t) => t.unique(['user_id', 'guild_id'])); } catch (_) {}
     }
   } catch (err) {

@@ -106,7 +106,7 @@ async function safeReply(interaction, payload = {}, opts = {}) {
           if (usingStyledPayload) {
             try {
               return await interaction.editReply(originalPayload);
-            } catch (_) {}
+            } catch (_) { /* ignore */ }
           }
           // fallthrough to followUp
             try {
@@ -121,7 +121,7 @@ async function safeReply(interaction, payload = {}, opts = {}) {
             if (usingStyledPayload) {
               try {
                 if (typeof interaction.followUp === 'function') return await interaction.followUp(originalPayload);
-              } catch (_) {}
+              } catch (_) { /* ignore */ }
             }
             logger && logger.warn && logger.warn('safeReply: editReply/followUp failed', {
               error: e2 && (e2.stack || e2),
@@ -155,7 +155,7 @@ async function safeReply(interaction, payload = {}, opts = {}) {
       if (usingStyledPayload) {
         try {
           return await interaction.reply(originalPayload);
-        } catch (_) {}
+        } catch (_) { /* ignore */ }
       }
       logger && logger.warn && logger.warn('safeReply: reply failed, attempting defer+edit', {
         error: e && (e.stack || e),
@@ -170,7 +170,7 @@ async function safeReply(interaction, payload = {}, opts = {}) {
           try {
             if (!interaction.deferred) await interaction.deferReply({ ephemeral: originalPayload && originalPayload.ephemeral ? true : false });
             return await interaction.editReply(originalPayload);
-          } catch (_) {}
+          } catch (_) { /* ignore */ }
         }
         try {
           if (typeof interaction.followUp === 'function') {
@@ -184,7 +184,7 @@ async function safeReply(interaction, payload = {}, opts = {}) {
           if (usingStyledPayload) {
             try {
               if (typeof interaction.followUp === 'function') return await interaction.followUp(originalPayload);
-            } catch (_) {}
+            } catch (_) { /* ignore */ }
           }
             logger && logger.error && logger.error('safeReply: all reply strategies failed', {
             error: e3 && (e3.stack || e3),

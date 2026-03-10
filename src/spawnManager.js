@@ -6,7 +6,7 @@ const emojis = require('../config/emojis.json');
 const eggTypes = require('../config/eggTypes.json');
 const path = require('path');
 const fs = require('fs');
-const { AttachmentBuilder, PermissionsBitField, ContainerBuilder, TextDisplayBuilder, MessageFlags } = require('discord.js');
+const { PermissionsBitField, ContainerBuilder, TextDisplayBuilder, MessageFlags } = require('discord.js');
 const db = require('./db');
 
 // Helper: Get guild name for logging
@@ -529,10 +529,10 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     let sent;
     const preferLegacy = guildSendMode.get(guildId) === 'legacy';
     try {
-      if (preferLegacy) {
+        if (preferLegacy) {
         sent = await channel.send({ content: `${eggEmoji} ${message}` });
         if (attachment) {
-          try { await channel.send({ files: [attachment] }); } catch (_) {}
+          try { await channel.send({ files: [attachment] }); } catch (_) { /* ignore */ }
         }
       } else if (attachment) {
         // Prefer sending text+image together
@@ -752,9 +752,9 @@ async function forceSpawn(guildId, forcedEggTypeId) {
             try {
               const msg = await channel.messages.fetch(eggEvent.messageId).catch(() => null);
               if (msg) await msg.delete().catch(() => null);
-            } catch (_) {}
+            } catch (_) { /* ignore */ }
           }
-        } catch (_) {}
+        } catch (_) { /* ignore */ }
       }
       activeEggs.delete(guildId);
       try {

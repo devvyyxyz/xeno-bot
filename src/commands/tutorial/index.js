@@ -235,7 +235,7 @@ module.exports = {
       );
 
       let msg = null;
-      try { msg = await interaction.fetchReply(); } catch (_) {}
+      try { msg = await interaction.fetchReply(); } catch (_) { /* ignore */ }
       if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
 
       const collector = msg.createMessageComponentCollector({ filter: () => true, time: 300_000 });
@@ -243,7 +243,7 @@ module.exports = {
       collector.on('collect', async i => {
         try {
           if (i.user.id !== interaction.user.id) {
-            try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:tutorial' }); } catch (_) {}
+            try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:tutorial' }); } catch (_) { /* ignore */ }
             return;
           }
 
@@ -262,7 +262,7 @@ module.exports = {
             flags: MessageFlags.IsComponentsV2
           });
         } catch (err) {
-          try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:tutorial' }); } catch (_) {}
+          try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:tutorial' }); } catch (_) { /* ignore */ }
         }
       });
 
@@ -274,11 +274,11 @@ module.exports = {
               flags: MessageFlags.IsComponentsV2
             });
           }
-        } catch (_) {}
+        } catch (_) { /* ignore */ }
       });
     } catch (e) {
       logger.error('Unhandled error in tutorial command', { error: e && (e.stack || e) });
-      try { await safeReply(interaction, { content: 'Failed to open tutorial.', ephemeral: true }, { loggerName: 'command:tutorial' }); } catch (_) {}
+      try { await safeReply(interaction, { content: 'Failed to open tutorial.', ephemeral: true }, { loggerName: 'command:tutorial' }); } catch (_) { /* ignore */ }
     }
   },
 
