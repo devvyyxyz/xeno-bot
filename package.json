@@ -8,7 +8,7 @@
     "start:single": "NODE_ENV=production NODE_OPTIONS=--max-old-space-size=1024 node src/index.js",
     "start:dev": "NODE_ENV=development node src/index.js",
     "dev": "NODE_ENV=development nodemon",
-    "start:shards": "NODE_ENV=production NODE_OPTIONS=--max-old-space-size=1024 node bin/shard.js",
+    
     "dev:shards": "NODE_ENV=development node bin/shard.js",
     "deploy-dev-commands": "BOT_PROFILE=dev node bin/deploy-commands.js",
     "clear-public-commands": "BOT_PROFILE=public CLEAR_GLOBAL_COMMANDS=true node bin/deploy-commands.js",
@@ -17,11 +17,13 @@
     "deploy-commands": "node bin/deploy-commands.js",
     "update-topgg-commands": "node scripts/update-topgg-commands.js",
     "cleanup-shop-items": "node scripts/remove-shop-items.js",
-    "start:local": "NODE_ENV=development node src/index.js",
+    
     "migrate:facehuggers:dry": "node scripts/migrate-facehuggers-to-xenos.js",
     "migrate:facehuggers": "node scripts/migrate-facehuggers-to-xenos.js --apply",
     "test": "jest --runInBand",
-    "lint": "eslint src --ext .js"
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src --ext .js",
+    "lint:fix": "eslint --fix src --ext .js"
   },
   "dependencies": {
     "@discordjs/builders": "^2.0.0-dev.1771286636-ccce987fa",
