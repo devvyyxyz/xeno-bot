@@ -83,6 +83,7 @@ class NewsReminderCache {
 const cache = new NewsReminderCache();
 
 // Cleanup every 10 minutes
-setInterval(() => cache.cleanup(), 10 * 60 * 1000);
+const _newsReminderSweep = setInterval(() => cache.cleanup(), 10 * 60 * 1000);
+if (_newsReminderSweep && typeof _newsReminderSweep.unref === 'function') _newsReminderSweep.unref();
 
 module.exports = cache;

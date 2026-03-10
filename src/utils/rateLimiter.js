@@ -11,6 +11,7 @@ class RateLimiter {
     
     // Start cleanup interval to prevent memory leaks
     this.cleanupInterval = setInterval(() => this.cleanup(), 60000); // Every minute
+    if (this.cleanupInterval && typeof this.cleanupInterval.unref === 'function') this.cleanupInterval.unref();
   }
 
   // Check if user can perform action
