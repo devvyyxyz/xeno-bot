@@ -3,13 +3,14 @@ const path = require('path');
 // Register optional path aliases when available (no-op if module not installed)
 try { require('../alias-register'); } catch (_) { /* ignore if module-alias not installed */ void 0; }
 require('dotenv').config();
-const baseLogger = require('./utils/logger');
+const utils = require('./utils');
+const baseLogger = utils.logger;
 const logger = baseLogger.get('index');
 // Route any remaining `console.warn` / `console.error` fallbacks to a
 // file-backed fallback logger. This prevents raw stdout writes from
 // appearing in production logs if the main logger fails.
-try {
-  const fallback = require('./utils/fallbackLogger');
+  try {
+    const fallback = utils.fallbackLogger;
   const origWarn = console.warn.bind(console);
   const origError = console.error.bind(console);
   console.warn = (...args) => {
@@ -308,7 +309,7 @@ const client = new Client({
 
 // System monitor: post status to designated channel when modules fail
 try {
-  const systemMonitor = require('./utils/systemMonitor');
+  const systemMonitor = utils.systemMonitor;
   client.once('clientReady', () => {
     try {
       // Channel ID provided by user
@@ -404,7 +405,7 @@ async function gracefulShutdown(reason) {
   try {
     logger.info('Graceful shutdown starting', { reason });
     try {
-      const systemMonitor = require('./utils/systemMonitor');
+      const systemMonitor = utils.systemMonitor;
       if (systemMonitor) {
         logger.info('Invoking systemMonitor to mark systems down', { reason });
         try {

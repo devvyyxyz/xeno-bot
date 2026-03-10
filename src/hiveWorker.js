@@ -1,5 +1,7 @@
 const db = require('./db');
-const logger = require('./utils/logger').get('hiveWorker');
+const utils = require('./utils');
+const baseLogger = utils.logger;
+const logger = baseLogger.get('hiveWorker');
 const userModel = require('./models/user');
 const hiveModel = require('./models/hive');
 
@@ -65,8 +67,8 @@ async function start(opts = {}) {
     processHives().catch(e => logger.error('Hive worker run failed', { error: e && (e.stack || e) }));
   }, pollMs);
   logger.info('Hive worker started', { pollMs });
-  try {
-    const systemMonitor = require('./utils/systemMonitor');
+    try {
+    const systemMonitor = utils.systemMonitor;
     systemMonitor.registerSystem('hiveWorker', { name: 'Hive Worker', shutdown: stop });
   } catch (e) { logger.warn('Failed registering hiveWorker with systemMonitor', { error: e && (e.stack || e) }); }
 }
