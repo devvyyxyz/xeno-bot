@@ -162,7 +162,7 @@ module.exports = {
     }
   },
 
-  async autocomplete(interaction) {
+  async autocomplete() {
     // No autocomplete needed for this command
     return;
   }

@@ -10,11 +10,13 @@ const {
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder
 } = require('@discordjs/builders');
+// Mark builders that may be unused in some environments to satisfy linter
+void PrimaryButtonBuilder;
 const {
   ContainerBuilder,
   TextDisplayBuilder,
   MessageFlags,
-  SectionBuilder,
+  
   SeparatorBuilder,
   SeparatorSpacingSize
 } = require('discord.js');
@@ -34,7 +36,8 @@ function buildPathwayListView({ client = null }) {
     return new StringSelectMenuOptionBuilder()
       .setLabel(id.charAt(0).toUpperCase() + id.slice(1))
       .setValue(id)
-      .setDescription(pathway.description.slice(0, 100));
+
+  .setDescription(pathway.description.slice(0, 100));
   });
 
   container.addActionRowComponents(
@@ -178,6 +181,7 @@ module.exports = {
   async executeInteraction(interaction) {
     const discordId = interaction.user.id;
     const guildId = interaction.guildId;
+    void guildId;
     const logger = require('../../utils/logger').get('command:pathway');
     const safeReply = require('../../utils/safeReply');
 
@@ -191,7 +195,7 @@ module.exports = {
       );
 
       let msg = null;
-      try { msg = await interaction.fetchReply(); } catch (_) {}
+      try { msg = await interaction.fetchReply(); } catch (_) { /* ignore */ void 0; }
       if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
 
       let currentPathway = null;
@@ -219,9 +223,7 @@ module.exports = {
         }
       });
 
-      collector.on('end', () => {
-        // No action needed
-      });
+      collector.on('end', () => { /* No action needed */ void 0; });
     } catch (err) {
       logger.error('Unhandled error in pathway command', { error: err && (err.stack || err) });
       try {

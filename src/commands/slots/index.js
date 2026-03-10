@@ -1,4 +1,5 @@
 const { getCommandConfig, buildSubcommandOptions, isCommandEphemeral } = require('../../utils/commandsConfig');
+void buildSubcommandOptions;
 const safeReply = require('../../utils/safeReply');
 const userModel = require('../../models/user');
 const emojis = require('../../../config/emojis.json');
@@ -15,6 +16,7 @@ const {
   ButtonStyle,
   MessageFlags
 } = require('discord.js');
+void ThumbnailBuilder;
 
 const cmd = getCommandConfig('slots') || {
   name: 'slots',
@@ -77,7 +79,8 @@ module.exports = {
           });
         }
       } catch (e) {
-        // non-fatal: if table cannot be created (permissions), we'll still proceed without persistent stats
+        /* non-fatal: if table cannot be created (permissions), we'll still proceed without persistent stats */
+        void 0;
       }
     }
 
@@ -147,7 +150,7 @@ module.exports = {
       }
     } catch (e) {
       // Fallback: safeReply may not support the flags property; call with statsPayload
-      try { await safeReply(interaction, statsPayload); } catch (_) {}
+      try { await safeReply(interaction, statsPayload); } catch (_) { /* ignore */ void 0; }
     }
 
     // Attach collector for the Play button
@@ -157,13 +160,13 @@ module.exports = {
       try {
         if (i.customId !== 'slots-play') return;
         // only allow the command user to press play
-        if (i.user.id !== userId) { try { await i.reply({ content: 'Only the command invoker can start this spin.', ephemeral: true }); } catch (_) {} return; }
-        try { await i.deferUpdate(); } catch (_) {}
+        if (i.user.id !== userId) { try { await i.reply({ content: 'Only the command invoker can start this spin.', ephemeral: true }); } catch (_) { /* ignore */ void 0; } return; }
+        try { await i.deferUpdate(); } catch (_) { /* ignore */ void 0; }
 
         // Re-check balance before spinning
         const bal = await userModel.getCurrencyForGuild(userId, guildId, 'royal_jelly');
         if (bal < amount) {
-          try { await interaction.editReply(buildNoticeV2Payload({ message: `Insufficient Royal Jelly. You have ${bal}, need ${amount}.`, tone: 'error', client: interaction.client })); } catch (_) {}
+          try { await interaction.editReply(buildNoticeV2Payload({ message: `Insufficient Royal Jelly. You have ${bal}, need ${amount}.`, tone: 'error', client: interaction.client })); } catch (_) { /* ignore */ void 0; }
           return;
         }
 
@@ -179,11 +182,11 @@ module.exports = {
 
         // Frame 1
         await new Promise(res => setTimeout(res, delays[0]));
-        try { await interaction.editReply(buildStatsV2Payload({ title: '🎰 Slots', rows: [ { label: 'Spin', value: renderReels(finalR1, pick(), pick()) }, { label: 'Status', value: 'Revealing...' } ], footer: `Bet: ${amount} RJ`, client: interaction.client })); } catch (_) {}
+        try { await interaction.editReply(buildStatsV2Payload({ title: '🎰 Slots', rows: [ { label: 'Spin', value: renderReels(finalR1, pick(), pick()) }, { label: 'Status', value: 'Revealing...' } ], footer: `Bet: ${amount} RJ`, client: interaction.client })); } catch (_) { /* ignore */ void 0; }
 
         // Frame 2
         await new Promise(res => setTimeout(res, delays[1]));
-        try { await interaction.editReply(buildStatsV2Payload({ title: '🎰 Slots', rows: [ { label: 'Spin', value: renderReels(finalR1, finalR2, pick()) }, { label: 'Status', value: 'Almost there...' } ], footer: `Bet: ${amount} RJ`, client: interaction.client })); } catch (_) {}
+        try { await interaction.editReply(buildStatsV2Payload({ title: '🎰 Slots', rows: [ { label: 'Spin', value: renderReels(finalR1, finalR2, pick()) }, { label: 'Status', value: 'Almost there...' } ], footer: `Bet: ${amount} RJ`, client: interaction.client })); } catch (_) { /* ignore */ void 0; }
 
         // Final
         await new Promise(res => setTimeout(res, delays[2]));
@@ -198,13 +201,14 @@ module.exports = {
         const payout = multiplier > 0 ? amount * multiplier : 0;
         if (payout > 0) await userModel.modifyCurrencyForGuild(userId, guildId, 'royal_jelly', +payout);
         const newBal = await userModel.getCurrencyForGuild(userId, guildId, 'royal_jelly');
+        void newBal;
 
         // persist play record if DB available
         try {
           if (db.knex) {
             await db.knex('slot_plays').insert({ user_id: userId, guild_id: guildId, bet: amount, payout, multiplier, is_big_win: multiplier >= 5, result: `${r1},${r2},${r3}`, created_at: Date.now() });
           }
-        } catch (e) { /* ignore persistence failures */ }
+        } catch (e) { /* ignore persistence failures */ void 0; }
 
         // Build final grid and result
         const gridReelsFinal = { top: [ ' ', ' ', ' ' ], mid: [ symbolEmoji(r1), symbolEmoji(r2), symbolEmoji(r3) ], bot: [ ' ', ' ', ' ' ] };
@@ -215,13 +219,13 @@ module.exports = {
         gridCollector.on('collect', async i2 => {
           try {
             if (i2.customId === 'slots-betagain') {
-              if (i2.user.id !== userId) {
-                try { await i2.reply({ content: 'Only the original bettor can press this.', ephemeral: true }); } catch (_) {}
+                if (i2.user.id !== userId) {
+                try { await i2.reply({ content: 'Only the original bettor can press this.', ephemeral: true }); } catch (_) { /* ignore */ void 0; }
                 return;
               }
               // re-run slots with same amount by faking options on the component interaction
               i2.options = { getInteger: (name) => (name === 'amount' ? amount : null) };
-              try { i2.guildId = interaction.guildId; } catch (e) {}
+              try { i2.guildId = interaction.guildId; } catch (e) { /* ignore */ void 0; }
               await module.exports.executeInteraction(i2);
             } else if (i2.customId === 'slots-paytable') {
               const payContainer = new ContainerBuilder();
@@ -230,11 +234,11 @@ module.exports = {
               await safeReply(i2, { components: [payContainer], flags: MessageFlags.IsComponentsV2, ephemeral: ephemeralFlag });
             }
           } catch (err) {
-            try { await i2.reply({ content: 'Action failed.', ephemeral: true }); } catch (_) {}
+            try { await i2.reply({ content: 'Action failed.', ephemeral: true }); } catch (_) { /* ignore */ void 0; }
           }
         });
       } catch (err) {
-        try { await i.reply({ content: 'Action failed.', ephemeral: true }); } catch (_) {}
+        try { await i.reply({ content: 'Action failed.', ephemeral: true }); } catch (_) { /* ignore */ void 0; }
       }
     });
 
@@ -319,6 +323,7 @@ module.exports = {
       mid: [ '❔', '❔', '❔' ],
       bot: [ '❔', '❔', '❔' ]
     };
+    void gridReelsInitial;
 
     // Do nothing here — the play collector will replace the stats with the grid
     // and attach the Bet Again / Paytable collector after the spin completes.

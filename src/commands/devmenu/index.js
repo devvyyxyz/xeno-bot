@@ -1,9 +1,9 @@
 function resolveOwnerId() {
   try {
     if (process.env.BOT_CONFIG_PATH) {
-      try { const bc = require(process.env.BOT_CONFIG_PATH); if (bc && bc.owner) return String(bc.owner); } catch (e) {}
+      try { const bc = require(process.env.BOT_CONFIG_PATH); if (bc && bc.owner) return String(bc.owner); } catch (e) { /* ignore */ }
     }
-  } catch (e) {}
+  } catch (e) { /* ignore */ }
   return process.env.OWNER || process.env.BOT_OWNER || process.env.OWNER_ID || null;
 }
 

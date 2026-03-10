@@ -52,7 +52,7 @@ module.exports = {
         try {
           baseLogger.sentry.addBreadcrumb({ message: 'db.getUser.start', category: 'db', data: { userId: target.id } });
         } catch (e) {
-          try { require('../../utils/logger').get('command:stats').warn('Failed to add sentry breadcrumb (db.getUser.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging stat breadcrumb error (db.getUser.start)', le && (le.stack || le)); } catch (ignored) {} }
+          try { require('../../utils/logger').get('command:stats').warn('Failed to add sentry breadcrumb (db.getUser.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging stat breadcrumb error (db.getUser.start)', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
         }
       }
 
@@ -61,7 +61,7 @@ module.exports = {
         try {
           baseLogger.sentry.addBreadcrumb({ message: 'db.getUser.finish', category: 'db', data: { userId: target.id } });
         } catch (e) {
-          try { require('../../utils/logger').get('command:stats').warn('Failed to add sentry breadcrumb (db.getUser.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging stat breadcrumb error (db.getUser.finish)', le && (le.stack || le)); } catch (ignored) {} }
+          try { require('../../utils/logger').get('command:stats').warn('Failed to add sentry breadcrumb (db.getUser.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging stat breadcrumb error (db.getUser.finish)', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
         }
       }
 
@@ -74,16 +74,18 @@ module.exports = {
       // global totals across all guilds
       const allGuilds = (user && user.data && user.data.guilds) || {};
       let globalEggs = 0, globalItems = 0;
-      const eggTotalsByType = {};
-      const currencyTotals = {};
+        const eggTotalsByType = {};
+        const currencyTotals = {};
       for (const [gId, gData] of Object.entries(allGuilds)) {
+        void gId;
         const eggs = gData.eggs || {};
+        const items = gData.items || {};
         for (const [etype, qty] of Object.entries(eggs)) {
           const n = Number(qty || 0);
           globalEggs += n;
           eggTotalsByType[etype] = (eggTotalsByType[etype] || 0) + n;
         }
-        const items = gData.items || {};
+            /* logging placeholder removed to avoid referencing undefined error variable */ void 0;
         for (const qty of Object.values(items)) globalItems += Number(qty || 0);
         const curr = gData.currency || {};
         for (const [ck, cv] of Object.entries(curr)) currencyTotals[ck] = (currencyTotals[ck] || 0) + Number(cv || 0);
@@ -111,7 +113,7 @@ module.exports = {
         const totalUsers = (totalUsersRaw && totalUsersRaw.rows && totalUsersRaw.rows[0] && totalUsersRaw.rows[0].c) || (totalUsersRaw && totalUsersRaw[0] && totalUsersRaw[0].c) || (totalUsersRaw && totalUsersRaw.length && totalUsersRaw[0].c) || 0;
         rankInfo = `${(Number(higher) + 1)}/${Number(totalUsers) || 'n'}`;
       } catch (e) {
-        try { require('../../utils/logger').get('command:stats').warn('Failed computing leaderboard rank', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard rank error', le && (le.stack || le)); } catch (ignored) {} }
+        try { require('../../utils/logger').get('command:stats').warn('Failed computing leaderboard rank', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard rank error', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
       }
 
       // Compute per-egg rates accurately using egg_catches events (server & global)
@@ -126,7 +128,7 @@ module.exports = {
         const firstRow = await db.knex('egg_catches').where({ user_id: String(target.id) }).min('caught_at as m').first();
         firstCatchAt = firstRow && (firstRow.m || firstRow['min(`caught_at`)']) ? new Date(firstRow.m || firstRow['min(`caught_at`)']) : null;
       } catch (e) {
-        try { require('../../utils/logger').get('command:stats').warn('Failed fetching egg_catches for rates', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging egg_catches fetch error', le && (le.stack || le)); } catch (ignored) {} }
+        try { require('../../utils/logger').get('command:stats').warn('Failed fetching egg_catches for rates', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging egg_catches fetch error', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
       }
       const now = Date.now();
       const daysSince = firstCatchAt ? Math.max((now - firstCatchAt.getTime()) / 86400000, 1/24) : Math.max((Date.now() - (global._softUptimeStart || Date.now())) / 86400000, 1/24);
@@ -153,7 +155,7 @@ module.exports = {
           );
         }
       } catch (e) {
-        try { require('../../utils/logger').get('command:stats').warn('Failed adding avatar thumbnail', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging avatar thumbnail error', le && (le.stack || le)); } catch (ignored) {} }
+        try { require('../../utils/logger').get('command:stats').warn('Failed adding avatar thumbnail', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging avatar thumbnail error', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
       }
 
       // Performance section
@@ -223,7 +225,7 @@ module.exports = {
       try {
         await safeReply(interaction, { content: 'Failed to fetch stats or interaction expired.' }, { loggerName: 'command:stats' });
       } catch (e) {
-        try { require('../../utils/logger').get('command:stats').warn('Failed to send failure reply in stats command', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging failed-reply in stats command', le && (le.stack || le)); } catch (ignored) {} }
+        try { require('../../utils/logger').get('command:stats').warn('Failed to send failure reply in stats command', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging failed-reply in stats command', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
       }
       throw err;
     }

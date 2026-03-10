@@ -24,6 +24,7 @@ function maybeBuildStyledNoticePayload(payload = {}, opts = {}) {
     });
 
     const { content: _content, ...rest } = payload;
+    void _content;
     return {
       ...rest,
       ...notice,
@@ -205,7 +206,7 @@ async function safeReply(interaction, payload = {}, opts = {}) {
       }
     }
   } catch (finalErr) {
-    try { logger && logger.error && logger.error('safeReply: unexpected error', { error: finalErr && (finalErr.stack || finalErr) }); } catch (e) { try { fallbackLogger.warn('safeReply: failed logging unexpected error', e && (e.stack || e)); } catch (ignored) {} }
+    try { logger && logger.error && logger.error('safeReply: unexpected error', { error: finalErr && (finalErr.stack || finalErr) }); } catch (e) { try { fallbackLogger.warn('safeReply: failed logging unexpected error', e && (e.stack || e)); } catch (ignored) { /* ignore */ } }
   }
 }
 

@@ -258,4 +258,4 @@ async function init(client, chId) {
   }
 }
 
-module.exports = { init, registerSystem, markDown, markUp, markAllDown, buildStatusEmbed };
+module.exports = { init, registerSystem, markDown, markUp, markAllDown, buildStatusEmbed, buildStatusText };

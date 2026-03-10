@@ -46,9 +46,9 @@ module.exports = async function autocomplete(interaction, items = [], opts = {})
       try {
         const logger = require('./logger').get('utils:autocomplete');
         logger.info('Responding autocomplete choices', { count: choices.length, sample: choices.slice(0, 5) });
-      } catch (e) {}
+      } catch (e) { /* ignore */ void 0; }
       await interaction.respond(choices);
   } catch (e) {
-    try { await interaction.respond([]); } catch (e2) {}
+    try { await interaction.respond([]); } catch (e2) { /* ignore */ void 0; }
   }
 };

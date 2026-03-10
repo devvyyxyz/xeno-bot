@@ -7,9 +7,9 @@ const config = require('../../config/config.json');
 function resolveOwnerId() {
   try {
     if (process.env.BOT_CONFIG_PATH) {
-      try { const bc = require(process.env.BOT_CONFIG_PATH); if (bc && bc.owner) return String(bc.owner); } catch (e) { /* ignore */ }
+      try { const bc = require(process.env.BOT_CONFIG_PATH); if (bc && bc.owner) return String(bc.owner); } catch (e) { /* ignore */ void 0; }
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) { /* ignore */ void 0; }
   return process.env.OWNER || process.env.BOT_OWNER || process.env.OWNER_ID || null;
 }
 
@@ -49,7 +49,7 @@ module.exports = {
             }
           } catch (e) {
             logger.error('Failed processing devmenu modal submit', { error: e && (e.stack || e) });
-            try { await safeReply(interaction, { content: `❌ Error: ${e && e.message ? e.message : 'Unknown error'}`, ephemeral: true }, { loggerName: 'interactionCreate' }); } catch (_) {}
+            try { await safeReply(interaction, { content: `❌ Error: ${e && e.message ? e.message : 'Unknown error'}`, ephemeral: true }, { loggerName: 'interactionCreate' }); } catch (_) { /* ignore */ void 0; }
             return;
           }
         }
@@ -70,7 +70,7 @@ module.exports = {
           try {
             const fetchedGuild = await interaction.client.guilds.fetch(interaction.guildId);
             guildOwnerId = String(fetchedGuild?.ownerId || '').trim();
-          } catch (_) {}
+          } catch (_) { /* ignore */ void 0; }
         }
         const isGuildOwner = guildOwnerId && String(interaction.user.id || '') === guildOwnerId;
 
@@ -146,14 +146,14 @@ module.exports = {
                           interaction._newsLatest = latestInfo.latest;
                           interaction._newsTitle = latestInfo.title || null;
                         }
-                      } catch (inner) { /* ignore */ }
-                    }).catch(() => {});
-                  } catch (e2) { /* ignore */ }
+                      } catch (inner) { /* ignore */ void 0; }
+                    }).catch(() => { /* ignore */ });
+                    } catch (e2) { /* ignore */ void 0; }
                 }
               }
             }
-          } catch (e) {
-            try { logger.warn('Failed checking latest articles for reminder', { error: e && (e.stack || e) }); } catch (_) {}
+            } catch (e) {
+            try { logger.warn('Failed checking latest articles for reminder', { error: e && (e.stack || e) }); } catch (_) { /* ignore */ void 0; }
           }
 
         // Permission guard: commands can specify `requiredPermissions: ['ManageGuild']` or similar
@@ -188,12 +188,7 @@ module.exports = {
             } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (command.execute.start)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (command.execute.start)', le && (le.stack || le)); } }
           }
           if (command.executeInteraction) {
-            try {
-              await command.executeInteraction(interaction);
-            } catch (cmdErr) {
-              // Let outer error handler catch it by rethrowing
-              throw cmdErr;
-            }
+            await command.executeInteraction(interaction);
           }
           if (baseLogger && baseLogger.sentry) {
             try {

@@ -147,9 +147,9 @@ module.exports = {
     }
     // Get all users in DB
     const baseLogger = require('../../utils/logger');
-    if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.getAllUsers.start', category: 'db' }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to add sentry breadcrumb (db.getAllUsers.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard breadcrumb (db.getAllUsers.start)', le && (le.stack || le)); } catch (ignored) {} } } }
+    if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.getAllUsers.start', category: 'db' }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to add sentry breadcrumb (db.getAllUsers.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard breadcrumb (db.getAllUsers.start)', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } } }
     const rows = await userModel.getAllUsers();
-    if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.getAllUsers.finish', category: 'db', data: { count: rows.length } }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to add sentry breadcrumb (db.getAllUsers.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard breadcrumb (db.getAllUsers.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
+    if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.getAllUsers.finish', category: 'db', data: { count: rows.length } }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to add sentry breadcrumb (db.getAllUsers.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard breadcrumb (db.getAllUsers.finish)', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } } }
     const guildId = interaction.guildId;
 
     // If global subcommand requested, build server-level totals and show global ranking
@@ -190,7 +190,7 @@ module.exports = {
               guildStats[gid].eggsByType[etype] = (guildStats[gid].eggsByType[etype] || 0) + n;
               guildStats[gid].total = (guildStats[gid].total || 0) + n;
             }
-          } catch (e) { }
+          } catch (e) { /* ignore */ void 0; }
           
           // Add hosts for this user to this guild (hosts are global, so they count for every guild the user is in)
           try {
@@ -198,14 +198,14 @@ module.exports = {
               guildStats[gid].hostsByType[htype] = (guildStats[gid].hostsByType[htype] || 0) + count;
             }
             guildStats[gid].hostsTotal = (guildStats[gid].hostsTotal || 0) + userHosts.total;
-          } catch (e) { }
+          } catch (e) { /* ignore */ void 0; }
           
           // include user's catchTimes for this guild if user has presence here
           try {
             if (stats && stats.catchTimes && stats.catchTimes.length) {
               guildStats[gid].catchTimes = guildStats[gid].catchTimes.concat(stats.catchTimes);
             }
-          } catch (e) { }
+          } catch (e) { /* ignore */ void 0; }
         }
       }
 
@@ -217,9 +217,7 @@ module.exports = {
           const set = new Set(blacklisted.map(String));
           entries = entries.filter(e => !set.has(String(e.gid)));
         }
-      } catch (e) {
-        // ignore blacklist failures and proceed
-      }
+      } catch (e) { /* ignore */ void 0; }
 
       // Sorting by requested option
       if (sortOpt === 'eggs') {
@@ -273,7 +271,7 @@ module.exports = {
             try {
               const fetched = await interaction.client.guilds.fetch(gid).catch(() => null);
               if (fetched && fetched.name) guildName = fetched.name;
-            } catch (e) { }
+            } catch (e) { /* ignore */ void 0; }
           }
           // final fallback: try guild settings cache (may have stored display name in data)
           if (!guildName) {
@@ -284,9 +282,9 @@ module.exports = {
                 const possible = cfg.data.name || cfg.data.guildName || cfg.data.guild_name || cfg.data.displayName || cfg.data.display_name;
                 if (possible) guildName = possible;
               }
-            } catch (e) { }
+            } catch (e) { /* ignore */ void 0; }
           }
-        } catch (e) { }
+        } catch (e) { /* ignore */ void 0; }
         const displayName = guildName ? `${guildName}` : `Guild ${gid}`;
         // Format value per sort
         let value = '';
@@ -365,7 +363,7 @@ module.exports = {
       await safeReply(interaction, { components, flags: MessageFlags.IsComponentsV2, ephemeral: cmd.ephemeral === true }, { loggerName: 'command:leaderboard' });
       const { collector, message: msg } = await createInteractionCollector(interaction, { components, time: 60_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 3 } });
       if (!collector) {
-        try { require('../../utils/logger').get('command:leaderboard').warn('Failed to attach global leaderboard collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach global leaderboard collector', le && (le.stack || le)); } catch (ignored) {} }
+        try { require('../../utils/logger').get('command:leaderboard').warn('Failed to attach global leaderboard collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach global leaderboard collector', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
         return;
       }
       collector.on('collect', async i => {
@@ -373,17 +371,17 @@ module.exports = {
           const newSort = i.values[0];
           i.options = { getString: () => newSort, getSubcommand: () => 'global' };
           // preserve the original guild context so re-invoked handler uses per-guild data
-          try { i.guildId = interaction.guildId; } catch (e) {}
+          try { i.guildId = interaction.guildId; } catch (e) { /* ignore */ void 0; }
           await module.exports.executeInteraction(i);
         } else if (i.customId === 'leaderboard-eggtype') {
           const newSort = i.values[0];
           i.options = { getString: () => newSort, getSubcommand: () => 'global' };
-          try { i.guildId = interaction.guildId; } catch (e) {}
+          try { i.guildId = interaction.guildId; } catch (e) { /* ignore */ void 0; }
           await module.exports.executeInteraction(i);
         } else if (i.customId === 'leaderboard-hosttype') {
           const newSort = i.values[0];
           i.options = { getString: () => newSort, getSubcommand: () => 'global' };
-          try { i.guildId = interaction.guildId; } catch (e) {}
+          try { i.guildId = interaction.guildId; } catch (e) { /* ignore */ void 0; }
           await module.exports.executeInteraction(i);
         }
       });
@@ -406,7 +404,7 @@ module.exports = {
               })
             });
           }
-        } catch (e) { try { require('../../utils/logger').get('command:leaderboard').warn('Failed finalizing global leaderboard view after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed finalizing global leaderboard view after collector end', le && (le.stack || le)); } catch (ignored) {} } }
+        } catch (e) { try { require('../../utils/logger').get('command:leaderboard').warn('Failed finalizing global leaderboard view after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed finalizing global leaderboard view after collector end', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
       });
       return;
     }
@@ -414,6 +412,7 @@ module.exports = {
     // Build per-user leaderboard data for the server
     // First, query all hosts from the hosts table
     const hostModel = require('../../models/host');
+    void hostModel;
     const hostsConfig = require('../../../config/hosts.json');
     const allHosts = await db.knex('hosts').select('owner_id', 'host_type');
     
@@ -553,7 +552,7 @@ module.exports = {
       // Collector for sort menu
       const { collector, message: msg } = await createInteractionCollector(interaction, { components, time: 60_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 3 } });
       if (!collector) {
-        try { require('../../utils/logger').get('command:leaderboard').warn('Failed to attach leaderboard collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach leaderboard collector', le && (le.stack || le)); } catch (ignored) {} }
+        try { require('../../utils/logger').get('command:leaderboard').warn('Failed to attach leaderboard collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach leaderboard collector', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
         return;
       }
       collector.on('collect', async i => {
@@ -561,17 +560,17 @@ module.exports = {
           const newSort = i.values[0];
           i.options = { getString: () => newSort, getSubcommand: () => 'server' };
           // ensure the re-invoked interaction preserves the guild id
-          try { i.guildId = interaction.guildId; } catch (e) {}
+          try { i.guildId = interaction.guildId; } catch (e) { /* ignore */ void 0; }
           await module.exports.executeInteraction(i);
         } else if (i.customId === 'leaderboard-eggtype') {
           const newSort = i.values[0];
           i.options = { getString: () => newSort, getSubcommand: () => 'server' };
-          try { i.guildId = interaction.guildId; } catch (e) {}
+          try { i.guildId = interaction.guildId; } catch (e) { /* ignore */ void 0; }
           await module.exports.executeInteraction(i);
         } else if (i.customId === 'leaderboard-hosttype') {
           const newSort = i.values[0];
           i.options = { getString: () => newSort, getSubcommand: () => 'server' };
-          try { i.guildId = interaction.guildId; } catch (e) {}
+          try { i.guildId = interaction.guildId; } catch (e) { /* ignore */ void 0; }
           await module.exports.executeInteraction(i);
         }
       });
@@ -594,7 +593,7 @@ module.exports = {
               })
             });
           }
-        } catch (e) { try { logger && logger.warn && logger.warn('Failed finalizing leaderboard view after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard finalization failure', le && (le.stack || le)); } catch (ignored) {} } }
+        } catch (e) { try { logger && logger.warn && logger.warn('Failed finalizing leaderboard view after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging leaderboard finalization failure', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
       });
     }
   }

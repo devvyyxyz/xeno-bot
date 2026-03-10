@@ -62,9 +62,9 @@ const fileFormat = printf(({ timestamp, level, message, label, stack, ...meta })
     if (typeof v !== 'string') return v;
     // Mask URL credentials: protocol://user:pass@host -> protocol://user:****@host
     try {
-      if (/^[a-zA-Z]+:\/\//.test(v)) {
-        try {
-          const u = new URL(v);
+      if (new RegExp('^[a-zA-Z]+://').test(v)) {
+          try {
+            const u = new URL(v);
           if (u.username || u.password) {
             u.password = '****';
             return u.toString();
@@ -72,10 +72,10 @@ const fileFormat = printf(({ timestamp, level, message, label, stack, ...meta })
           return v;
         } catch (e) {
           // fallback to regex masking
-          return v.replace(/:\/\/([^:@\/]+):([^@\/]+)@/, '://$1:****@');
+          return v.replace(/:\/\/([^:@/]+):([^@/]+)@/, '://$1:****@');
         }
       }
-    } catch (_) {}
+    } catch (_) { /* ignore */ }
     // Mask obvious tokens/keys
     if (/token|password|passwd|secret|dsn/i.test(v)) return 'REDACTED';
     return v;
@@ -109,7 +109,7 @@ const consoleFormat = printf(({ timestamp, level, message, label, stack }) => {
   let labelPart = '';
   if (label) {
     // If label already contains ANSI sequences (e.g. forceColorFormat applied), don't recolor
-    const hasAnsi = /\x1b\[/.test(String(label));
+    const hasAnsi = String(label).indexOf('\u001b[') !== -1;
     if (!hasAnsi && shouldColorLabels()) {
       const code = pickLabelColor(label);
       labelPart = ` [${code}${label}${ANSI.reset}]`;

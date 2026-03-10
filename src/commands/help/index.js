@@ -3,23 +3,19 @@ const {
   TextDisplayBuilder,
   MessageFlags,
   SeparatorBuilder,
-  SeparatorSpacingSize,
-  SectionBuilder
+  SeparatorSpacingSize
 } = require('discord.js');
 const {
   ActionRowBuilder,
   StringSelectMenuBuilder,
-  SecondaryButtonBuilder,
-  PrimaryButtonBuilder
+  SecondaryButtonBuilder
 } = require('@discordjs/builders');
-const { getCommandConfig, getCommandsObject, isCommandEphemeral } = require('../../utils/commandsConfig');
+const { getCommandsObject, isCommandEphemeral } = require('../../utils/commandsConfig');
 const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const fallbackLogger = require('../../utils/fallbackLogger');
 const safeReply = require('../../utils/safeReply');
 // Reload cmd each time to get fresh config (in case it changes)
-function getCmd() {
-  return getCommandConfig('help') || { name: 'help', description: 'Show help for available commands' };
-}
+// `getCmd` removed — reload config on-demand via `getCommandsObject()` where needed
 
 function getCategories() {
   const commandsConfig = getCommandsObject();
@@ -91,7 +87,6 @@ module.exports = {
   data: { name: 'help', description: 'Show help for available commands' },
   async executeInteraction(interaction) {
     const logger = require('../../utils/logger').get('command:help');
-    const cmd = getCmd();
     const categories = getCategories();
     // include "All" category at the front
     if (!categories.includes('All')) categories.unshift('All');
@@ -205,7 +200,7 @@ module.exports = {
             setupIntro = `Configure the bot with ${root} — subcommands: ${mentions.slice(0, 5).join(', ')}. Use ${mentions[5]} to reset a user or server (admin/owner only).`;
           }
         }
-      } catch (_) {}
+      } catch (_) { /* ignore */ }
       return setupIntro;
     }
 
@@ -317,7 +312,7 @@ module.exports = {
     } catch (e) {
       try {
         logger.error('Help V2 payload failed, using plain text fallback', { error: e && (e.stack || e), message: e && e.message });
-      } catch (_) {}
+      } catch (_) { /* ignore */ void 0; }
       await safeReply(interaction, {
         content: 'Help UI failed to render with components. Please try again.',
         ephemeral: isEphemeral
@@ -326,9 +321,9 @@ module.exports = {
     }
 
     let msg = null;
-    try { msg = await interaction.fetchReply(); } catch (_) {}
+    try { msg = await interaction.fetchReply(); } catch (_) { /* ignore */ }
     if (!msg || typeof msg.createMessageComponentCollector !== 'function') {
-      try { logger.warn('Failed to attach help collector (no message)'); } catch (le) { try { fallbackLogger.warn('Failed to attach help collector', le && (le.stack || le)); } catch (ignored) {} }
+      try { logger.warn('Failed to attach help collector (no message)'); } catch (le) { try { fallbackLogger.warn('Failed to attach help collector', le && (le.stack || le)); } catch (ignored) { /* ignore */ } }
       return;
     }
 
@@ -337,7 +332,7 @@ module.exports = {
     collector.on('collect', async i => {
       try {
         if (i.user.id !== interaction.user.id) {
-          try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:help' }); } catch (e) {}
+          try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:help' }); } catch (e) { /* ignore */ }
           return;
         }
 
@@ -366,7 +361,7 @@ module.exports = {
         if (msg) {
           await msg.edit({ components: buildHelpComponents(currentCategory, pages, page, true, interaction.client) });
         }
-      } catch (e) { try { logger && logger.warn && logger.warn('Failed finalizing help view after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging help finalization failure', le && (le.stack || le)); } catch (ignored) {} } }
+      } catch (e) { try { logger && logger.warn && logger.warn('Failed finalizing help view after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging help finalization failure', le && (le.stack || le)); } catch (ignored) { /* ignore */ } } }
     });
   },
   // text-mode handler removed; use slash command

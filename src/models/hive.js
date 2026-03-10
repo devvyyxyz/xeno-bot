@@ -99,11 +99,11 @@ async function getHiveByOwner(ownerDiscordId, guildId = null) {
     }
     if (!row && !_hiveHasUserIdColumn && !_hiveHasOwnerColumn) {
       whereClause.user_id = String(ownerDiscordId);
-      try { row = await db.knex('hives').where(whereClause).first(); } catch (_) {}
+      try { row = await db.knex('hives').where(whereClause).first(); } catch (_) { /* ignore */ void 0; }
       if (!row) {
         delete whereClause.user_id;
         whereClause.owner_discord_id = String(ownerDiscordId);
-        try { row = await db.knex('hives').where(whereClause).first(); } catch (_) {}
+        try { row = await db.knex('hives').where(whereClause).first(); } catch (_) { /* ignore */ void 0; }
       }
     }
     if (!row) return null;

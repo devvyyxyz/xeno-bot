@@ -87,13 +87,13 @@ module.exports = {
     collector.on('collect', async i => {
       try {
         if (i.user.id !== interaction.user.id) {
-          try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }); } catch (_) {}
+          try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }); } catch (_) { /* ignore */ void 0; }
           return;
         }
         await i.update(buildPingPayload(i, customId));
       } catch (e) {
         logger.warn('Ping refresh update failed', { error: e && (e.stack || e) });
-        try { await i.reply({ content: 'Failed to refresh ping.', ephemeral: true }); } catch (__) {}
+        try { await i.reply({ content: 'Failed to refresh ping.', ephemeral: true }); } catch (__) { /* ignore */ void 0; }
       }
     });
 

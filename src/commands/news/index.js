@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../../utils/logger').get('command:news');
 const links = require('../../../config/links.json');
-const { ContainerBuilder, TextDisplayBuilder, MessageFlags, SeparatorBuilder, SeparatorSpacingSize, ActionRowBuilder, PrimaryButtonBuilder, SecondaryButtonBuilder, ButtonStyle, SectionBuilder } = require('discord.js');
+const { ContainerBuilder, TextDisplayBuilder, MessageFlags, SeparatorBuilder, SeparatorSpacingSize, ActionRowBuilder, PrimaryButtonBuilder, SecondaryButtonBuilder, SectionBuilder } = require('discord.js');
 const safeReply = require('../../utils/safeReply');
 const userModel = require('../../models/user');
 const articlesUtil = require('../../utils/articles');
@@ -193,7 +193,7 @@ function buildHomeV2(linksObj, latestArticle, categories, avatarUrl) {
               const label = String(key).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
               description += `• [${label}](${url})\n`;
             }
-          } catch (e) { /* ignore malformed */ }
+          } catch (e) { /* ignore malformed */ void 0; }
         }
         description += "\n";
       } else {
@@ -208,7 +208,7 @@ function buildHomeV2(linksObj, latestArticle, categories, avatarUrl) {
                 const label = String(key).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                 description += `• [${label}](${url})\n`;
               }
-            } catch (e) { /* ignore malformed */ }
+            } catch (e) { /* ignore malformed */ void 0; }
           }
         }
         description += "\n";
@@ -277,14 +277,14 @@ module.exports = {
             newsReminderCache.invalidate(interaction.user.id);
           }
         }
-      } catch (e) { try { logger.warn('Failed marking article as read for user', { error: e && (e.stack || e) }); } catch (_) {} }
+      } catch (e) { try { logger.warn('Failed marking article as read for user', { error: e && (e.stack || e) }); } catch (_) { /* ignore */ void 0; } }
 
       // Build home view
       const components = buildHomeV2(links.general || links, null, categoryKeys, botAvatar);
 
       await safeReply(interaction, { components, flags: MessageFlags.IsComponentsV2, ephemeral: false }, { loggerName: 'command:news' });
       
-      const { collector, message } = await createInteractionCollector(interaction, { components: [], time: 1000 * 60 * 10 });
+      const { collector } = await createInteractionCollector(interaction, { components: [], time: 1000 * 60 * 10 });
       if (!collector) return;
 
       collector.on('collect', async (btn) => {
@@ -308,12 +308,12 @@ module.exports = {
                 expired: false,
                 avatarUrl: botAvatar
               });
-              try { await btn.editReply({ components: emptyComponents, flags: MessageFlags.IsComponentsV2 }); } catch (_) {}
+              try { await btn.editReply({ components: emptyComponents, flags: MessageFlags.IsComponentsV2 }); } catch (_) { /* ignore */ void 0; }
               return;
             }
             articles = catArticles;
             const newComponents = buildArticleV2(articles[idx], idx, total, botAvatar);
-            try { await btn.editReply({ components: newComponents, flags: MessageFlags.IsComponentsV2 }); } catch (_) {}
+            try { await btn.editReply({ components: newComponents, flags: MessageFlags.IsComponentsV2 }); } catch (_) { /* ignore */ void 0; }
             return;
           }
 
@@ -329,7 +329,7 @@ module.exports = {
           } else {
             newComponents = buildArticleV2(articles[idx], idx, total, botAvatar);
           }
-          try { await btn.editReply({ components: newComponents, flags: MessageFlags.IsComponentsV2 }); } catch (e) { /* ignore */ }
+          try { await btn.editReply({ components: newComponents, flags: MessageFlags.IsComponentsV2 }); } catch (e) { /* ignore */ void 0; }
         } catch (e) {
           logger.warn('Error handling news button collect', { error: e && (e.stack || e) });
         }
@@ -339,9 +339,9 @@ module.exports = {
         // V2 components don't support traditional disable states via message.edit()
         // so we skip the end handler for now
       });
-    } catch (err) {
+      } catch (err) {
       logger.error('Error in news command', { error: err && (err.stack || err) });
-      try { await safeReply(interaction, { content: 'Failed showing news.' }, { loggerName: 'command:news' }); } catch (_) {}
+      try { await safeReply(interaction, { content: 'Failed showing news.' }, { loggerName: 'command:news' }); } catch (_) { /* ignore */ void 0; }
     }
   },
 };

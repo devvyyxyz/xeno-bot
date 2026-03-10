@@ -25,7 +25,7 @@ module.exports = {
       }
 
       if (!ownerId || message.author.id !== String(ownerId)) {
-        try { await message.reply('You are not authorized to run this preview command.'); } catch (_) {}
+        try { await message.reply('You are not authorized to run this preview command.'); } catch (_) { /* ignore */ void 0; }
         return;
       }
 
@@ -45,7 +45,7 @@ module.exports = {
           await message.reply(`Preview join embed sent to guild ${targetGuildId}.`);
         } catch (e) {
           logger.warn('Failed sending preview join to target guild', { targetGuildId, error: e && (e.stack || e) });
-          try { await message.reply(`Failed to send preview to guild ${targetGuildId}: ${e && e.message ? e.message : 'error'}`); } catch (_) {}
+          try { await message.reply(`Failed to send preview to guild ${targetGuildId}: ${e && e.message ? e.message : 'error'}`); } catch (_) { /* ignore */ void 0; }
         }
         return;
       }
@@ -62,13 +62,13 @@ module.exports = {
               const guildCmds = await clientRef.application.commands.fetch({ guildId });
               const found = guildCmds.find(c => c.name === 'help');
               if (found) return `</help:${found.id}>`;
-            } catch (_) {}
+            } catch (_) { /* ignore */ void 0; }
           }
           try {
             const globalCmds = await clientRef.application.commands.fetch();
             const found = globalCmds.find(c => c.name === 'help');
             if (found) return `</help:${found.id}>`;
-          } catch (_) {}
+          } catch (_) { /* ignore */ void 0; }
         } catch (e) {
           logger.warn('Failed resolving /help command id', { error: e && (e.stack || e) });
         }
@@ -133,7 +133,7 @@ module.exports = {
       logger.info('Preview join embed posted', { channelId: message.channel.id, author: message.author.id });
     } catch (err) {
       logger.error('Error in previewjoin command', { error: err && (err.stack || err) });
-      try { await message.reply('Failed to post preview embed.'); } catch (_) {}
+      try { await message.reply('Failed to post preview embed.'); } catch (_) { /* ignore */ void 0; }
     }
   }
 };

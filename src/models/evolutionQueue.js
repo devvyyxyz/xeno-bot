@@ -1,5 +1,6 @@
 const db = require('../db');
 const logger = require('../utils/logger').get('models:evolutionQueue');
+void logger;
 
 async function addToQueue({ xeno_id, user_id, hive_id = null, target_role, durationMs = 0, cost_jelly = 0, stabilizer_used = false }) {
   const now = Date.now();

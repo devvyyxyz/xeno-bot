@@ -1,6 +1,7 @@
 const db = require('../db');
 const { parseJSON } = require('../utils/jsonParse');
 const { insertWithReusedId } = require('../utils/idReuse');
+const logger = require('../utils/logger').get('models:xenomorph');
 
 async function getById(id) {
   const row = await db.knex('xenomorphs').where({ id: Number(id) }).first();
@@ -88,7 +89,7 @@ async function createXeno(ownerId, opts = {}) {
       const hiveModel = require('./hive');
       const hive = await hiveModel.getHiveByUser(String(ownerId), String(opts.guildId));
       if (hive && hive.id) payload.hive_id = hive.id;
-    } catch (_) {}
+    } catch (_) { /* ignore */ void 0; }
   }
 
   // Canonicalize legacy 'facehugger' values to pathway-specific names
@@ -114,19 +115,15 @@ async function getXenoById(id) {
 }
 
 async function updateXenoById(id, changes = {}) {
-  try {
-    const payload = {};
-    if ('role' in changes) payload.role = changes.role;
-    if ('stage' in changes) payload.stage = changes.stage;
-    if ('pathway' in changes) payload.pathway = changes.pathway;
-    if ('data' in changes) payload.data = JSON.stringify(changes.data);
-    if ('stats' in changes) payload.stats = JSON.stringify(changes.stats);
-    if (Object.keys(payload).length === 0) return getXenoById(id);
-    await db.knex('xenomorphs').where({ id: Number(id) }).update({ ...payload, updated_at: db.knex.fn.now() });
-    return getXenoById(id);
-  } catch (err) {
-    throw err;
-  }
+  const payload = {};
+  if ('role' in changes) payload.role = changes.role;
+  if ('stage' in changes) payload.stage = changes.stage;
+  if ('pathway' in changes) payload.pathway = changes.pathway;
+  if ('data' in changes) payload.data = JSON.stringify(changes.data);
+  if ('stats' in changes) payload.stats = JSON.stringify(changes.stats);
+  if (Object.keys(payload).length === 0) return getXenoById(id);
+  await db.knex('xenomorphs').where({ id: Number(id) }).update({ ...payload, updated_at: db.knex.fn.now() });
+  return getXenoById(id);
 }
 
 async function getXenosByOwner(ownerId, guildId = null, includeUnassigned = false) {

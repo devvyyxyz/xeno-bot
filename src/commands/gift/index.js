@@ -10,7 +10,7 @@ const xenoModel = require('../../models/xenomorph');
 const db = require('../../db');
 const safeReply = require('../../utils/safeReply');
 const fallbackLogger = require('../../utils/fallbackLogger');
-const { buildStatsV2Payload, buildNoticeV2Payload } = require('../../utils/componentsV2');
+const { buildStatsV2Payload } = require('../../utils/componentsV2');
 
 const cmd = getCommandConfig('gift') || {
   name: 'gift',

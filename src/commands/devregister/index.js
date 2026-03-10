@@ -14,7 +14,7 @@ module.exports = {
   name: 'devregister',
   description: 'Developer-only: re-register slash commands (owner only)',
   developerOnly: true,
-  async executeMessage(message, args) {
+  async executeMessage(message) {
     const ownerId = resolveOwnerId();
     if (!ownerId || String(message.author.id) !== String(ownerId)) {
       try { await message.reply({ content: 'This command is owner-only.', allowedMentions: { repliedUser: false } }); } catch (e) { /* ignore */ }

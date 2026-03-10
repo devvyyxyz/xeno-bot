@@ -25,16 +25,15 @@ function formatDurationShort(totalSeconds) {
 function resolveOwnerId() {
   try {
     if (process.env.BOT_CONFIG_PATH) {
-      try { const bc = require(process.env.BOT_CONFIG_PATH); if (bc && bc.owner) return String(bc.owner); } catch (e) {}
+      try { const bc = require(process.env.BOT_CONFIG_PATH); if (bc && bc.owner) return String(bc.owner); } catch (e) { /* ignore */ void 0; }
     }
-  } catch (e) {}
+  } catch (e) { /* ignore */ void 0; }
   return process.env.OWNER || process.env.BOT_OWNER || process.env.OWNER_ID || null;
 }
 
 module.exports = {
   name: cmd.name,
   description: cmd.description,
-  requiredPermissions: cmd.requiredPermissions,
   hidden: cmd.hidden === true,
   ephemeral: cmd.ephemeral === true,
   requiredPermissions: ['ManageGuild'],
@@ -154,7 +153,8 @@ module.exports = {
     try {
       await interaction.deferReply({ ephemeral: true });
     } catch (deferErr) {
-      const logger = require('../../utils/logger').get('command:setup');
+      const _logger = require('../../utils/logger').get('command:setup');
+      void _logger;
       const ageMs = Date.now() - (interaction.createdTimestamp || Date.now());
         try { require('../../utils/fallbackLogger').warn('Failed to defer reply for interaction', { error: deferErr && (deferErr.stack || deferErr), ageMs }); } catch (le) { fallbackLogger.warn('Failed logging defer reply failure in setup', le && (le.stack || le)); }
       // If the interaction is too old, bail quietly
@@ -217,20 +217,20 @@ module.exports = {
       }
       const baseLogger = require('../../utils/logger');
       if (baseLogger && baseLogger.sentry) {
-        try { baseLogger.sentry.addBreadcrumb({ message: 'db.upsertGuild.start', category: 'db', data: { guildId: interaction.guildId, channel: channel.id } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.upsertGuild.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging breadcrumb failure (db.upsertGuild.start)', le && (le.stack || le)); } catch (ignored) {} } }
+        try { baseLogger.sentry.addBreadcrumb({ message: 'db.upsertGuild.start', category: 'db', data: { guildId: interaction.guildId, channel: channel.id } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.upsertGuild.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging breadcrumb failure (db.upsertGuild.start)', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
       }
       await guildModel.upsertGuildConfig(interaction.guildId, { channel_id: channel.id });
       if (baseLogger && baseLogger.sentry) {
-        try { baseLogger.sentry.addBreadcrumb({ message: 'db.upsertGuild.finish', category: 'db', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.upsertGuild.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging breadcrumb failure (db.upsertGuild.finish)', le && (le.stack || le)); } catch (ignored) {} } }
+        try { baseLogger.sentry.addBreadcrumb({ message: 'db.upsertGuild.finish', category: 'db', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.upsertGuild.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging breadcrumb failure (db.upsertGuild.finish)', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
       }
       await sendSetupNotice(interaction, `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Egg spawn channel set to ${channel}.`, 'info');
         // Immediately spawn an egg in the new channel
         try {
           const spawnManager = require('../../spawnManager');
             if (spawnManager && typeof spawnManager.doSpawn === 'function') {
-            if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.start', category: 'spawn', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.start)', le && (le.stack || le)); } catch (ignored) {} } } }
+            if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.start', category: 'spawn', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.start)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.start)', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } } }
             await spawnManager.doSpawn(interaction.guildId);
-            if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.finish', category: 'spawn', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
+            if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'spawn.doSpawn.finish', category: 'spawn', data: { guildId: interaction.guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (spawn.doSpawn.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (spawn.doSpawn.finish)', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } } }
           }
         } catch (err) {
           // Log but don't fail the command
@@ -263,7 +263,7 @@ module.exports = {
       try {
         const spawnManager = require('../../spawnManager');
         if (spawnManager && typeof spawnManager.requestReschedule === 'function') spawnManager.requestReschedule(interaction.guildId);
-      } catch (e) { try { require('../../utils/logger').get('command:setup').warn('Failed to request spawn reschedule', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging requestReschedule error in setup', le && (le.stack || le)); } catch (ignored) {} } }
+      } catch (e) { try { require('../../utils/logger').get('command:setup').warn('Failed to request spawn reschedule', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging requestReschedule error in setup', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
       await sendSetupNotice(interaction, `${emojis.pressurised_with_artificial_grav || emojis.egg || ''} Spawn rate set: min ${min}s, max ${max}s. (interpreted as ${units})`, 'info');
     } else if (sub === 'hunt-cooldown') {
       const seconds = interaction.options.getInteger('seconds');
@@ -314,7 +314,7 @@ module.exports = {
             ? Math.max(0, configuredHuntCooldown)
             : Math.max(0, defaultHuntCooldown);
           let nextSpawn = null;
-          try { const row = await require('../../db').knex('guild_settings').where({ guild_id: guildId }).first('next_spawn_at'); nextSpawn = row && row.next_spawn_at ? Number(row.next_spawn_at) : null; } catch (e) {}
+          try { const row = await require('../../db').knex('guild_settings').where({ guild_id: guildId }).first('next_spawn_at'); nextSpawn = row && row.next_spawn_at ? Number(row.next_spawn_at) : null; } catch (e) { /* ignore */ void 0; }
 
           const rows = [
             { label: 'Spawn Channel', value: cfg.channel_id ? `<#${cfg.channel_id}>` : 'Not set' },

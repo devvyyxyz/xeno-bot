@@ -108,7 +108,7 @@ module.exports = {
       await safeReply(interaction, buildNextSpawnPayload(info, customId, true, false), { loggerName: 'command:nextspawn' });
 
       let msg = null;
-      try { msg = await interaction.fetchReply(); } catch (_) {}
+      try { msg = await interaction.fetchReply(); } catch (_) { /* ignore */ void 0; }
       if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
 
       const collector = msg.createMessageComponentCollector({
@@ -133,7 +133,7 @@ module.exports = {
               ...buildNoticeV2Payload({ message: `Failed to refresh spawn info: ${err && (err.message || err)}`, tone: 'error' }),
               ephemeral: true
             }, { loggerName: 'command:nextspawn' });
-          } catch (_) {}
+          } catch (_) { /* ignore */ void 0; }
         }
       });
 
@@ -141,9 +141,7 @@ module.exports = {
         try {
           const fresh = spawnManager.getNextSpawnForGuild(interaction.guildId);
           await safeReply(interaction, buildNextSpawnPayload(fresh, customId, false, true), { loggerName: 'command:nextspawn' });
-        } catch (e) {
-          logger.warn('Failed finalizing nextspawn refresh view', { error: e && (e.stack || e) });
-        }
+        } catch (e) { logger && logger.warn && logger.warn('Failed finalizing nextspawn refresh view', { error: e && (e.stack || e) }); }
       });
     } catch (err) {
       try {

@@ -44,7 +44,7 @@ async function processDueJobs(client) {
         try {
           const xenoModel = require('./models/xenomorph');
           targetRole = xenoModel.canonicalizeFacehugger(currentXeno?.pathway || 'standard', job.target_role);
-        } catch (e) {}
+        } catch (e) { /* ignore */ void 0; }
         // update xenomorph role
         await db.knex('xenomorphs').where({ id: job.xeno_id }).update({ role: targetRole, updated_at: db.knex.fn.now() });
         await db.knex('evolution_queue').where({ id: job.id }).update({ status: 'completed', result: 'success', updated_at: db.knex.fn.now() });
@@ -66,7 +66,7 @@ async function processDueJobs(client) {
         try {
           const user = await client.users.fetch(String(job.user_id));
           if (user) await user.send(`Your evolution job #${job.id} failed.`);
-        } catch (dmErr) {}
+        } catch (dmErr) { /* ignore */ void 0; }
       }
     } catch (e) {
       logger.error('Failed processing evolution job', { job, error: e && (e.stack || e) });

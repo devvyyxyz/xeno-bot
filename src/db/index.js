@@ -116,7 +116,7 @@ async function migrate() {
         logger.warn('DB connection refused for DATABASE_URL; falling back to local SQLite', { error: str });
         try {
           await knex.destroy();
-        } catch (_) {}
+        } catch (_) { /* ignore */ void 0; }
         knex = await createSqliteKnex();
       } else {
         // non-connection error - rethrow so migrate() fails loudly
@@ -348,7 +348,7 @@ async function migrate() {
         table.timestamps(true, true);
       });
       // Ensure composite uniqueness per (user_id, guild_id)
-      try { await knex.schema.alterTable('hives', (t) => t.unique(['user_id', 'guild_id'])); } catch (_) { /* ignore */ }
+      try { await knex.schema.alterTable('hives', (t) => t.unique(['user_id', 'guild_id'])); } catch (_) { /* ignore */ void 0; }
       logger.info('Created `hives` table');
     } else {
       logger.info('`hives` table already exists');
@@ -363,10 +363,10 @@ async function migrate() {
       // Ensure unique constraint is composite (user_id, guild_id). Older schema may have had a unique on user_id alone.
       try {
         await knex.schema.alterTable('hives', (t) => {
-          try { t.dropUnique(['user_id']); } catch (_) { /* ignore */ }
+          try { t.dropUnique(['user_id']); } catch (_) { /* ignore */ void 0; }
         });
-      } catch (_) { /* ignore */ }
-      try { await knex.schema.alterTable('hives', (t) => t.unique(['user_id', 'guild_id'])); } catch (_) {}
+      } catch (_) { /* ignore */ void 0; }
+      try { await knex.schema.alterTable('hives', (t) => t.unique(['user_id', 'guild_id'])); } catch (_) { /* ignore */ void 0; }
     }
   } catch (err) {
     logger.error('Failed ensuring hives table', { error: err.stack || err });

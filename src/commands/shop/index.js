@@ -47,6 +47,7 @@ function makeShopComponents({
   expired = false,
   client = null
 }) {
+  void categoryName;
   const page = pages[pageIdx] || [];
   const container = new ContainerBuilder();
 
@@ -176,7 +177,7 @@ module.exports = {
     }
 
     let msg = null;
-    try { msg = await interaction.fetchReply(); } catch (_) {}
+    try { msg = await interaction.fetchReply(); } catch (_) { /* ignore */ void 0; }
     if (!msg || typeof msg.createMessageComponentCollector !== 'function') {
       logger.warn('Failed to attach main shop collector');
       return;
@@ -267,7 +268,7 @@ module.exports = {
                 await userModel.addItemForGuild(String(i.user.id), interaction.guildId, itemId, 1);
               }
             } catch (addErr) {
-              try { await userModel.modifyCurrencyForGuild(String(i.user.id), interaction.guildId, 'royal_jelly', +price); } catch (_) {}
+                try { await userModel.modifyCurrencyForGuild(String(i.user.id), interaction.guildId, 'royal_jelly', +price); } catch (_) { /* ignore */ void 0; }
               await safeReply(i, { content: `Failed to add item after purchase: ${addErr && (addErr.message || addErr)}`, ephemeral: true }, { loggerName: 'command:shop' });
               return;
             }
@@ -289,14 +290,14 @@ module.exports = {
 
             try {
               await i.followUp({ content: `Purchased ${item.name} for ${price} royal_jelly. New balance: ${newBal}.`, ephemeral: true });
-            } catch (_) {}
+            } catch (_) { /* ignore */ void 0; }
           } catch (err) {
             await safeReply(i, { content: `Failed to process purchase: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:shop' });
           }
           return;
         }
       } catch (err) {
-        try { await safeReply(i, { content: 'Error handling shop interaction.', ephemeral: true }, { loggerName: 'command:shop' }); } catch (e) { try { logger.warn('Failed sending error reply in shop interaction handler', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging shop interaction error reply failure', le && (le.stack || le)); } catch (ignored) {} } }
+        try { await safeReply(i, { content: 'Error handling shop interaction.', ephemeral: true }, { loggerName: 'command:shop' }); } catch (e) { try { logger.warn('Failed sending error reply in shop interaction handler', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging shop interaction error reply failure', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
       }
     });
 
@@ -318,7 +319,7 @@ module.exports = {
           });
         }
       } catch (e) {
-        try { logger.warn('Failed finalizing shop components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging finalizing shop components error', le && (le.stack || le)); } catch (ignored) {} }
+        try { logger.warn('Failed finalizing shop components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging finalizing shop components error', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
       }
     });
   }

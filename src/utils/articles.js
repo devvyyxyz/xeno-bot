@@ -11,14 +11,14 @@ function scanLatest() {
     const files = fs.readdirSync(ARTICLES_DIR).filter(f => f.endsWith('.md'));
     let latest = 0;
     let latestFile = null;
-    for (const f of files) {
+      for (const f of files) {
       try {
         const st = fs.statSync(path.join(ARTICLES_DIR, f));
         if (st.mtimeMs > latest) { latest = st.mtimeMs; latestFile = f; }
-      } catch (e) { /* ignore */ }
+      } catch (e) { /* ignore */ void 0; }
     }
     let title = null;
-    if (latestFile) {
+      if (latestFile) {
       try {
         const raw = fs.readFileSync(path.join(ARTICLES_DIR, latestFile), 'utf8');
         // split into parts similar to news loader
@@ -38,7 +38,7 @@ function scanLatest() {
             title = mm ? mm[1] : m;
           }
         }
-      } catch (e) { /* ignore */ }
+      } catch (e) { /* ignore */ void 0; }
     }
     return { latest, title, latestFile };
   } catch (e) {
@@ -56,7 +56,7 @@ function scanLatest() {
         try {
           const st = fs.statSync(path.join(ARTICLES_DIR, f));
           if (st.mtimeMs > latest) { latest = st.mtimeMs; latestFile = f; }
-        } catch (e) { }
+        } catch (e) { /* ignore */ void 0; }
       }
       if (!latestFile) return null;
       const raw = fs.readFileSync(path.join(ARTICLES_DIR, latestFile), 'utf8');

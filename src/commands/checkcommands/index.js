@@ -37,7 +37,7 @@ module.exports = {
       await message.reply(out);
     } catch (err) {
       logger.error('Error in checkcommands', { error: err && (err.stack || err) });
-      try { await message.reply('Failed checking commands.'); } catch (_) {}
+      try { await message.reply('Failed checking commands.'); } catch (_) { /* ignore */ }
     }
   }
 };

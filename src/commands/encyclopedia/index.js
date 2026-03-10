@@ -43,7 +43,7 @@ module.exports = {
       try { baseLogger.sentry.addBreadcrumb({ message: 'db.getEggStats.start', category: 'db', data: { guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (getEggStats.start)', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging breadcrumb failure (getEggStats.start)', le && (le.stack || le)); } }
     }
     const stats = await eggModel.getEggStatsForGuild(guildId);
-    if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.getEggStats.finish', category: 'db', data: { guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.getEggStats.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (db.getEggStats.finish)', le && (le.stack || le)); } catch (ignored) {} } } }
+    if (baseLogger && baseLogger.sentry) { try { baseLogger.sentry.addBreadcrumb({ message: 'db.getEggStats.finish', category: 'db', data: { guildId } }); } catch (e) { try { logger.warn('Failed to add sentry breadcrumb (db.getEggStats.finish)', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging sentry breadcrumb failure (db.getEggStats.finish)', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } } }
     const totalWeight = eggTypes.reduce((a, b) => a + b.weight, 0);
     const hiddenEmoji = emojis.get('egg_hidden');
     const eggsPerPage = 9;
@@ -89,8 +89,8 @@ module.exports = {
       for (let i = 0; i < hostKeys.length; i += eggsPerPage) {
         const fields = hostKeys.slice(i, i + eggsPerPage).map(k => {
           const h = hostsCfg.hosts[k] || {};
-          const hostEmoji = h.emoji ? emojis.get(h.emoji) : '';
-          const name = `${hostEmoji} **${h.display || k}**`;
+            const hostEmoji = h.emoji ? emojis.get(h.emoji) : '';
+            let name = `${hostEmoji} **${h.display || k}**`;
           const valParts = [];
           if (h.rarity) valParts.push(`Rarity: ${h.rarity}`);
           if (counts[k] !== undefined) valParts.push(`Found: ${counts[k]}`);
@@ -104,7 +104,7 @@ module.exports = {
         hostPages.push(fields);
       }
     } catch (e) {
-      // ignore host page building errors
+      /* ignore host page building errors */ void 0;
     }
 
     // Build xeno pages from evolutions config + DB counts
@@ -136,7 +136,7 @@ module.exports = {
           const xeno = evolutions.roles[k] || {};
           const xenoEmoji = xeno.emoji ? emojis.get(xeno.emoji) : '';
           const rarityEmoji = getRarityEmoji(xeno.rarity);
-          const name = `${xenoEmoji} **${xeno.display || k}**`;
+            let name = `${xenoEmoji} **${xeno.display || k}**`;
           const valParts = [];
           if (xeno.rarity && rarityEmoji) valParts.push(`${rarityEmoji} Rarity: ${xeno.rarity}`);
           if (xenoCounts[k] !== undefined) valParts.push(`Found: ${xenoCounts[k]}`);
@@ -149,7 +149,7 @@ module.exports = {
         xenoPages.push(fields);
       }
     } catch (e) {
-      // ignore xeno page building errors
+      /* ignore xeno page building errors */ void 0;
     }
 
     const getEmbed = (pageIdx) => new EmbedBuilder()
@@ -166,9 +166,9 @@ module.exports = {
     );
     await safeReply(interaction, { embeds: [getEmbed(page)], components: [row] }, { loggerName: 'command:encyclopedia' });
     if (pages.length === 1) return;
-    const { collector, message: msg } = await createInteractionCollector(interaction, { embeds: [getEmbed(page)], components: [row], time: 120_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 2 } });
+    const { collector } = await createInteractionCollector(interaction, { embeds: [getEmbed(page)], components: [row], time: 120_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 2 } });
     if (!collector) {
-      try { const l = require('../../utils/logger').get('command:encyclopedia'); l && l.warn && l.warn('Failed to attach encyclopedia collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach encyclopedia collector', le && (le.stack || le)); } catch (ignored) {} }
+      try { const l = require('../../utils/logger').get('command:encyclopedia'); l && l.warn && l.warn('Failed to attach encyclopedia collector'); } catch (le) { try { fallbackLogger.warn('Failed to attach encyclopedia collector', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
       return;
     }
     collector.on('collect', async i => {
@@ -227,11 +227,11 @@ module.exports = {
 
         await i.update({ embeds: [embedToSend], components: [newRow] });
       } catch (err) {
-        try { await safeReply(i, { content: 'Error changing view.', ephemeral: true }, { loggerName: 'command:encyclopedia' }); } catch (_) {}
+        try { await safeReply(i, { content: 'Error changing view.', ephemeral: true }, { loggerName: 'command:encyclopedia' }); } catch (_) { /* ignore */ }
       }
     });
     collector.on('end', async () => {
-      try { await safeReply(interaction, { components: [] }, { loggerName: 'command:encyclopedia' }); } catch (e) { try { const l = require('../../utils/logger').get('command:encyclopedia'); l && l.warn && l.warn('Failed clearing components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging encyclopedia component clear failure', le && (le.stack || le)); } catch (ignored) {} } }
+      try { await safeReply(interaction, { components: [] }, { loggerName: 'command:encyclopedia' }); } catch (e) { try { const l = require('../../utils/logger').get('command:encyclopedia'); l && l.warn && l.warn('Failed clearing components after collector end', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging encyclopedia component clear failure', le && (le.stack || le)); } catch (ignored) { /* ignore */ } } }
     });
   }
 };

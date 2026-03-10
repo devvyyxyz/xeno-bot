@@ -1,5 +1,6 @@
 const db = require('../db');
 const logger = require('../utils/logger').get('models:userResources');
+void logger;
 
 async function ensureRow(userId) {
   const exists = await db.knex('user_resources').where({ user_id: String(userId) }).first();

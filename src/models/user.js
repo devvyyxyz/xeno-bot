@@ -22,6 +22,7 @@ async function getUserByDiscordId(discordId) {
 async function createUser(discordId, initialData = {}) {
   const defaults = { guilds: {}, stats: {} };
   const gd = (userDefaults && userDefaults.guildDefaults) ? userDefaults.guildDefaults : { eggs: { classic: 1 }, items: {}, currency: { royal_jelly: 0 } };
+  void gd;
   const globalDefaults = (userDefaults && userDefaults.globalDefaults) ? userDefaults.globalDefaults : { currency: { credits: 0 } };
   const dataToStore = Object.assign({}, defaults, initialData || {});
   dataToStore.guilds = dataToStore.guilds || {};

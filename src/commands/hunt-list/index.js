@@ -22,7 +22,7 @@ const emojisCfg = require('../../../config/emojis.json');
 const rarities = require('../../../config/rarities.json');
 const { addV2TitleWithBotThumbnail, addV2TitleWithImageThumbnail } = require('../../utils/componentsV2');
 const safeReply = require('../../utils/safeReply');
-const logger = require('../../utils/logger').get('command:hunt-list');
+// logger intentionally omitted to avoid unused variable warnings
 
 const HOSTS_PER_PAGE = 4;
 
@@ -155,7 +155,7 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
   const navRow = new ActionRowBuilder();
   if (safePageIdx > 0) {
     navRow.addComponents(
-      new SecondaryButtonBuilder().setCustomId('hunt-prev-page').setLabel('Prev')
+      new SecondaryButtonBuilder().setCustomId('hunt-prev-page').setLabel('Prev').setDisabled(expired || safePageIdx === 0)
     );
   }
   const pageInfo = totalPages > 1 ? ` (${safePageIdx + 1}/${totalPages})` : '';
@@ -167,7 +167,7 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
 
   if (safePageIdx < totalPages - 1) {
     navRow.addComponents(
-      new SecondaryButtonBuilder().setCustomId('hunt-next-page').setLabel('Next')
+      new SecondaryButtonBuilder().setCustomId('hunt-next-page').setLabel('Next').setDisabled(expired || safePageIdx >= totalPages - 1)
     );
   }
 
@@ -176,16 +176,16 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
   // Stats + Hunt Row
   const anyOnPage = Array.isArray(page) && page.length > 0;
   const actionRow = new ActionRowBuilder().addComponents(
-    new PrimaryButtonBuilder().setCustomId('hunt-view-stats').setLabel('Stats'),
-    new PrimaryButtonBuilder().setCustomId('hunt-go-now').setLabel('Hunt'),
-    new DangerButtonBuilder().setCustomId('hunt-release-all').setLabel('Release All').setDisabled(!anyOnPage)
+    new PrimaryButtonBuilder().setCustomId('hunt-view-stats').setLabel('Stats').setDisabled(expired),
+    new PrimaryButtonBuilder().setCustomId('hunt-go-now').setLabel('Hunt').setDisabled(expired),
+    new DangerButtonBuilder().setCustomId('hunt-release-all').setLabel('Release All').setDisabled(!anyOnPage || expired)
   );
   container.addActionRowComponents(actionRow);
 
   return [container];
 }
 
-function buildStatsPage({ userId, allHosts = [], cfgHosts = {}, emojis = {}, client = null }) {
+function buildStatsPage({ allHosts = [], cfgHosts = {}, emojis = {}, client = null }) {
   const rarityOrder = { 'very_rare': 3, 'rare': 2, 'common': 1 };
   const hostTypeCounts = {};
   let rarest = null;
@@ -260,9 +260,9 @@ module.exports = {
       const guildId = interaction.guildId;
       const allRows = await hostModel.listHostsByOwner(userId, guildId) || [];
       let rows = allRows.slice();
-      let currentSort = null;
-      let currentFilter = null;
-      const availableFilters = Array.from(new Set((allRows || []).map(r => r.host_type))).map(t => ({ label: getHostDisplay(t, cfgHosts, emojisCfg), value: t }));
+          let currentSort = null;
+          let currentFilter = null;
+          const availableFilters = Array.from(new Set((allRows || []).map(r => r.host_type))).map(t => ({ label: getHostDisplay(t, cfgHosts, emojisCfg), value: t }));
 
       await safeReply(
         interaction,
@@ -271,11 +271,10 @@ module.exports = {
       );
 
       let msg = null;
-      try { msg = await interaction.fetchReply(); } catch (_) {}
+      try { msg = await interaction.fetchReply(); } catch (_) { /* ignore */ void 0; }
       if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
 
       let currentPage = 0;
-      let currentViewMode = 'list'; // 'list', 'stats'
 
       const collector = msg.createMessageComponentCollector({
         filter: i => i.user.id === userId,
@@ -314,7 +313,6 @@ module.exports = {
               if (idx !== -1) allRows.splice(idx, 1);
             
               await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client, currentSort, currentFilter, availableFilters }) });
-            currentViewMode = 'list';
             return;
           }
 
@@ -336,7 +334,7 @@ module.exports = {
                 });
               }
             } catch (err) {
-              try { await safeReply(i, { content: `Failed to sort hosts: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt-list' }); } catch (_) {}
+              try { await safeReply(i, { content: `Failed to sort hosts: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt-list' }); } catch (_) { /* ignore */ void 0; }
             }
             await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client, currentSort, currentFilter, availableFilters }) });
             return;
@@ -360,7 +358,7 @@ module.exports = {
                 });
               }
             } catch (err) {
-              try { await safeReply(i, { content: `Failed to filter hosts: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt-list' }); } catch (_) {}
+              try { await safeReply(i, { content: `Failed to filter hosts: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt-list' }); } catch (_) { /* ignore */ void 0; }
             }
             await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client, currentSort, currentFilter, availableFilters }) });
             return;
@@ -385,17 +383,15 @@ module.exports = {
                 if (currentPage >= totalPages && currentPage > 0) currentPage = totalPages - 1;
               }
             } catch (err) {
-              try { await safeReply(i, { content: `Failed releasing hosts: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt-list' }); } catch (_) {}
+              try { await safeReply(i, { content: `Failed releasing hosts: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt-list' }); } catch (_) { /* ignore */ void 0; }
             }
             await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client, currentSort, currentFilter, availableFilters }) });
-            currentViewMode = 'list';
             return;
           }
 
           // View stats
           if (i.customId === 'hunt-view-stats') {
-            await i.update({ components: buildStatsPage({ userId, allHosts: rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
-            currentViewMode = 'stats';
+            await i.update({ components: buildStatsPage({ allHosts: rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
             return;
           }
 
@@ -414,11 +410,10 @@ module.exports = {
           if (i.customId === 'hunt-back-to-list') {
             currentPage = 0;
             await i.update({ components: buildHostListPage({ pageIdx: 0, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
-            currentViewMode = 'list';
             return;
           }
         } catch (err) {
-          try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt-list' }); } catch (_) {}
+          try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt-list' }); } catch (_) { /* ignore */ void 0; }
         }
       });
 
@@ -427,7 +422,7 @@ module.exports = {
           if (msg) {
             await msg.edit({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, expired: true, client: interaction.client }) });
           }
-        } catch (_) {}
+        } catch (_) { /* ignore */ void 0; }
       });
 
       return;
@@ -436,7 +431,7 @@ module.exports = {
     }
   },
 
-  async autocomplete(interaction) {
+  async autocomplete(/* interaction */) {
     return;
   }
 };

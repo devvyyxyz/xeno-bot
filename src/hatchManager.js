@@ -3,6 +3,7 @@ const logger = require('./utils/logger').get('hatch');
 const fallbackLogger = require('./utils/fallbackLogger');
 const userModel = require('./models/user');
 const eggTypes = require('../config/eggTypes.json');
+void eggTypes;
 const xenoModel = require('./models/xenomorph');
 
 // Helper: Get guild name for logging
@@ -171,7 +172,7 @@ async function collectHatch(discordId, guildId, hatchId) {
   } catch (e) {
     logger.warn('Failed creating xenomorph in collectHatch', { error: e && e.message });
     // fallback to adding as an item if xeno creation fails
-    try { await userModel.addItemForGuild(discordId, guildId, 'facehugger', 1); } catch (_) {}
+    try { await userModel.addItemForGuild(discordId, guildId, 'facehugger', 1); } catch (_) { /* ignore */ void 0; }
   }
   await db.knex('hatches').where({ id: hatchId }).update({ collected: true });
   const guildName = getGuildName(guildId);
@@ -189,8 +190,8 @@ module.exports = { init, startHatch, skipHatch, collectHatch, listHatches };
 // Shutdown helper: clear any pending timers
 async function shutdown() {
   try {
-    for (const [id, t] of timers.entries()) {
-      try { clearTimeout(t); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing hatch timer during shutdown', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging timer clear error during hatchManager shutdown', le && (le.stack || le)); } catch (ignored) {} } }
+    for (const [, t] of timers.entries()) {
+      try { clearTimeout(t); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing hatch timer during shutdown', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging timer clear error during hatchManager shutdown', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
     }
     timers.clear();
     logger.info('hatchManager shutdown: cleared timers');

@@ -34,7 +34,7 @@ class TTLCache {
   }
 
   clear() {
-    for (const [k, v] of this.map.entries()) {
+    for (const [, v] of this.map.entries()) {
       clearTimeout(v.timeout);
     }
     this.map.clear();
@@ -60,7 +60,7 @@ class TTLCache {
     this._sweeper = setInterval(() => {
       try {
         this.sweep();
-      } catch (_) {}
+      } catch (_) { /* ignore */ void 0; }
     }, intervalMs);
     if (this._sweeper && typeof this._sweeper.unref === 'function') this._sweeper.unref();
   }

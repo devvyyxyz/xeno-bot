@@ -118,7 +118,7 @@ class EnhancedCache {
   }
 
   clear() {
-    for (const [k, v] of this.map.entries()) {
+    for (const [, v] of this.map.entries()) {
       clearTimeout(v.timeout);
     }
     this.map.clear();

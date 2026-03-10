@@ -66,7 +66,7 @@ module.exports = {
           const { URL } = require('url');
           const parsed = new URL(process.env.DATABASE_URL);
           dbInfo += ` | Host: ${parsed.hostname}` + (parsed.pathname ? ` | DB: ${parsed.pathname.replace('/', '')}` : '');
-        } catch (e) { try { logger && logger.warn && logger.warn('Failed parsing DATABASE_URL in health command', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed parsing DATABASE_URL in health command', le && (le.stack || le)); } catch (ignored) {} } }
+        } catch (e) { try { logger && logger.warn && logger.warn('Failed parsing DATABASE_URL in health command', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed parsing DATABASE_URL in health command', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
       }
       try { const u = await db.knex('users').count('* as c').first(); usersCount = u && (u.c ?? u['count(*)']) ? String(u.c || u['count(*)']) : '0'; } catch (e) { usersCount = 'err'; }
       try { const g = await db.knex('guild_settings').count('* as c').first(); guildsCount = g && (g.c ?? g['count(*)']) ? String(g.c || g['count(*)']) : '0'; } catch (e) { guildsCount = 'err'; }
@@ -99,7 +99,7 @@ module.exports = {
           return;
         }
         lastHealthRun.set(uid, nowTs);
-        try { fs.appendFileSync(AUDIT_LOG, `${new Date().toISOString()} health:lastlogs by ${uid}\n`); } catch (e) { }
+        try { fs.appendFileSync(AUDIT_LOG, `${new Date().toISOString()} health:lastlogs by ${uid}\n`); } catch (e) { /* ignore */ }
 
         const lines = (interaction.options && interaction.options.getInteger && interaction.options.getInteger('lines')) || 50;
         const logsDir = path.join(__dirname, '..', '..', 'logs');
@@ -114,7 +114,7 @@ module.exports = {
         const allLines = content.split(/\r?\n/).filter(Boolean);
         const tail = allLines.slice(-Math.min(lines, 1000));
         const redact = (s) => {
-          if (!s) return s; let out = String(s); const secrets = [process.env.TOKEN, process.env.TOKEN_DEV, process.env.DATABASE_URL, process.env.PG_PASSWORD, process.env.PGPASSWORD]; for (const sec of secrets) if (sec) out = out.split(sec).join('*****'); out = out.replace(/([A-Za-z0-9_\-]{30,})/g, '*****'); return out;
+          if (!s) return s; let out = String(s); const secrets = [process.env.TOKEN, process.env.TOKEN_DEV, process.env.DATABASE_URL, process.env.PG_PASSWORD, process.env.PGPASSWORD]; for (const sec of secrets) if (sec) out = out.split(sec).join('*****'); out = out.replace(/([A-Za-z0-9_-]{30,})/g, '*****'); return out;
         };
         const redacted = tail.map(redact).join('\n');
         const chunks = [];
@@ -145,7 +145,7 @@ module.exports = {
             { name: 'Memory (RSS)', value: formatBytes(mem.rss), inline: true },
             { name: 'Heap Used', value: formatBytes(mem.heapUsed), inline: true }
           );
-          try { const cpu = process.cpuUsage(); embed.addFields({ name: 'CPU (user)', value: `${cpu.user} μs`, inline: true }); embed.addFields({ name: 'CPU (system)', value: `${cpu.system} μs`, inline: true }); } catch (e) { }
+          try { const cpu = process.cpuUsage(); embed.addFields({ name: 'CPU (user)', value: `${cpu.user} μs`, inline: true }); embed.addFields({ name: 'CPU (system)', value: `${cpu.system} μs`, inline: true }); } catch (e) { /* ignore */ }
         }
 
         if (detail === 'full' || detail === 'env') {
@@ -163,10 +163,10 @@ module.exports = {
 
         if (detail === 'full' || detail === 'db') {
           try { const start = Date.now(); await db.knex.raw('select 1 as result'); const latency = Date.now() - start; embed.addFields({ name: 'DB Ping', value: `${latency} ms`, inline: true }); } catch (e) { embed.addFields({ name: 'DB Ping', value: `failed: ${e && e.message ? e.message : String(e)}`, inline: true }); }
-          try { const migrationsExists = await db.knex.schema.hasTable('knex_migrations'); if (migrationsExists) { const m = await db.knex('knex_migrations').count('* as c').first(); embed.addFields({ name: 'Migrations', value: String(m && (m.c || m['count(*)']) || '0'), inline: true }); } } catch (e) { }
-          try { const fallbackPath = path.join(__dirname, '..', '..', 'logs', 'fallback.log'); if (fs.existsSync(fallbackPath)) { const st = fs.statSync(fallbackPath); embed.addFields({ name: 'Fallback log', value: `${st.size} bytes`, inline: true }); } } catch (e) { }
+          try { const migrationsExists = await db.knex.schema.hasTable('knex_migrations'); if (migrationsExists) { const m = await db.knex('knex_migrations').count('* as c').first(); embed.addFields({ name: 'Migrations', value: String(m && (m.c || m['count(*)']) || '0'), inline: true }); } } catch (e) { /* ignore */ }
+          try { const fallbackPath = path.join(__dirname, '..', '..', 'logs', 'fallback.log'); if (fs.existsSync(fallbackPath)) { const st = fs.statSync(fallbackPath); embed.addFields({ name: 'Fallback log', value: `${st.size} bytes`, inline: true }); } } catch (e) { /* ignore */ }
         }
-      } catch (e) { try { logger.warn('Failed building full health details', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('health full build failed', le && (le.stack || le)); } catch (ignored) {} } }
+      } catch (e) { try { logger.warn('Failed building full health details', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('health full build failed', le && (le.stack || le)); } catch (ignored) { /* ignore */ } } }
     }
     const safeReply = require('../../utils/safeReply');
     await safeReply(interaction, { embeds: [embed], ephemeral: true }, { loggerName: 'command:health' });

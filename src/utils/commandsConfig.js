@@ -168,7 +168,7 @@ function isCommandEphemeral(commandName) {
   if (cfg && typeof cfg.ephemeral !== 'undefined') return !!cfg.ephemeral;
 
   // Fallback: try top-level command name
-  const top = String(commandName).split(/[ ._\-]+/)[0];
+  const top = String(commandName).split(/[ ._-]+/)[0];
   const commands = loadCommands();
   for (const cat of Object.values(commands)) {
     if (cat && Object.prototype.hasOwnProperty.call(cat, top)) {
