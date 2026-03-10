@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+// Register optional path aliases when available (no-op if module not installed)
+try { require('../alias-register'); } catch (_) { /* ignore if module-alias not installed */ void 0; }
 require('dotenv').config();
 const baseLogger = require('./utils/logger');
 const logger = baseLogger.get('index');
