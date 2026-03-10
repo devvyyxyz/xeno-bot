@@ -1,8 +1,8 @@
 const { EmbedBuilder } = require('discord.js');
 const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
 const shopConfig = require('../../../config/shop.json');
-const userModel = require('../../models/user');
-const safeReply = require('../../utils/safeReply');
+let userModel = null;
+let safeReply = null;
 
 const cmdCfg = getCommandConfig('item') || { name: 'item', description: 'Manage and use items' };
 
@@ -27,6 +27,9 @@ module.exports = {
   },
 
   async executeInteraction(interaction) {
+    // lazy-require models/utilities so tests can mock requires before invoking
+    userModel = require('../../models/user');
+    safeReply = require('../../utils/safeReply');
     const respond = (payload) => safeReply(interaction, payload, { loggerName: 'command:item' });
     const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
     // Lazy-require models so tests can mock `require('../src/models/user')` after module load
@@ -187,6 +190,8 @@ module.exports = {
 
   async autocomplete(interaction) {
     try {
+      // lazy-require userModel for testability
+      userModel = require('../../models/user');
       const focused = interaction.options.getFocused ? interaction.options.getFocused(true) : null;
       if (!focused) return interaction.respond([]);
       const guildId = interaction.guildId;
