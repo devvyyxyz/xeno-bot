@@ -1,6 +1,7 @@
-const logger = require('../utils/logger').get('messageCreate');
+const utils = require('../utils');
+const logger = utils.logger.get('messageCreate');
 const spawnManager = require('../spawnManager');
-const fallbackLogger = require('../utils/fallbackLogger');
+const fallbackLogger = utils.fallbackLogger;
 
 module.exports = {
   name: 'messageCreate',
@@ -25,7 +26,7 @@ module.exports = {
     }
     try {
       logger.info('Executing message command', { command: commandName, user: message.author.id });
-      const baseLogger = require('../utils/logger');
+      const baseLogger = utils.logger;
       if (baseLogger && baseLogger.sentry) {
         try {
           baseLogger.sentry.addBreadcrumb({ message: 'command.execute.start', category: 'command', data: { command: commandName, user: message.author.id, channel: message.channel.id } });
@@ -39,7 +40,7 @@ module.exports = {
     } catch (err) {
       logger.error('Error executing message command', { error: err.stack || err, command: commandName, user: message.author.id });
       try {
-        const baseLogger = require('../utils/logger');
+        const baseLogger = utils.logger;
         if (baseLogger && baseLogger.sentry) baseLogger.sentry.captureException(err);
       } catch (captureErr) {
         logger.warn('Failed to capture exception to Sentry', { error: captureErr && (captureErr.stack || captureErr) });

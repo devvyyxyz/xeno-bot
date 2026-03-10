@@ -1,4 +1,5 @@
-const logger = require('../utils/logger').get('guildCreate');
+const utils = require('../utils');
+const logger = utils.logger.get('guildCreate');
 const {
   PermissionFlagsBits,
   EmbedBuilder,
@@ -9,7 +10,7 @@ const {
 const https = require('https');
 const links = require('../../config/links.json');
 const webhooks = require('../../config/webhooks.json');
-const { buildLinkButtons } = require('../utils/buttonBuilder');
+const { buildLinkButtons } = utils.buttonBuilder;
 
 function postWebhookJson(webhookUrl, payload) {
   return new Promise((resolve, reject) => {

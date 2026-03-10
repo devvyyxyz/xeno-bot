@@ -1,6 +1,7 @@
-const logger = require('../utils/logger').get('ready');
+const utils = require('../utils');
+const logger = utils.logger.get('ready');
 const db = require('../db');
-const cache = require('../utils/cache');
+const cache = utils.cache;
 
 // Store interval reference to clean up on reconnect
 let statusCyclingInterval = null;

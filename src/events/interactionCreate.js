@@ -1,6 +1,7 @@
-const logger = require('../utils/logger').get('interactionCreate');
-const safeReply = require('../utils/safeReply');
-const fallbackLogger = require('../utils/fallbackLogger');
+const utils = require('../utils');
+const logger = utils.logger.get('interactionCreate');
+const safeReply = utils.safeReply;
+const fallbackLogger = utils.fallbackLogger;
 const { PermissionsBitField } = require('discord.js');
 const config = require('../../config/config.json');
 
@@ -175,7 +176,7 @@ module.exports = {
           logger.warn('Permission check failed', { error: permErr && (permErr.stack || permErr) });
         }
 
-        const baseLogger = require('../utils/logger');
+        const baseLogger = utils.logger;
         try {
           if (baseLogger && baseLogger.sentry) {
             try {
@@ -213,7 +214,7 @@ module.exports = {
       };
       logger.error('Error handling interaction', { error: err && (err.stack || err), ...meta });
       try {
-        const baseLogger = require('../utils/logger');
+          const baseLogger = utils.logger;
         if (baseLogger && baseLogger.sentry) baseLogger.sentry.captureException(err);
       } catch (captureErr) {
         logger.warn('Failed to capture exception to Sentry', { error: captureErr && (captureErr.stack || captureErr) });
