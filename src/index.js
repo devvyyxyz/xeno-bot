@@ -1,7 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 // Register optional path aliases when available (no-op if module not installed)
-try { require('../alias-register'); } catch (_) { /* ignore if module-alias not installed */ void 0; }
+try {
+  require('../alias-register');
+} catch (_) {
+  /* ignore if module-alias not installed */ void 0;
+}
 require('dotenv').config();
 const utils = require('./utils');
 const baseLogger = utils.logger;
@@ -9,13 +13,15 @@ const logger = baseLogger.get('index');
 // Route any remaining `console.warn` / `console.error` fallbacks to a
 // file-backed fallback logger. This prevents raw stdout writes from
 // appearing in production logs if the main logger fails.
-  try {
-    const fallback = utils.fallbackLogger;
+try {
+  const fallback = utils.fallbackLogger;
   const origWarn = console.warn.bind(console);
   const origError = console.error.bind(console);
   console.warn = (...args) => {
     try {
-      const msg = args.map(a => (typeof a === 'string' ? a : (a && a.stack) || String(a))).join(' ');
+      const msg = args
+        .map((a) => (typeof a === 'string' ? a : (a && a.stack) || String(a)))
+        .join(' ');
       fallback.warn(msg);
     } catch (e) {
       origWarn(...args);
@@ -23,7 +29,9 @@ const logger = baseLogger.get('index');
   };
   console.error = (...args) => {
     try {
-      const msg = args.map(a => (typeof a === 'string' ? a : (a && a.stack) || String(a))).join(' ');
+      const msg = args
+        .map((a) => (typeof a === 'string' ? a : (a && a.stack) || String(a)))
+        .join(' ');
       fallback.error(msg);
     } catch (e) {
       origError(...args);
@@ -46,7 +54,9 @@ if (process.env.npm_lifecycle_event) {
 }
 // Also accept a plain 'dev' CLI arg (e.g. `npm start dev`) or `--dev` flag passed through npm
 if (!inferred && process.argv && process.argv.length > 2) {
-  const hasDevArg = process.argv.slice(2).some(a => /(^|\W)(dev|development)(\W|$)/i.test(String(a)));
+  const hasDevArg = process.argv
+    .slice(2)
+    .some((a) => /(^|\W)(dev|development)(\W|$)/i.test(String(a)));
   if (hasDevArg) inferred = 'dev';
 }
 const profile = explicit || inferred || (process.env.NODE_ENV === 'production' ? 'public' : 'dev');
@@ -70,7 +80,7 @@ try {
 
 // Basic env validation: ensure required secrets are present
 const requiredEnvs = ['TOKEN'];
-const missing = requiredEnvs.filter(k => !process.env[k]);
+const missing = requiredEnvs.filter((k) => !process.env[k]);
 if (missing.length > 0) {
   // Fail fast — bot cannot run without a token
   // Log via console because logger not yet configured
@@ -79,7 +89,6 @@ if (missing.length > 0) {
   baseLogger.error('Missing required environment variables', { missing: missing.join(', ') });
   process.exit(1);
 }
-
 
 // (logger already initialized above)
 
@@ -92,12 +101,18 @@ let Sentry;
 if (process.env.SENTRY_DSN) {
   try {
     const SentryLib = require('@sentry/node');
-    SentryLib.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV || 'development' });
+    SentryLib.init({
+      dsn: process.env.SENTRY_DSN,
+      environment: process.env.NODE_ENV || 'development',
+    });
     Sentry = SentryLib;
     baseLogger.info('Sentry initialized', { env: process.env.NODE_ENV });
     baseLogger.sentry = Sentry;
   } catch (err) {
-    baseLogger.warn('Invalid Sentry DSN or failed to initialize Sentry; continuing without Sentry', { error: err && (err.stack || err) });
+    baseLogger.warn(
+      'Invalid Sentry DSN or failed to initialize Sentry; continuing without Sentry',
+      { error: err && (err.stack || err) }
+    );
     Sentry = null;
   }
 }
@@ -119,7 +134,9 @@ function createStartupProgress(totalSteps) {
     const empty = width - filled;
     const percent = Math.round(ratio * 100);
     const bar = `${'█'.repeat(filled)}${'░'.repeat(empty)}`;
-    baseLogger.info(`[startup] [${bar}] ${percent}% (${completed}/${totalSteps}) ${state} - ${label}`);
+    baseLogger.info(
+      `[startup] [${bar}] ${percent}% (${completed}/${totalSteps}) ${state} - ${label}`
+    );
   };
 
   return {
@@ -140,7 +157,7 @@ function createStartupProgress(totalSteps) {
     finish() {
       const totalMs = Date.now() - startedAt;
       baseLogger.info('[startup] All startup tasks completed', { totalMs, completed, totalSteps });
-    }
+    },
   };
 }
 
@@ -159,7 +176,13 @@ function startMemoryWatchdog() {
       const rssMb = Math.round((m.rss / 1024 / 1024) * 10) / 10;
 
       if (heapUsedMb >= warnHeapMb || rssMb >= warnRssMb) {
-        baseLogger.warn('Memory watchdog threshold exceeded', { heapUsedMb, heapTotalMb, rssMb, warnHeapMb, warnRssMb });
+        baseLogger.warn('Memory watchdog threshold exceeded', {
+          heapUsedMb,
+          heapTotalMb,
+          rssMb,
+          warnHeapMb,
+          warnRssMb,
+        });
       }
     } catch (err) {
       baseLogger.warn('Memory watchdog failed', { error: err && (err.stack || err) });
@@ -197,20 +220,41 @@ async function startup() {
       // - If running the public bot via `npm start` -> register/update global commands for public bot.
       // - If running the dev bot via `npm start dev` or `npm run start:dev` -> register/update dev guild commands only.
       try {
-        const isDevProfile = process.env.BOT_PROFILE === 'dev' || profile === 'dev' || (process.argv && process.argv.slice(2).some(a => /(^|\W)(dev|development)(\W|$)/i.test(String(a))));
+        const isDevProfile =
+          process.env.BOT_PROFILE === 'dev' ||
+          profile === 'dev' ||
+          (process.argv &&
+            process.argv.slice(2).some((a) => /(^|\W)(dev|development)(\W|$)/i.test(String(a))));
         const isPublicProfile = !isDevProfile;
 
-        const lifecycle = process.env.npm_lifecycle_event ? String(process.env.npm_lifecycle_event).toLowerCase() : null;
+        const lifecycle = process.env.npm_lifecycle_event
+          ? String(process.env.npm_lifecycle_event).toLowerCase()
+          : null;
 
-        const shouldAutoDeployDev = isDevProfile && (
-          lifecycle === 'start:dev' || lifecycle === 'dev' || lifecycle === 'start' && process.argv.slice(2).some(a => /(^|\W)(dev|development)(\W|$)/i.test(String(a))) || process.env.DEV_AUTO_DEPLOY === 'true'
-        );
+        const shouldAutoDeployDev =
+          isDevProfile &&
+          (lifecycle === 'start:dev' ||
+            lifecycle === 'dev' ||
+            (lifecycle === 'start' &&
+              process.argv
+                .slice(2)
+                .some((a) => /(^|\W)(dev|development)(\W|$)/i.test(String(a)))) ||
+            process.env.DEV_AUTO_DEPLOY === 'true');
 
         const shouldAutoDeployPublic = isPublicProfile && process.env.AUTO_DEPLOY_PUBLIC === 'true';
 
-        const guildToUse = process.env.GUILD_ID || (process.env.BOT_CONFIG_PATH ? (() => {
-          try { const pc = require(process.env.BOT_CONFIG_PATH); return pc && pc.guildId; } catch (_) { return null; }
-        })() : null);
+        const guildToUse =
+          process.env.GUILD_ID ||
+          (process.env.BOT_CONFIG_PATH
+            ? (() => {
+                try {
+                  const pc = require(process.env.BOT_CONFIG_PATH);
+                  return pc && pc.guildId;
+                } catch (_) {
+                  return null;
+                }
+              })()
+            : null);
 
         const deployChild = async (envOverrides = {}) => {
           try {
@@ -218,8 +262,12 @@ async function startup() {
             const deployPath = path.join(__dirname, '..', 'deploy-commands.js');
             const env = Object.assign({}, process.env, envOverrides);
             const res = childProcess.spawnSync(node, [deployPath], { env, stdio: 'inherit' });
-            if (res.error) baseLogger.warn('Auto-deploy child process failed to start', { error: String(res.error) });
-            else if (res.status !== 0) baseLogger.warn('Auto-deploy child process exited non-zero', { status: res.status });
+            if (res.error)
+              baseLogger.warn('Auto-deploy child process failed to start', {
+                error: String(res.error),
+              });
+            else if (res.status !== 0)
+              baseLogger.warn('Auto-deploy child process exited non-zero', { status: res.status });
             else baseLogger.info('Auto-deploy completed successfully');
           } catch (e) {
             baseLogger.warn('Auto-deploy failed', { error: e && (e.stack || e) });
@@ -227,7 +275,10 @@ async function startup() {
         };
 
         if (shouldAutoDeployDev) {
-          if (!guildToUse) baseLogger.warn('Dev auto-deploy requested but no GUILD_ID/profile.guildId found; skipping dev deploy');
+          if (!guildToUse)
+            baseLogger.warn(
+              'Dev auto-deploy requested but no GUILD_ID/profile.guildId found; skipping dev deploy'
+            );
           else {
             baseLogger.info('Auto-deploying dev guild commands', { guild: guildToUse });
             await deployChild({ BOT_PROFILE: 'dev', GUILD_ID: guildToUse });
@@ -241,7 +292,6 @@ async function startup() {
       } catch (e) {
         baseLogger.warn('Auto-deploy check failed', { error: e && (e.stack || e) });
       }
-
     });
 
     await startupProgress.runStep('Discord login', async () => {
@@ -259,17 +309,18 @@ async function startup() {
 // Handle uncaught promise rejections (prevents silent crashes)
 process.on('unhandledRejection', (reason, promise) => {
   try {
-    const reasonStr = reason instanceof Error 
-      ? reason.stack || reason.message 
-      : typeof reason === 'object' 
-        ? JSON.stringify(reason)
-        : String(reason);
-    
-    baseLogger.error('Unhandled promise rejection', { 
+    const reasonStr =
+      reason instanceof Error
+        ? reason.stack || reason.message
+        : typeof reason === 'object'
+          ? JSON.stringify(reason)
+          : String(reason);
+
+    baseLogger.error('Unhandled promise rejection', {
       reason: reasonStr,
       reasonType: reason?.constructor?.name || typeof reason,
       promiseState: promise?.state || 'unknown',
-      stack: reason instanceof Error ? reason.stack : undefined
+      stack: reason instanceof Error ? reason.stack : undefined,
     });
   } catch (e) {
     console.error('Unhandled rejection (logger failed):', reason, promise);
@@ -280,9 +331,9 @@ process.on('unhandledRejection', (reason, promise) => {
 // Handle uncaught exceptions as last resort
 process.on('uncaughtException', (error) => {
   try {
-    baseLogger.error('Uncaught exception', { 
+    baseLogger.error('Uncaught exception', {
       error: error && (error.stack || error.message || String(error)),
-      type: error?.constructor?.name || 'Unknown'
+      type: error?.constructor?.name || 'Unknown',
     });
   } catch (e) {
     console.error('Uncaught exception (logger failed):', error);
@@ -304,8 +355,12 @@ process.on('uncaughtException', (error) => {
 
 // Create client BEFORE startup so it's available in startup()
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
-  partials: [Partials.Channel]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
+  partials: [Partials.Channel],
 });
 
 // System monitor: post status to designated channel when modules fail
@@ -315,9 +370,13 @@ try {
     try {
       // Channel ID provided by user
       systemMonitor.init(client, config.statusChannelId).catch(() => {});
-    } catch (e) { logger.warn('Failed initializing systemMonitor', { error: e && (e.stack || e) }); }
+    } catch (e) {
+      logger.warn('Failed initializing systemMonitor', { error: e && (e.stack || e) });
+    }
   });
-} catch (e) { logger.warn('systemMonitor module not available', { error: e && (e.stack || e) }); }
+} catch (e) {
+  logger.warn('systemMonitor module not available', { error: e && (e.stack || e) });
+}
 
 startMemoryWatchdog();
 
@@ -331,7 +390,15 @@ startup();
 try {
   const evolutionWorker = require('./evolutionWorker');
   client.once('clientReady', () => {
-    try { evolutionWorker.start(client).catch(e => logger.warn('Failed starting evolution worker', { error: e && (e.stack || e) })); } catch (e) { logger.warn('Failed to invoke evolutionWorker.start', { error: e && (e.stack || e) }); }
+    try {
+      evolutionWorker
+        .start(client)
+        .catch((e) =>
+          logger.warn('Failed starting evolution worker', { error: e && (e.stack || e) })
+        );
+    } catch (e) {
+      logger.warn('Failed to invoke evolutionWorker.start', { error: e && (e.stack || e) });
+    }
   });
 } catch (e) {
   logger.warn('evolutionWorker module not available', { error: e && (e.stack || e) });
@@ -341,7 +408,13 @@ try {
 try {
   const hiveWorker = require('./hiveWorker');
   client.once('clientReady', () => {
-    try { hiveWorker.start().catch(e => logger.warn('Failed starting hive worker', { error: e && (e.stack || e) })); } catch (e) { logger.warn('Failed to invoke hiveWorker.start', { error: e && (e.stack || e) }); }
+    try {
+      hiveWorker
+        .start()
+        .catch((e) => logger.warn('Failed starting hive worker', { error: e && (e.stack || e) }));
+    } catch (e) {
+      logger.warn('Failed to invoke hiveWorker.start', { error: e && (e.stack || e) });
+    }
   });
 } catch (e) {
   logger.warn('hiveWorker module not available', { error: e && (e.stack || e) });
@@ -357,7 +430,10 @@ if (fs.existsSync(commandsPath)) {
       client.commands.set(name, cmd);
       logger.info(`Loaded command ${name}`, { command: name });
     }
-    logger.info('Commands loaded', { count: client.commands.size, commands: Array.from(client.commands.keys()).sort() });
+    logger.info('Commands loaded', {
+      count: client.commands.size,
+      commands: Array.from(client.commands.keys()).sort(),
+    });
   } catch (err) {
     logger.error('Failed loading commands via loader', { error: err && (err.stack || err) });
   }
@@ -366,7 +442,7 @@ if (fs.existsSync(commandsPath)) {
 // Load events
 const eventsPath = path.join(__dirname, 'events');
 if (fs.existsSync(eventsPath)) {
-  const eventFiles = fs.readdirSync(eventsPath).filter(f => f.endsWith('.js'));
+  const eventFiles = fs.readdirSync(eventsPath).filter((f) => f.endsWith('.js'));
   for (const file of eventFiles) {
     try {
       const event = require(path.join(eventsPath, file));
@@ -381,7 +457,12 @@ if (fs.existsSync(eventsPath)) {
       logger.error(`Failed loading event file: ${file}`, { file, error: err.stack || err });
     }
   }
-  logger.info('Events loaded', { count: (fs.existsSync(eventsPath) && fs.readdirSync(eventsPath).filter(f => f.endsWith('.js')).length) || 0 });
+  logger.info('Events loaded', {
+    count:
+      (fs.existsSync(eventsPath) &&
+        fs.readdirSync(eventsPath).filter((f) => f.endsWith('.js')).length) ||
+      0,
+  });
 }
 
 // Global error handlers
@@ -397,9 +478,11 @@ process.on('uncaughtException', (err) => {
 
 process.on('unhandledRejection', (reason) => {
   baseLogger.error('Unhandled Rejection', { reason: reason && (reason.stack || reason) });
-  if (baseLogger.sentry) baseLogger.sentry.captureException(reason instanceof Error ? reason : new Error(String(reason)));
+  if (baseLogger.sentry)
+    baseLogger.sentry.captureException(
+      reason instanceof Error ? reason : new Error(String(reason))
+    );
 });
- 
 
 // Graceful shutdown: try to clean up managers and DB before exit
 async function gracefulShutdown(reason) {
@@ -416,25 +499,37 @@ async function gracefulShutdown(reason) {
             await systemMonitor.markDown('bot', reason);
           }
           // give Discord API a short moment to process edits
-          await new Promise(res => setTimeout(res, 500));
+          await new Promise((res) => setTimeout(res, 500));
           logger.info('systemMonitor mark down complete');
         } catch (smErr) {
-          logger.warn('systemMonitor mark down failed during shutdown', { error: smErr && (smErr.stack || smErr) });
+          logger.warn('systemMonitor mark down failed during shutdown', {
+            error: smErr && (smErr.stack || smErr),
+          });
         }
       }
     } catch (e) {
-      logger.warn('systemMonitor not available during graceful shutdown', { error: e && (e.stack || e) });
+      logger.warn('systemMonitor not available during graceful shutdown', {
+        error: e && (e.stack || e),
+      });
     }
     // call optional shutdown hooks if modules expose them
     try {
       const spawnManager = require('./spawnManager');
       if (typeof spawnManager.shutdown === 'function') await spawnManager.shutdown();
-    } catch (e) { logger.warn('spawnManager.shutdown not available', { error: e && (e.stack || e) }); }
+    } catch (e) {
+      logger.warn('spawnManager.shutdown not available', { error: e && (e.stack || e) });
+    }
     try {
       const hatchManager = require('./hatchManager');
       if (typeof hatchManager.shutdown === 'function') await hatchManager.shutdown();
-    } catch (e) { logger.warn('hatchManager.shutdown not available', { error: e && (e.stack || e) }); }
-    try { await db.knex.destroy(); } catch (e) { logger.warn('Failed to destroy knex', { error: e && (e.stack || e) }); }
+    } catch (e) {
+      logger.warn('hatchManager.shutdown not available', { error: e && (e.stack || e) });
+    }
+    try {
+      await db.knex.destroy();
+    } catch (e) {
+      logger.warn('Failed to destroy knex', { error: e && (e.stack || e) });
+    }
     logger.info('Graceful shutdown complete, exiting');
     process.exit(0);
   } catch (err) {
@@ -445,4 +540,3 @@ async function gracefulShutdown(reason) {
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-

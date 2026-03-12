@@ -9,7 +9,12 @@ const emojis = require('../config/emojis.json');
 const eggTypes = require('../config/eggTypes.json');
 const path = require('path');
 const fs = require('fs');
-const { PermissionsBitField, ContainerBuilder, TextDisplayBuilder, MessageFlags } = require('discord.js');
+const {
+  PermissionsBitField,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  MessageFlags,
+} = require('discord.js');
 const db = require('./db');
 
 // Helper: Get guild name for logging
@@ -28,7 +33,11 @@ function getGuildName(guildId) {
     if (guildById && guildById.name) {
       return guildById.name;
     }
-    logger.debug && logger.debug('getGuildName: guild not in cache', { guildId, cacheSize: client.guilds.cache.size });
+    logger.debug &&
+      logger.debug('getGuildName: guild not in cache', {
+        guildId,
+        cacheSize: client.guilds.cache.size,
+      });
     return `Guild-${guildId}`;
   } catch (e) {
     logger.warn && logger.warn('getGuildName error', { guildId, error: e.message });
@@ -79,20 +88,20 @@ function warnWithCooldown(key, message, meta = {}, cooldownMs = 15 * 60 * 1000) 
 function getSpawnBackoffDelay(guildId) {
   const tracker = failureTracker.get(guildId);
   if (!tracker) return 0; // No failures, no backoff
-  
+
   const now = Date.now();
   const timeSinceLastFailure = now - (tracker.lastFailTime || 0);
   const failureCount = tracker.count || 0;
-  
+
   // Reset failure count if last failure was >5 minutes ago
   if (timeSinceLastFailure > 5 * 60 * 1000) {
     failureTracker.delete(guildId);
     return 0;
   }
-  
+
   // Cap failure count at 10 to prevent exponential explosion
   const cappedCount = Math.min(failureCount, 10);
-  
+
   // Exponential backoff: 2s, 4s, 8s, 16s, 32s, 64s, 128s, 256s, 512s, 1024s (max ~17 min)
   const backoffMs = Math.pow(2, cappedCount + 1) * 1000;
   return backoffMs;
@@ -126,15 +135,21 @@ function isPermissionError(error) {
   // Discord permission denied: HTTP 403
   if (code === 403) return true;
   // Common permission error indicators
-  if (msg.includes('permission') || msg.includes('forbidden') || msg.includes('unauthorized')) return true;
-  if (msg.includes('no attach') || msg.includes('attach') && msg.includes('permission')) return true;
+  if (msg.includes('permission') || msg.includes('forbidden') || msg.includes('unauthorized'))
+    return true;
+  if (msg.includes('no attach') || (msg.includes('attach') && msg.includes('permission')))
+    return true;
   return false;
 }
 
 function enqueueSpawn(guildId, forcedEggTypeId, isForced = false) {
   // Prevent queue from growing unbounded during failure cascades
   if (spawnQueue.length >= maxSpawnQueueDepth) {
-    logger.warn('Spawn queue depth limit reached; dropping new spawn request', { guildId, queueDepth: spawnQueue.length, maxDepth: maxSpawnQueueDepth });
+    logger.warn('Spawn queue depth limit reached; dropping new spawn request', {
+      guildId,
+      queueDepth: spawnQueue.length,
+      maxDepth: maxSpawnQueueDepth,
+    });
     return Promise.reject(new Error('Spawn queue full'));
   }
   return new Promise((resolve, reject) => {
@@ -176,7 +191,7 @@ async function init(botClient) {
 
     // restore any active spawns from DB
     try {
-    let activeRows = [];
+      let activeRows = [];
       for (const ids of guildIdChunks) {
         if (!ids.length) continue;
         const chunkRows = await knex('active_spawns').whereIn('guild_id', ids).select('*');
@@ -205,26 +220,93 @@ async function init(botClient) {
             const ageMismatchMs = Math.abs((msg.createdTimestamp || 0) - spawnedAtNum);
             const maxMismatch = 1000 * 60 * 60; // 1 hour tolerance
             if (msg.author?.id !== client.user?.id || ageMismatchMs > maxMismatch) {
-              logger.info('Cleaned up stale active spawn (message validation failed)', { messageId: r.message_id, channelId: r.channel_id, ageMismatchMs });
+              logger.info('Cleaned up stale active spawn (message validation failed)', {
+                messageId: r.message_id,
+                channelId: r.channel_id,
+                ageMismatchMs,
+              });
               await knex('active_spawns').where({ id: r.id }).del();
               continue;
             }
           } catch (valErr) {
-            try { logger.warn('Error validating restored active spawn; removing row', { row: r, error: valErr && (valErr.stack || valErr) }); } catch (le) { try { logger && logger.warn && logger.warn('Failed logging validation error restoring active spawn', { error: le && (le.stack || le) }); } catch (lle) { fallbackLogger && fallbackLogger.warn && fallbackLogger.warn('Failed logging validation error restoring active spawn fallback', lle && (lle.stack || lle)); } }
+            try {
+              logger.warn('Error validating restored active spawn; removing row', {
+                row: r,
+                error: valErr && (valErr.stack || valErr),
+              });
+            } catch (le) {
+              try {
+                logger &&
+                  logger.warn &&
+                  logger.warn('Failed logging validation error restoring active spawn', {
+                    error: le && (le.stack || le),
+                  });
+              } catch (lle) {
+                fallbackLogger &&
+                  fallbackLogger.warn &&
+                  fallbackLogger.warn(
+                    'Failed logging validation error restoring active spawn fallback',
+                    lle && (lle.stack || lle)
+                  );
+              }
+            }
             await knex('active_spawns').where({ id: r.id }).del();
             continue;
           }
           const guildMap = activeEggs.get(r.guild_id) || new Map();
           // restore full eggType metadata when possible
-          const restoredEggType = (eggTypes.find(t => t.id === r.egg_type) || { id: r.egg_type });
-          guildMap.set(r.message_id, { messageId: r.message_id, channelId: r.channel_id, spawnedAt: Number(r.spawned_at), numEggs: r.num_eggs, eggType: restoredEggType });
+          const restoredEggType = eggTypes.find((t) => t.id === r.egg_type) || { id: r.egg_type };
+          guildMap.set(r.message_id, {
+            messageId: r.message_id,
+            channelId: r.channel_id,
+            spawnedAt: Number(r.spawned_at),
+            numEggs: r.num_eggs,
+            eggType: restoredEggType,
+          });
           activeEggs.set(r.guild_id, guildMap);
         } catch (e) {
-          try { logger.warn('Failed restoring active spawn row', { row: r, error: e && (e.stack || e) }); } catch (le) { try { logger && logger.warn && logger.warn('Failed logging restore active spawn error', { error: le && (le.stack || le) }); } catch (lle) { fallbackLogger && fallbackLogger.warn && fallbackLogger.warn('Failed logging restore active spawn error fallback', lle && (lle.stack || lle)); } }
+          try {
+            logger.warn('Failed restoring active spawn row', {
+              row: r,
+              error: e && (e.stack || e),
+            });
+          } catch (le) {
+            try {
+              logger &&
+                logger.warn &&
+                logger.warn('Failed logging restore active spawn error', {
+                  error: le && (le.stack || le),
+                });
+            } catch (lle) {
+              fallbackLogger &&
+                fallbackLogger.warn &&
+                fallbackLogger.warn(
+                  'Failed logging restore active spawn error fallback',
+                  lle && (lle.stack || lle)
+                );
+            }
+          }
         }
       }
     } catch (e) {
-      try { logger.warn('Failed loading active_spawns table', { error: e && (e.stack || e) }); } catch (le) { try { logger && logger.warn && logger.warn('Failed logging active_spawns load error', { error: le && (le.stack || le) }); } catch (lle) { fallbackLogger && fallbackLogger.warn && fallbackLogger.warn('Failed logging active_spawns load error fallback', lle && (lle.stack || lle)); } }
+      try {
+        logger.warn('Failed loading active_spawns table', { error: e && (e.stack || e) });
+      } catch (le) {
+        try {
+          logger &&
+            logger.warn &&
+            logger.warn('Failed logging active_spawns load error', {
+              error: le && (le.stack || le),
+            });
+        } catch (lle) {
+          fallbackLogger &&
+            fallbackLogger.warn &&
+            fallbackLogger.warn(
+              'Failed logging active_spawns load error fallback',
+              lle && (lle.stack || lle)
+            );
+        }
+      }
     }
 
     for (const row of rows) {
@@ -234,20 +316,39 @@ async function init(botClient) {
         const ts = Number(row.next_spawn_at);
         const remaining = Math.max(0, ts - Date.now());
         if (remaining > 0) {
-          const t = setTimeout(() => enqueueSpawn(row.guild_id).catch(err => logger.error('Spawn error', { guildId: row.guild_id, error: err.stack || err })), remaining);
+          const t = setTimeout(
+            () =>
+              enqueueSpawn(row.guild_id).catch((err) =>
+                logger.error('Spawn error', { guildId: row.guild_id, error: err.stack || err })
+              ),
+            remaining
+          );
           timers.set(row.guild_id, t);
           nextSpawnAt.set(row.guild_id, ts);
-          logger.debug('Restored scheduled spawn from DB', { guildId: row.guild_id, scheduled_at: ts, in_ms: remaining });
+          logger.debug('Restored scheduled spawn from DB', {
+            guildId: row.guild_id,
+            scheduled_at: ts,
+            in_ms: remaining,
+          });
           continue;
         }
       }
       scheduleNext(row.guild_id);
     }
-    logger.info('Spawn manager initialized', { shardGuilds: shardGuildIds.length, configuredGuilds: rows.length, chunkSize: inChunkSize, maxConcurrentSpawns });
+    logger.info('Spawn manager initialized', {
+      shardGuilds: shardGuildIds.length,
+      configuredGuilds: rows.length,
+      chunkSize: inChunkSize,
+      maxConcurrentSpawns,
+    });
     try {
       const systemMonitor = require('./utils/systemMonitor');
       systemMonitor.registerSystem('spawnManager', { name: 'Spawn Manager', shutdown: shutdown });
-    } catch (e) { logger.warn('Failed registering spawnManager with systemMonitor', { error: e && (e.stack || e) }); }
+    } catch (e) {
+      logger.warn('Failed registering spawnManager with systemMonitor', {
+        error: e && (e.stack || e),
+      });
+    }
   } catch (err) {
     logger.error('Failed initializing spawn manager', { error: err.stack || err });
   }
@@ -263,84 +364,131 @@ function scheduleNext(guildId) {
     // Checkpoint 1: Check active eggs
     const activeMap = activeEggs.get(guildId);
     if (activeMap && activeMap.size > 0) {
-      logger.info('Active eggs present; delaying schedule until cleared', { guildId, active: activeMap.size });
+      logger.info('Active eggs present; delaying schedule until cleared', {
+        guildId,
+        active: activeMap.size,
+      });
       pendingReschedule.add(guildId);
       return;
     }
-    
+
     // Checkpoint 2: Get guild config
     let cfg;
     try {
       cfg = await guildModel.getGuildConfig(guildId);
     } catch (cfgErr) {
-      logger.warn('Failed to get guild config during scheduleNext', { guildId, error: cfgErr && (cfgErr.stack || cfgErr) });
+      logger.warn('Failed to get guild config during scheduleNext', {
+        guildId,
+        error: cfgErr && (cfgErr.stack || cfgErr),
+      });
       cfg = null;
     }
-    
+
     const min = (cfg && cfg.spawn_min_seconds) || 60;
     const max = (cfg && cfg.spawn_max_seconds) || 3600;
     let delay = randomInt(min, max) * 1000;
-    
+
     // Checkpoint 3: Apply exponential backoff for repeated failures
     const backoffDelay = getSpawnBackoffDelay(guildId);
     if (backoffDelay > 0) {
       delay = Math.max(delay, backoffDelay);
-      logger.info('Applied exponential backoff to spawn schedule', { guildId, backoffMs: backoffDelay, totalDelayMs: delay });
+      logger.info('Applied exponential backoff to spawn schedule', {
+        guildId,
+        backoffMs: backoffDelay,
+        totalDelayMs: delay,
+      });
     }
-    
+
     const scheduledAt = Date.now() + delay;
-    
+
     // Checkpoint 4: Log debug info
     try {
-      const guildName = client ? (client.guilds.cache.get(guildId)?.name || null) : null;
-      const persistedNext = await (async () => { 
-        try { 
-          const k = db.knex; 
-          const row = await k('guild_settings').where({ guild_id: guildId }).first('next_spawn_at'); 
-          return row && row.next_spawn_at; 
-        } catch (e) { 
-          return null; 
-        } 
+      const guildName = client ? client.guilds.cache.get(guildId)?.name || null : null;
+      const persistedNext = await (async () => {
+        try {
+          const k = db.knex;
+          const row = await k('guild_settings').where({ guild_id: guildId }).first('next_spawn_at');
+          return row && row.next_spawn_at;
+        } catch (e) {
+          return null;
+        }
       })();
-      logger.debug('About to schedule next spawn', { guildId, guildName, min, max, delay, scheduledAt, pendingReschedule: pendingReschedule.has(guildId), existingTimer: timers.has(guildId), persistedNext });
+      logger.debug('About to schedule next spawn', {
+        guildId,
+        guildName,
+        min,
+        max,
+        delay,
+        scheduledAt,
+        pendingReschedule: pendingReschedule.has(guildId),
+        existingTimer: timers.has(guildId),
+        persistedNext,
+      });
     } catch (debugErr) {
-      logger.debug('About to schedule next spawn (debug logging failed)', { guildId, min, max, delay, scheduledAt });
+      logger.debug('About to schedule next spawn (debug logging failed)', {
+        guildId,
+        min,
+        max,
+        delay,
+        scheduledAt,
+      });
     }
-    
+
     // Checkpoint 5: Set timeout
     try {
-      const t = setTimeout(() => enqueueSpawn(guildId).catch(err => {
-        const guildName = getGuildName(guildId);
-        logger.error(`Spawn error (${guildName})`, { guildId, error: err.stack || err });
-      }), delay);
+      const t = setTimeout(
+        () =>
+          enqueueSpawn(guildId).catch((err) => {
+            const guildName = getGuildName(guildId);
+            logger.error(`Spawn error (${guildName})`, { guildId, error: err.stack || err });
+          }),
+        delay
+      );
       timers.set(guildId, t);
       nextSpawnAt.set(guildId, scheduledAt);
     } catch (timerErr) {
-      logger.error('Failed to set spawn timer', { guildId, error: timerErr && (timerErr.stack || timerErr) });
+      logger.error('Failed to set spawn timer', {
+        guildId,
+        error: timerErr && (timerErr.stack || timerErr),
+      });
       throw timerErr;
     }
-    
+
     // Checkpoint 6: Persist to DB
     try {
       const knex = db.knex;
-      await knex('guild_settings').where({ guild_id: guildId }).update({ next_spawn_at: scheduledAt });
+      await knex('guild_settings')
+        .where({ guild_id: guildId })
+        .update({ next_spawn_at: scheduledAt });
     } catch (dbErr) {
-      logger.warn('Failed persisting next_spawn_at to DB', { guildId, error: dbErr && (dbErr.stack || dbErr) });
+      logger.warn('Failed persisting next_spawn_at to DB', {
+        guildId,
+        error: dbErr && (dbErr.stack || dbErr),
+      });
       // Don't re-throw - persistence is non-critical
     }
-    
+
     // Checkpoint 7: Log completion
     try {
-      const guildName = client ? (client.guilds.cache.get(guildId)?.name || null) : null;
-      logger.debug('Scheduled next spawn successfully', { guildId, guildName, in_ms: delay, scheduled_at: scheduledAt });
+      const guildName = client ? client.guilds.cache.get(guildId)?.name || null : null;
+      logger.debug('Scheduled next spawn successfully', {
+        guildId,
+        guildName,
+        in_ms: delay,
+        scheduled_at: scheduledAt,
+      });
     } catch (logErr) {
       logger.debug('Scheduled next spawn', { guildId, in_ms: delay, scheduled_at: scheduledAt });
     }
-  })().catch(err => {
+  })().catch((err) => {
     const guildName = getGuildName(guildId);
-    
+
     if (err instanceof Error) {
-      logger.error(`scheduleNext failed (${guildName})`, { guildId, message: err.message, stack: err.stack });
+      logger.error(`scheduleNext failed (${guildName})`, {
+        guildId,
+        message: err.message,
+        stack: err.stack,
+      });
       console.error(`[SPAWN ERROR] Guild ${guildId} (${guildName}): ${err.message}\n${err.stack}`);
     } else if (typeof err === 'object' && err) {
       logger.error(`scheduleNext failed (${guildName})`, { guildId, errorObj: String(err) });
@@ -358,7 +506,9 @@ function requestReschedule(guildId) {
   if (activeMap && activeMap.size > 0) {
     pendingReschedule.add(guildId);
     const guildName = getGuildName(guildId);
-    logger.info(`Reschedule requested; will apply after active eggs cleared (${guildName})`, { guildId });
+    logger.info(`Reschedule requested; will apply after active eggs cleared (${guildName})`, {
+      guildId,
+    });
     return;
   }
   // schedule immediately
@@ -368,18 +518,28 @@ function requestReschedule(guildId) {
 function getNextSpawnForGuild(guildId) {
   // If an active egg event exists, return null to indicate spawn is active now
   const activeMap = activeEggs.get(guildId);
-  if (activeMap && activeMap.size > 0) return { active: true, activeSinceMs: Date.now() - (Array.from(activeMap.values())[0].spawnedAt || Date.now()), numEggs: Array.from(activeMap.values())[0].numEggs };
+  if (activeMap && activeMap.size > 0)
+    return {
+      active: true,
+      activeSinceMs: Date.now() - (Array.from(activeMap.values())[0].spawnedAt || Date.now()),
+      numEggs: Array.from(activeMap.values())[0].numEggs,
+    };
   if (nextSpawnAt.has(guildId)) {
     const ts = nextSpawnAt.get(guildId);
     const remaining = Math.max(0, ts - Date.now());
-    return { active: false, scheduledAt: ts, remainingMs: remaining, pendingReschedule: pendingReschedule.has(guildId) };
+    return {
+      active: false,
+      scheduledAt: ts,
+      remainingMs: remaining,
+      pendingReschedule: pendingReschedule.has(guildId),
+    };
   }
   return null;
 }
 
 function pickEggType() {
   // Weighted random selection from spawnable eggTypes (exclude grantable_only)
-  const spawnableEggs = eggTypes.filter(t => !t.grantable_only);
+  const spawnableEggs = eggTypes.filter((t) => !t.grantable_only);
   const totalWeight = spawnableEggs.reduce((sum, t) => sum + (t.weight || 1), 0);
   let r = Math.random() * totalWeight;
   for (const type of spawnableEggs) {
@@ -397,31 +557,89 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     return;
   }
   inProgress.add(guildId);
-  logger.info(`doSpawn entered (${guildName})`, { guildId, forcedEggTypeId, timersHas: timers.has(guildId), nextSpawnPersisted: nextSpawnAt.get(guildId) });
+  logger.info(`doSpawn entered (${guildName})`, {
+    guildId,
+    forcedEggTypeId,
+    timersHas: timers.has(guildId),
+    nextSpawnPersisted: nextSpawnAt.get(guildId),
+  });
   // suppress near-duplicate spawns (e.g., timer firing while a force spawn also triggered)
   try {
     const last = lastSpawnAt.get(guildId) || 0;
     const since = Date.now() - last;
     const thresholdMs = 5000; // 5s
-      if (!isForced && since >= 0 && since < thresholdMs) {
-        logger.warn(`doSpawn suppressed: recent spawn within threshold (${guildName})`, { guildId, sinceMs: since, thresholdMs });
-        inProgress.delete(guildId);
-        return false;
-      }
+    if (!isForced && since >= 0 && since < thresholdMs) {
+      logger.warn(`doSpawn suppressed: recent spawn within threshold (${guildName})`, {
+        guildId,
+        sinceMs: since,
+        thresholdMs,
+      });
+      inProgress.delete(guildId);
+      return false;
+    }
   } catch (e) {
-    try { logger && logger.warn && logger.warn('Error checking recent spawn suppression', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging recent spawn suppression error', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
+    try {
+      logger &&
+        logger.warn &&
+        logger.warn('Error checking recent spawn suppression', {
+          guildId,
+          error: e && (e.stack || e),
+        });
+    } catch (le) {
+      try {
+        fallbackLogger.warn(
+          'Failed logging recent spawn suppression error',
+          le && (le.stack || le)
+        );
+      } catch (ignored) {
+        /* ignore */ void 0;
+      }
+    }
   }
   try {
     // Clear any existing scheduled timer to avoid duplicate spawns
+    try {
+      if (timers.has(guildId)) {
+        clearTimeout(timers.get(guildId));
+        timers.delete(guildId);
+      }
+      nextSpawnAt.delete(guildId);
       try {
-        if (timers.has(guildId)) {
-          clearTimeout(timers.get(guildId));
-          timers.delete(guildId);
+        const knex = db.knex;
+        await knex('guild_settings').where({ guild_id: guildId }).update({ next_spawn_at: null });
+      } catch (e) {
+        try {
+          logger.warn('Failed clearing next_spawn_at at doSpawn start', {
+            guildId,
+            error: e && (e.stack || e),
+          });
+        } catch (le) {
+          try {
+            fallbackLogger.warn(
+              'Failed logging next_spawn_at clear error at doSpawn start',
+              le && (le.stack || le)
+            );
+          } catch (ignored) {
+            /* ignore */ void 0;
+          }
         }
-        nextSpawnAt.delete(guildId);
-        try { const knex = db.knex; await knex('guild_settings').where({ guild_id: guildId }).update({ next_spawn_at: null }); } catch (e) { try { logger.warn('Failed clearing next_spawn_at at doSpawn start', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging next_spawn_at clear error at doSpawn start', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
+      }
     } catch (e) {
-      try { logger.warn('Error clearing existing spawn timer at doSpawn start', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging error clearing existing spawn timer', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
+      try {
+        logger.warn('Error clearing existing spawn timer at doSpawn start', {
+          guildId,
+          error: e && (e.stack || e),
+        });
+      } catch (le) {
+        try {
+          fallbackLogger.warn(
+            'Failed logging error clearing existing spawn timer',
+            le && (le.stack || le)
+          );
+        } catch (ignored) {
+          /* ignore */ void 0;
+        }
+      }
     }
     const cfg = await guildModel.getGuildConfig(guildId);
     if (!cfg || !cfg.channel_id) {
@@ -438,14 +656,17 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     const limit = (cfg && cfg.egg_limit) || 1;
     const channel = await client.channels.fetch(cfg.channel_id).catch(() => null);
     if (!channel) {
-      logger.warn(`Configured channel not found (${guildName})`, { guildId, channel_id: cfg.channel_id });
+      logger.warn(`Configured channel not found (${guildName})`, {
+        guildId,
+        channel_id: cfg.channel_id,
+      });
       return scheduleNext(guildId);
     }
-    const channelPerms = channel.permissionsFor && client && client.user
-      ? channel.permissionsFor(client.user)
-      : null;
+    const channelPerms =
+      channel.permissionsFor && client && client.user ? channel.permissionsFor(client.user) : null;
     const canSendMessages = channelPerms
-      ? channelPerms.has(PermissionsBitField.Flags.ViewChannel) && channelPerms.has(PermissionsBitField.Flags.SendMessages)
+      ? channelPerms.has(PermissionsBitField.Flags.ViewChannel) &&
+        channelPerms.has(PermissionsBitField.Flags.SendMessages)
       : true;
     if (!canSendMessages) {
       const permErr = new Error('Missing ViewChannel/SendMessages permission in spawn channel');
@@ -469,13 +690,11 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     // Pick egg type
     let eggType;
     if (forcedEggTypeId) {
-      eggType = eggTypes.find(e => e.id === forcedEggTypeId) || pickEggType();
+      eggType = eggTypes.find((e) => e.id === forcedEggTypeId) || pickEggType();
     } else {
       eggType = pickEggType();
     }
-    const eggWord = numEggs === 1
-      ? `${eggType.name} has`
-      : `${numEggs} ${eggType.name}s have`;
+    const eggWord = numEggs === 1 ? `${eggType.name} has` : `${numEggs} ${eggType.name}s have`;
     const eggEmoji = eggType.emoji;
     // Attempt to attach the spawn image if available. Ensure the text is always sent.
     const imgPath = path.join(__dirname, '../assets/images/egg_spawn.png');
@@ -489,38 +708,44 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       try {
         const stats = fs.statSync(imgPath);
         const maxSize = 8 * 1024 * 1024; // 8MB conservative limit for many guilds
-          if (stats.size <= maxSize) {
+        if (stats.size <= maxSize) {
           // Read into buffer and attach from memory — send buffer form directly to avoid AttachmentBuilder/path issues
           try {
             const buf = fs.readFileSync(imgPath);
             // Use raw buffer attachment format which is more consistent across environments
             attachment = { attachment: buf, name: 'egg_spawn.png' };
           } catch (readErr) {
-            logger.warn('Failed reading spawn image into buffer; skipping attach', { guildId, error: readErr && (readErr.stack || readErr) });
+            logger.warn('Failed reading spawn image into buffer; skipping attach', {
+              guildId,
+              error: readErr && (readErr.stack || readErr),
+            });
             attachment = null;
           }
         } else {
           logger.warn('Spawn image too large to attach', { guildId, size: stats.size, maxSize });
         }
       } catch (statErr) {
-        logger.warn('Failed to stat spawn image; skipping attach', { guildId, error: statErr && (statErr.stack || statErr) });
+        logger.warn('Failed to stat spawn image; skipping attach', {
+          guildId,
+          error: statErr && (statErr.stack || statErr),
+        });
       }
     } else if (hasImage && !canAttachFiles) {
-      warnWithCooldown(`attach:${guildId}`, 'Bot lacks AttachFiles permission in channel; skipping image attach', { guildId, channel: channel.id });
+      warnWithCooldown(
+        `attach:${guildId}`,
+        'Bot lacks AttachFiles permission in channel; skipping image attach',
+        { guildId, channel: channel.id }
+      );
     }
     const message = `${eggWord} spawned! Type \`egg\` to catch ${numEggs === 1 ? 'it' : 'them'}!`;
     const buildSpawnV2Payload = (files = null) => {
       const container = new ContainerBuilder();
       // Display emoji as a prominent element on the container (separate from text)
-      container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(`# ${eggEmoji}`)
-      );
-      container.addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(message)
-      );
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`# ${eggEmoji}`));
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(message));
       const payload = {
         components: [container],
-        flags: MessageFlags.IsComponentsV2
+        flags: MessageFlags.IsComponentsV2,
       };
       if (files) payload.files = files;
       return payload;
@@ -528,10 +753,14 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     let sent;
     const preferLegacy = guildSendMode.get(guildId) === 'legacy';
     try {
-        if (preferLegacy) {
+      if (preferLegacy) {
         sent = await channel.send({ content: `${eggEmoji} ${message}` });
         if (attachment) {
-          try { await channel.send({ files: [attachment] }); } catch (_) { /* ignore */ void 0; }
+          try {
+            await channel.send({ files: [attachment] });
+          } catch (_) {
+            /* ignore */ void 0;
+          }
         }
       } else if (attachment) {
         // Prefer sending text+image together
@@ -539,13 +768,25 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
           sent = await channel.send(buildSpawnV2Payload([attachment]));
         } catch (firstErr) {
           // Attempt fallback: read file into buffer and resend in one message
-          warnWithCooldown(`v2-combined:${guildId}`, 'Combined V2 text+image initial send failed; retrying with buffer', { guildId, error: firstErr && (firstErr.stack || firstErr) }, 5 * 60 * 1000);
+          warnWithCooldown(
+            `v2-combined:${guildId}`,
+            'Combined V2 text+image initial send failed; retrying with buffer',
+            { guildId, error: firstErr && (firstErr.stack || firstErr) },
+            5 * 60 * 1000
+          );
           try {
             const buf = fs.readFileSync(imgPath);
-            sent = await channel.send(buildSpawnV2Payload([{ attachment: buf, name: 'egg_spawn.png' }]));
+            sent = await channel.send(
+              buildSpawnV2Payload([{ attachment: buf, name: 'egg_spawn.png' }])
+            );
           } catch (bufErr) {
             // If buffer fallback also fails, rethrow to outer catch to handle V2-only-then-legacy strategy
-            warnWithCooldown(`v2-buffer:${guildId}`, 'Buffer fallback for combined V2 text+image failed', { guildId, error: bufErr && (bufErr.stack || bufErr) }, 5 * 60 * 1000);
+            warnWithCooldown(
+              `v2-buffer:${guildId}`,
+              'Buffer fallback for combined V2 text+image failed',
+              { guildId, error: bufErr && (bufErr.stack || bufErr) },
+              5 * 60 * 1000
+            );
             throw bufErr;
           }
         }
@@ -555,44 +796,124 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     } catch (e) {
       // If V2 send ultimately fails, try legacy content and then image separately.
       const guildName = getGuildName(guildId);
-      warnWithCooldown(`v2-fallback:${guildId}`, `V2 spawn send failed; falling back to legacy text/image strategy (${guildName})`, { guildId, error: e && (e.stack || e) }, 5 * 60 * 1000);
+      warnWithCooldown(
+        `v2-fallback:${guildId}`,
+        `V2 spawn send failed; falling back to legacy text/image strategy (${guildName})`,
+        { guildId, error: e && (e.stack || e) },
+        5 * 60 * 1000
+      );
       guildSendMode.set(guildId, 'legacy');
       try {
         sent = await channel.send({ content: `${eggEmoji} ${message}` });
       } catch (textErr) {
         const guildName = getGuildName(guildId);
-        logger.error(`Failed sending spawn text (${guildName})`, { guildId, error: textErr && (textErr.stack || textErr) });
+        logger.error(`Failed sending spawn text (${guildName})`, {
+          guildId,
+          error: textErr && (textErr.stack || textErr),
+        });
         throw textErr;
       }
       if (attachment) {
         try {
           await channel.send({ files: [attachment] });
         } catch (imgErr) {
-          logger.warn('Separate attachment send failed; retrying with buffer', { guildId, error: imgErr && (imgErr.stack || imgErr) });
+          logger.warn('Separate attachment send failed; retrying with buffer', {
+            guildId,
+            error: imgErr && (imgErr.stack || imgErr),
+          });
           try {
             const buf = fs.readFileSync(imgPath);
             await channel.send({ files: [{ attachment: buf, name: 'egg_spawn.png' }] });
           } catch (imgBufErr) {
-            logger.warn('Failed sending spawn image separately (buffer fallback)', { guildId, error: imgBufErr && (imgBufErr.stack || imgBufErr) });
+            logger.warn('Failed sending spawn image separately (buffer fallback)', {
+              guildId,
+              error: imgBufErr && (imgBufErr.stack || imgBufErr),
+            });
           }
         }
       }
     }
     // Store a single active egg event per guild
     const spawnedAt = Date.now();
-    activeEggs.set(guildId, new Map([[sent.id, { messageId: sent.id, channelId: channel.id, spawnedAt, numEggs, eggType }]]));
+    activeEggs.set(
+      guildId,
+      new Map([
+        [sent.id, { messageId: sent.id, channelId: channel.id, spawnedAt, numEggs, eggType }],
+      ])
+    );
     // persist active spawn so it survives restarts
     try {
       const knex = db.knex;
-      await knex('active_spawns').insert({ guild_id: guildId, message_id: sent.id, channel_id: channel.id, spawned_at: spawnedAt, num_eggs: numEggs, egg_type: eggType.id });
+      await knex('active_spawns').insert({
+        guild_id: guildId,
+        message_id: sent.id,
+        channel_id: channel.id,
+        spawned_at: spawnedAt,
+        num_eggs: numEggs,
+        egg_type: eggType.id,
+      });
     } catch (e) {
-      try { logger.warn('Failed persisting active spawn to DB', { guildId, messageId: sent.id, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging active spawn persistence error', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
+      try {
+        logger.warn('Failed persisting active spawn to DB', {
+          guildId,
+          messageId: sent.id,
+          error: e && (e.stack || e),
+        });
+      } catch (le) {
+        try {
+          fallbackLogger.warn(
+            'Failed logging active spawn persistence error',
+            le && (le.stack || le)
+          );
+        } catch (ignored) {
+          /* ignore */ void 0;
+        }
+      }
     }
     // clear persisted next_spawn_at since this spawn has now occurred
-    try { const knex = db.knex; await knex('guild_settings').where({ guild_id: guildId }).update({ next_spawn_at: null }); } catch (e) { try { logger.warn('Failed clearing next_spawn_at after spawn', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging next_spawn_at clear error after spawn', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
-    logger.info(`Egg(s) spawned (${guildName})`, { guildId, channel: channel.id, messageId: sent.id, numEggs, eggType: eggType.id });
+    try {
+      const knex = db.knex;
+      await knex('guild_settings').where({ guild_id: guildId }).update({ next_spawn_at: null });
+    } catch (e) {
+      try {
+        logger.warn('Failed clearing next_spawn_at after spawn', {
+          guildId,
+          error: e && (e.stack || e),
+        });
+      } catch (le) {
+        try {
+          fallbackLogger.warn(
+            'Failed logging next_spawn_at clear error after spawn',
+            le && (le.stack || le)
+          );
+        } catch (ignored) {
+          /* ignore */ void 0;
+        }
+      }
+    }
+    logger.info(`Egg(s) spawned (${guildName})`, {
+      guildId,
+      channel: channel.id,
+      messageId: sent.id,
+      numEggs,
+      eggType: eggType.id,
+    });
     logger.info(`doSpawn leaving (${guildName})`, { guildId, messageId: sent.id, spawnedAt });
-    try { lastSpawnAt.set(guildId, Date.now()); } catch (e) { try { logger && logger.warn && logger.warn('Failed setting lastSpawnAt', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging lastSpawnAt set error', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
+    try {
+      lastSpawnAt.set(guildId, Date.now());
+    } catch (e) {
+      try {
+        logger &&
+          logger.warn &&
+          logger.warn('Failed setting lastSpawnAt', { guildId, error: e && (e.stack || e) });
+      } catch (le) {
+        try {
+          fallbackLogger.warn('Failed logging lastSpawnAt set error', le && (le.stack || le));
+        } catch (ignored) {
+          /* ignore */ void 0;
+        }
+      }
+    }
     // Clear failure tracker on successful spawn
     if (failureTracker.has(guildId)) {
       failureTracker.delete(guildId);
@@ -607,20 +928,34 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     const errorType = isRateLimit ? 'rate-limit' : isPermission ? 'permission' : 'other';
 
     if (isPermission) {
-      warnWithCooldown(`spawn-perm:${guildId}`, `Error during doSpawn (${guildName})`, { guildId, error: err.stack || err, errorType, code: err.code, status: err.status }, 5 * 60 * 1000);
+      warnWithCooldown(
+        `spawn-perm:${guildId}`,
+        `Error during doSpawn (${guildName})`,
+        { guildId, error: err.stack || err, errorType, code: err.code, status: err.status },
+        5 * 60 * 1000
+      );
     } else {
-      logger.error(`Error during doSpawn (${guildName})`, { guildId, error: err.stack || err, errorType, code: err.code, status: err.status });
+      logger.error(`Error during doSpawn (${guildName})`, {
+        guildId,
+        error: err.stack || err,
+        errorType,
+        code: err.code,
+        status: err.status,
+      });
     }
-    
+
     recordSpawnFailure(guildId);
-    
+
     // Apply extra backoff for rate limits (wait longer before retry)
     if (isRateLimit) {
       const tracker = failureTracker.get(guildId);
       if (tracker) {
         // Double the failure count for rate limits to increase backoff aggressively
         tracker.count = Math.min(20, tracker.count + 1);
-        logger.warn(`Aggressive backoff applied to ${guildName} due to rate limit`, { guildId, newCount: tracker.count });
+        logger.warn(`Aggressive backoff applied to ${guildName} due to rate limit`, {
+          guildId,
+          newCount: tracker.count,
+        });
       }
     }
 
@@ -628,14 +963,16 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       const tracker = failureTracker.get(guildId);
       if (tracker) {
         tracker.count = Math.min(20, tracker.count + 2);
-        logger.warn(`Aggressive backoff applied to ${guildName} due to permissions`, { guildId, newCount: tracker.count });
+        logger.warn(`Aggressive backoff applied to ${guildName} due to permissions`, {
+          guildId,
+          newCount: tracker.count,
+        });
       }
     }
-    
+
     scheduleNext(guildId);
     return false;
-  }
-  finally {
+  } finally {
     inProgress.delete(guildId);
   }
 }
@@ -649,7 +986,7 @@ async function handleMessage(message) {
   if (message.content.trim().toLowerCase() !== 'egg') return false;
 
   // check for a single active egg event in this channel
-  const eggsInChannel = [...guildMap.values()].filter(e => e.channelId === message.channel.id);
+  const eggsInChannel = [...guildMap.values()].filter((e) => e.channelId === message.channel.id);
   if (eggsInChannel.length === 0) return false;
 
   // Only the first user to type 'egg' claims all eggs
@@ -659,21 +996,57 @@ async function handleMessage(message) {
     // Calculate catch time
     const catchTimeMs = Date.now() - eggEvent.spawnedAt;
     // Track per egg type and stats
-    const result = await userModel.addEggsForGuild(String(message.author.id), gid, eggEvent.numEggs, eggEvent.eggType.id, catchTimeMs);
+    const result = await userModel.addEggsForGuild(
+      String(message.author.id),
+      gid,
+      eggEvent.numEggs,
+      eggEvent.eggType.id,
+      catchTimeMs
+    );
     const catchTimeSec = (catchTimeMs / 1000).toFixed(2);
-      await message.channel.send(`${message.author} caught ${eggEvent.numEggs} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${eggEvent.numEggs > 1 ? 's' : ''}! (${catchTimeSec}s)\n\-# You now have ${result} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${result > 1 ? 's' : ''}.`);
-    logger.info('Egg(s) caught', { guildId: gid, user: message.author.id, numEggs: eggEvent.numEggs, eggType: eggEvent.eggType.id, catchTimeMs });
+    await message.channel.send(
+      `${message.author} caught ${eggEvent.numEggs} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${eggEvent.numEggs > 1 ? 's' : ''}! (${catchTimeSec}s)\n\-# You now have ${result} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${result > 1 ? 's' : ''}.`
+    );
+    logger.info('Egg(s) caught', {
+      guildId: gid,
+      user: message.author.id,
+      numEggs: eggEvent.numEggs,
+      eggType: eggEvent.eggType.id,
+      catchTimeMs,
+    });
   } catch (err) {
-    logger.error('Failed awarding egg', { guildId: gid, user: message.author.id, error: err.stack || err });
-    await message.channel.send(`${emojis.facehugger || ''} Error awarding egg to ${message.author}.`);
+    logger.error('Failed awarding egg', {
+      guildId: gid,
+      user: message.author.id,
+      error: err.stack || err,
+    });
+    await message.channel.send(
+      `${emojis.facehugger || ''} Error awarding egg to ${message.author}.`
+    );
   }
 
   // remove persisted active spawn row for this message
   try {
     const knex = db.knex;
-    if (eggEvent && eggEvent.messageId) await knex('active_spawns').where({ guild_id: gid, message_id: eggEvent.messageId }).del();
+    if (eggEvent && eggEvent.messageId)
+      await knex('active_spawns').where({ guild_id: gid, message_id: eggEvent.messageId }).del();
   } catch (e) {
-    try { logger.warn('Failed removing active_spawns row after catch', { guildId: gid, messageId: eggEvent && eggEvent.messageId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging removal of active_spawns row after catch', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
+    try {
+      logger.warn('Failed removing active_spawns row after catch', {
+        guildId: gid,
+        messageId: eggEvent && eggEvent.messageId,
+        error: e && (e.stack || e),
+      });
+    } catch (le) {
+      try {
+        fallbackLogger.warn(
+          'Failed logging removal of active_spawns row after catch',
+          le && (le.stack || le)
+        );
+      } catch (ignored) {
+        /* ignore */ void 0;
+      }
+    }
   }
 
   // Optionally delete the original spawn message if configured for this guild
@@ -686,28 +1059,61 @@ async function handleMessage(message) {
         const spawnChannelId = eggEvent.channelId || message.channel.id;
         const spawnChannel = await client.channels.fetch(spawnChannelId).catch(() => null);
         if (spawnChannel) {
-          const perms = spawnChannel.permissionsFor && client && client.user ? spawnChannel.permissionsFor(client.user) : null;
+          const perms =
+            spawnChannel.permissionsFor && client && client.user
+              ? spawnChannel.permissionsFor(client.user)
+              : null;
           const canManage = perms ? perms.has(PermissionsBitField.Flags.ManageMessages) : false;
           if (!canManage) {
-            logger.warn('Bot lacks permission to delete spawn message', { guildId: gid, channelId: spawnChannelId, messageId: eggEvent.messageId });
+            logger.warn('Bot lacks permission to delete spawn message', {
+              guildId: gid,
+              channelId: spawnChannelId,
+              messageId: eggEvent.messageId,
+            });
           } else {
-            const spawnMsg = await spawnChannel.messages.fetch(eggEvent.messageId).catch(() => null);
+            const spawnMsg = await spawnChannel.messages
+              .fetch(eggEvent.messageId)
+              .catch(() => null);
             if (spawnMsg) {
               await spawnMsg.delete().catch(() => null);
-              logger.info('Deleted spawn message after catch', { guildId: gid, messageId: eggEvent.messageId });
+              logger.info('Deleted spawn message after catch', {
+                guildId: gid,
+                messageId: eggEvent.messageId,
+              });
             } else {
-              logger.warn('Spawn message not found when attempting delete', { guildId: gid, messageId: eggEvent.messageId });
+              logger.warn('Spawn message not found when attempting delete', {
+                guildId: gid,
+                messageId: eggEvent.messageId,
+              });
             }
           }
         } else {
-          logger.warn('Spawn channel not found when attempting delete', { guildId: gid, channelId: eggEvent.channelId });
+          logger.warn('Spawn channel not found when attempting delete', {
+            guildId: gid,
+            channelId: eggEvent.channelId,
+          });
         }
       } catch (delErr) {
-        logger.warn('Failed to delete spawn message after catch', { guildId: gid, messageId: eggEvent && eggEvent.messageId, error: delErr && (delErr.stack || delErr) });
+        logger.warn('Failed to delete spawn message after catch', {
+          guildId: gid,
+          messageId: eggEvent && eggEvent.messageId,
+          error: delErr && (delErr.stack || delErr),
+        });
       }
     }
   } catch (e) {
-    try { logger.warn('Failed checking spawn deletion setting after catch', { guildId: gid, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging spawn deletion check error', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
+    try {
+      logger.warn('Failed checking spawn deletion setting after catch', {
+        guildId: gid,
+        error: e && (e.stack || e),
+      });
+    } catch (le) {
+      try {
+        fallbackLogger.warn('Failed logging spawn deletion check error', le && (le.stack || le));
+      } catch (ignored) {
+        /* ignore */ void 0;
+      }
+    }
   }
 
   // If no more active eggs, schedule the next spawn (apply pending reschedule if present)
@@ -719,13 +1125,35 @@ async function handleMessage(message) {
     try {
       scheduleNext(gid);
     } catch (e) {
-      try { logger.warn('Failed scheduling next spawn after catch', { guildId: gid, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging scheduleNext error after catch', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
+      try {
+        logger.warn('Failed scheduling next spawn after catch', {
+          guildId: gid,
+          error: e && (e.stack || e),
+        });
+      } catch (le) {
+        try {
+          fallbackLogger.warn(
+            'Failed logging scheduleNext error after catch',
+            le && (le.stack || le)
+          );
+        } catch (ignored) {
+          /* ignore */ void 0;
+        }
+      }
     }
   }
   return true;
 }
 
-module.exports = { init, scheduleNext, requestReschedule, handleMessage, activeEggs, doSpawn, getNextSpawnForGuild };
+module.exports = {
+  init,
+  scheduleNext,
+  requestReschedule,
+  handleMessage,
+  activeEggs,
+  doSpawn,
+  getNextSpawnForGuild,
+};
 
 // Force spawn wrapper: cancel any existing timer, run a spawn immediately, then schedule next normally.
 async function forceSpawn(guildId, forcedEggTypeId) {
@@ -736,9 +1164,39 @@ async function forceSpawn(guildId, forcedEggTypeId) {
       timers.delete(guildId);
     }
     nextSpawnAt.delete(guildId);
-    try { const knex = db.knex; await knex('guild_settings').where({ guild_id: guildId }).update({ next_spawn_at: null }); } catch (e) { try { logger.warn('Failed clearing next_spawn_at at forceSpawn start', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging next_spawn_at clear error at forceSpawn start', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
+    try {
+      const knex = db.knex;
+      await knex('guild_settings').where({ guild_id: guildId }).update({ next_spawn_at: null });
+    } catch (e) {
+      try {
+        logger.warn('Failed clearing next_spawn_at at forceSpawn start', {
+          guildId,
+          error: e && (e.stack || e),
+        });
+      } catch (le) {
+        try {
+          fallbackLogger.warn(
+            'Failed logging next_spawn_at clear error at forceSpawn start',
+            le && (le.stack || le)
+          );
+        } catch (ignored) {
+          /* ignore */ void 0;
+        }
+      }
+    }
   } catch (e) {
-    try { logger.warn('Error clearing timer in forceSpawn', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging error clearing timer in forceSpawn', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
+    try {
+      logger.warn('Error clearing timer in forceSpawn', { guildId, error: e && (e.stack || e) });
+    } catch (le) {
+      try {
+        fallbackLogger.warn(
+          'Failed logging error clearing timer in forceSpawn',
+          le && (le.stack || le)
+        );
+      } catch (ignored) {
+        /* ignore */ void 0;
+      }
+    }
   }
   // If an active spawn exists, clear it so force spawn always restarts the event.
   try {
@@ -751,22 +1209,56 @@ async function forceSpawn(guildId, forcedEggTypeId) {
             try {
               const msg = await channel.messages.fetch(eggEvent.messageId).catch(() => null);
               if (msg) await msg.delete().catch(() => null);
-            } catch (_) { /* ignore */ void 0; }
+            } catch (_) {
+              /* ignore */ void 0;
+            }
           }
-          } catch (_) { /* ignore */ void 0; }
+        } catch (_) {
+          /* ignore */ void 0;
+        }
       }
       activeEggs.delete(guildId);
       try {
         const knex = db.knex;
         await knex('active_spawns').where({ guild_id: guildId }).del();
       } catch (e) {
-        try { logger.warn('Failed clearing active_spawns rows during force spawn restart', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging active_spawns clear error in forceSpawn', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
+        try {
+          logger.warn('Failed clearing active_spawns rows during force spawn restart', {
+            guildId,
+            error: e && (e.stack || e),
+          });
+        } catch (le) {
+          try {
+            fallbackLogger.warn(
+              'Failed logging active_spawns clear error in forceSpawn',
+              le && (le.stack || le)
+            );
+          } catch (ignored) {
+            /* ignore */ void 0;
+          }
+        }
       }
       const guildName = getGuildName(guildId);
-      logger.info(`Cleared active spawn event before force spawn restart (${guildName})`, { guildId });
+      logger.info(`Cleared active spawn event before force spawn restart (${guildName})`, {
+        guildId,
+      });
     }
   } catch (e) {
-    try { logger.warn('Failed clearing active spawn event before force spawn', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging active spawn clear failure before force spawn', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } }
+    try {
+      logger.warn('Failed clearing active spawn event before force spawn', {
+        guildId,
+        error: e && (e.stack || e),
+      });
+    } catch (le) {
+      try {
+        fallbackLogger.warn(
+          'Failed logging active spawn clear failure before force spawn',
+          le && (le.stack || le)
+        );
+      } catch (ignored) {
+        /* ignore */ void 0;
+      }
+    }
   }
   try {
     // Clear timers so the forced spawn runs without racing scheduled timers.
@@ -775,7 +1267,25 @@ async function forceSpawn(guildId, forcedEggTypeId) {
     return spawned;
   } finally {
     // After forced spawn, schedule the next spawn normally
-    try { scheduleNext(guildId); } catch (e) { try { logger.warn('Failed scheduling next spawn after forceSpawn', { guildId, error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging scheduleNext error after forceSpawn', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
+    try {
+      scheduleNext(guildId);
+    } catch (e) {
+      try {
+        logger.warn('Failed scheduling next spawn after forceSpawn', {
+          guildId,
+          error: e && (e.stack || e),
+        });
+      } catch (le) {
+        try {
+          fallbackLogger.warn(
+            'Failed logging scheduleNext error after forceSpawn',
+            le && (le.stack || le)
+          );
+        } catch (ignored) {
+          /* ignore */ void 0;
+        }
+      }
+    }
   }
 }
 
@@ -785,7 +1295,26 @@ module.exports.forceSpawn = forceSpawn;
 async function shutdown() {
   try {
     for (const [, t] of timers.entries()) {
-      try { clearTimeout(t); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing spawn timer during shutdown', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger.warn('Failed logging timer clear error during spawnManager shutdown', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
+      try {
+        clearTimeout(t);
+      } catch (e) {
+        try {
+          logger &&
+            logger.warn &&
+            logger.warn('Failed clearing spawn timer during shutdown', {
+              error: e && (e.stack || e),
+            });
+        } catch (le) {
+          try {
+            fallbackLogger.warn(
+              'Failed logging timer clear error during spawnManager shutdown',
+              le && (le.stack || le)
+            );
+          } catch (ignored) {
+            /* ignore */ void 0;
+          }
+        }
+      }
     }
     timers.clear();
     pendingReschedule.clear();

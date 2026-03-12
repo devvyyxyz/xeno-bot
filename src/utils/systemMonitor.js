@@ -224,7 +224,7 @@ async function markAllDown(reason) {
   for (const k of keys) {
     try {
       // reuse markDown to preserve shutdown hook behavior
-      // eslint-disable-next-line no-await-in-loop
+       
       await markDown(k, reason).catch(() => {});
     } catch (_) { /* ignore individual failures */ }
   }
