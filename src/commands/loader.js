@@ -18,7 +18,17 @@ function loadCommands(commandsDir) {
         const indexPath = path.join(commandsDir, ent.name, 'index.js');
         if (fs.existsSync(indexPath)) {
           const command = require(indexPath);
-          if (command && command.name) commands.set(command.name, command);
+          if (command) {
+            // Infer missing command.name from directory when possible
+            if (!command.name) {
+              command.name = ent.name;
+              console.warn(`Loaded command from ${indexPath} without explicit name — inferring name='${command.name}'`);
+            }
+            // Ensure command.data.name exists for deployers/readers
+            command.data = command.data || {};
+            if (!command.data.name) command.data.name = command.name;
+            if (command.name) commands.set(command.name, command);
+          }
           continue;
         }
 
@@ -26,7 +36,15 @@ function loadCommands(commandsDir) {
         const fallback = path.join(commandsDir, ent.name, `${ent.name}.js`);
         if (fs.existsSync(fallback)) {
           const command = require(fallback);
-          if (command && command.name) commands.set(command.name, command);
+          if (command) {
+            if (!command.name) {
+              command.name = ent.name;
+              console.warn(`Loaded command from ${fallback} without explicit name — inferring name='${command.name}'`);
+            }
+            command.data = command.data || {};
+            if (!command.data.name) command.data.name = command.name;
+            if (command.name) commands.set(command.name, command);
+          }
           continue;
         }
       }
@@ -37,7 +55,15 @@ function loadCommands(commandsDir) {
         if (dirNames.has(base)) continue;
         const filePath = path.join(commandsDir, ent.name);
         const command = require(filePath);
-        if (command && command.name) commands.set(command.name, command);
+        if (command) {
+          if (!command.name) {
+            command.name = base;
+            console.warn(`Loaded command from ${filePath} without explicit name — inferring name='${command.name}'`);
+          }
+          command.data = command.data || {};
+          if (!command.data.name) command.data.name = command.name;
+          if (command.name) commands.set(command.name, command);
+        }
       }
     } catch (e) {
       // Do not throw; log via console.warn — index.js will wrap loader usage with logger
