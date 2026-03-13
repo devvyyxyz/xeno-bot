@@ -1,0 +1,16 @@
+{
+  "prefix": "xen!",
+  "owner": "<YOUR_DISCORD_USER_ID>",
+  "testerRoles": ["<ROLE_ID_1>", "<ROLE_ID_2>"],
+  "presence": {
+    "activities": ["Playing with the hive"],
+    "intervalSeconds": 60,
+    "status": "online"
+  },
+  "statusChannelId": "<STATUS_CHANNEL_ID>",
+  "bugReports": {
+    "forumChannelId": "<BUG_FORUM_CHANNEL_ID>",
+    "introMessage": "Thanks for opening a bug report. Include reproduction steps and logs.",
+    "resolvedMessage": "✅ This bug report has been marked as resolved."
+  }
+}
