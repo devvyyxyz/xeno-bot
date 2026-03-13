@@ -27,6 +27,7 @@ const safeReply = require('../../utils/safeReply');
 const hostsCfg = require('../../../config/hosts.json');
 const emojisCfg = require('../../../config/emojis.json');
 const evolutionsCfg = require('../../../config/evolutions.json');
+const itemsService = require('../../services/items');
 const cmd = { name: 'evolve', description: 'Evolve your xenomorphs' };
 const EVOLVE_LIST_PAGE_SIZE = 5;
 const EVOLVE_CANCEL_PAGE_SIZE = 10;
@@ -495,17 +496,16 @@ module.exports = {
                     await respond({ components: buildEvolveView({ screen: 'result', message: `Provided item is not valid for this evolution. Required: ${stepReq.requires_items.join(', ')}`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
                     return;
                   }
-                  // check inventory and remove one
+                  // consume the required item via items service (handles gifted/non-canonical keys)
                   try {
-                    const user = await userModel.getUserByDiscordId(String(userId));
-                    const g = (user && user.data && user.data.guilds && user.data.guilds[guildId]) ? user.data.guilds[guildId] : {};
-                    const qty = Number((g.items && g.items[normalized]) || 0);
-                    if (!qty || qty <= 0) {
-                      await respond({ components: buildEvolveView({ screen: 'result', message: `You don't have any ${normalized}.`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                    const consumed = await itemsService.consumeItemForUser(String(userId), guildId, normalized, 1);
+                    if (!consumed || !consumed.success) {
+                      const errMsg = consumed && consumed.error ? consumed.error : `You don't have any ${normalized}.`;
+                      await respond({ components: buildEvolveView({ screen: 'result', message: errMsg, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
                       return;
                     }
-                    await userModel.removeItemForGuild(String(userId), guildId, normalized, 1);
-                    itemPart = ` Item ${normalized} consumed.`;
+                    const itemName = consumed.item && consumed.item.name ? consumed.item.name : normalized;
+                    itemPart = ` Item ${itemName} consumed.`;
                   } catch (e) {
                     await respond({ components: buildEvolveView({ screen: 'result', message: `Failed to consume item: ${e && (e.message || e)}`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
                     return;
@@ -514,15 +514,14 @@ module.exports = {
                   // optional provided item: consume if user has it
                   try {
                     const normalized = String(providedItem).trim();
-                    const user = await userModel.getUserByDiscordId(String(userId));
-                    const g = (user && user.data && user.data.guilds && user.data.guilds[guildId]) ? user.data.guilds[guildId] : {};
-                    const qty = Number((g.items && g.items[normalized]) || 0);
-                    if (!qty || qty <= 0) {
-                      await respond({ components: buildEvolveView({ screen: 'result', message: `You don't have any ${normalized}.`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                    const consumed = await itemsService.consumeItemForUser(String(userId), guildId, normalized, 1);
+                    if (!consumed || !consumed.success) {
+                      const errMsg = consumed && consumed.error ? consumed.error : `You don't have any ${normalized}.`;
+                      await respond({ components: buildEvolveView({ screen: 'result', message: errMsg, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
                       return;
                     }
-                    await userModel.removeItemForGuild(String(userId), guildId, normalized, 1);
-                    itemPart = ` Item ${normalized} consumed.`;
+                    const itemName = consumed.item && consumed.item.name ? consumed.item.name : normalized;
+                    itemPart = ` Item ${itemName} consumed.`;
                   } catch (e) {
                     await respond({ components: buildEvolveView({ screen: 'result', message: `Failed to consume item: ${e && (e.message || e)}`, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
                     return;

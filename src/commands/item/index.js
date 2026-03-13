@@ -173,13 +173,15 @@ module.exports = {
       if (!a || !b) return respond({ content: 'One or both items not found.' });
       if (a.id === 'golden_gen' && b.id === 'golden_gen') {
         try {
-          const user = await userModel.getUserByDiscordId(userId);
-          const g = (user.data && user.data.guilds && user.data.guilds[guildId]) || {};
-          const qtyA = Number((g.items && g.items[a.id]) || 0);
-          const qtyB = Number((g.items && g.items[b.id]) || 0);
-          if (qtyA < 1 || qtyB < 1) return respond({ content: 'Insufficient items to combine.' });
-          await userModel.removeItemForGuild(userId, guildId, a.id, 1);
-          await userModel.removeItemForGuild(userId, guildId, b.id, 1);
+          // Attempt to consume both items via itemsService; restore if partial failure
+          const consumedA = await itemsService.consumeItemForUser(userId, guildId, a.id, 1);
+          if (!consumedA || !consumedA.success) return respond({ content: 'Insufficient items to combine.' });
+          const consumedB = await itemsService.consumeItemForUser(userId, guildId, b.id, 1);
+          if (!consumedB || !consumedB.success) {
+            // restore A
+            try { await itemsService.restoreItemForUser(userId, guildId, consumedA.key || a.id, 1); } catch (_) { /* ignore */ }
+            return respond({ content: 'Insufficient items to combine.' });
+          }
           await userModel.addItemForGuild(userId, guildId, 'golden_fragment', 1);
           return respond({ content: 'Combined two Golden Gen into Golden Fragment.' });
         } catch (e) {
