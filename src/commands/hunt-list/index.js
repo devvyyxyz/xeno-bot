@@ -22,6 +22,7 @@ const emojisCfg = require('../../../config/emojis.json');
 const rarities = require('../../../config/rarities.json');
 const { addV2TitleWithBotThumbnail, addV2TitleWithImageThumbnail } = require('../../utils/componentsV2');
 const safeReply = require('../../utils/safeReply');
+const componentsService = require('../../services/components');
 // logger intentionally omitted to avoid unused variable warnings
 
 const HOSTS_PER_PAGE = 4;
@@ -286,13 +287,13 @@ module.exports = {
           // Navigation
           if (i.customId === 'hunt-prev-page') {
             currentPage = Math.max(0, currentPage - 1);
-            await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client, currentSort, currentFilter, availableFilters }) });
+            await componentsService.updateInteraction(i, { components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client, currentSort, currentFilter, availableFilters }) });
             return;
           }
           if (i.customId === 'hunt-next-page') {
             const totalPages = Math.ceil(rows.length / HOSTS_PER_PAGE);
             currentPage = Math.min(totalPages - 1, currentPage + 1);
-            await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client, currentSort, currentFilter, availableFilters }) });
+            await componentsService.updateInteraction(i, { components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client, currentSort, currentFilter, availableFilters }) });
             return;
           }
 
@@ -312,7 +313,7 @@ module.exports = {
               const idx = allRows.findIndex(ar => ar.id === hostId);
               if (idx !== -1) allRows.splice(idx, 1);
             
-              await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client, currentSort, currentFilter, availableFilters }) });
+              await componentsService.updateInteraction(i, { components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client, currentSort, currentFilter, availableFilters }) });
             return;
           }
 
@@ -336,7 +337,7 @@ module.exports = {
             } catch (err) {
               try { await safeReply(i, { content: `Failed to sort hosts: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt-list' }); } catch (_) { /* ignore */ void 0; }
             }
-            await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client, currentSort, currentFilter, availableFilters }) });
+            await componentsService.updateInteraction(i, { components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client, currentSort, currentFilter, availableFilters }) });
             return;
           }
 
@@ -360,7 +361,7 @@ module.exports = {
             } catch (err) {
               try { await safeReply(i, { content: `Failed to filter hosts: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt-list' }); } catch (_) { /* ignore */ void 0; }
             }
-            await i.update({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client, currentSort, currentFilter, availableFilters }) });
+            await componentsService.updateInteraction(i, { components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, client: interaction.client, currentSort, currentFilter, availableFilters }) });
             return;
           }
 
@@ -391,7 +392,7 @@ module.exports = {
 
           // View stats
           if (i.customId === 'hunt-view-stats') {
-            await i.update({ components: buildStatsPage({ allHosts: rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
+            await componentsService.updateInteraction(i, { components: buildStatsPage({ allHosts: rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
             return;
           }
 
@@ -409,7 +410,7 @@ module.exports = {
           // Back to list
           if (i.customId === 'hunt-back-to-list') {
             currentPage = 0;
-            await i.update({ components: buildHostListPage({ pageIdx: 0, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
+            await componentsService.updateInteraction(i, { components: buildHostListPage({ pageIdx: 0, rows, cfgHosts, emojis: emojisCfg, client: interaction.client }) });
             return;
           }
         } catch (err) {
@@ -419,8 +420,8 @@ module.exports = {
 
       collector.on('end', async () => {
         try {
-          if (msg) {
-            await msg.edit({ components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, expired: true, client: interaction.client }) });
+            if (msg) {
+            await componentsService.updateInteraction(msg, { components: buildHostListPage({ pageIdx: currentPage, rows, cfgHosts, emojis: emojisCfg, expired: true, client: interaction.client }) });
           }
         } catch (_) { /* ignore */ void 0; }
       });

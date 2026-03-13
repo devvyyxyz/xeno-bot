@@ -27,6 +27,7 @@ const guildDefaultsCfg = require('../../../config/guildDefaults.json');
 const { addV2TitleWithBotThumbnail, addV2TitleWithImageThumbnail } = require('../../utils/componentsV2');
 const safeReply = require('../../utils/safeReply');
 const logger = require('../../utils/logger').get('command:hunt');
+const componentsService = require('../../services/components');
 
 const HOSTS_PER_PAGE = 4;
 
@@ -418,10 +419,10 @@ async function performHunt(interaction, client) {
 
     collector.on('collect', async i => {
       // Show host list from the result view
-      if (i.customId === 'hunt-view-list-from-result') {
+        if (i.customId === 'hunt-view-list-from-result') {
         rows = await hostModel.listHostsByOwner(userId, guildId);
         currentPage = 0;
-        await i.update({ components: buildHostListPage({ rows, cfgHosts, emojis: emojisCfg, client }), flags: MessageFlags.IsComponentsV2 });
+        await componentsService.updateInteraction(i, { components: buildHostListPage({ rows, cfgHosts, emojis: emojisCfg, client }), flags: MessageFlags.IsComponentsV2 });
         return;
       }
 
@@ -441,14 +442,14 @@ async function performHunt(interaction, client) {
         } catch (err) {
           try { await safeReply(i, { content: `Failed releasing hosts: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt' }); } catch (_) { /* ignore */ void 0; }
         }
-        await i.update({ components: buildHostListPage({ rows, pageIdx: currentPage, cfgHosts, emojis: emojisCfg, client }), flags: MessageFlags.IsComponentsV2 });
+        await componentsService.updateInteraction(i, { components: buildHostListPage({ rows, pageIdx: currentPage, cfgHosts, emojis: emojisCfg, client }), flags: MessageFlags.IsComponentsV2 });
         return;
       }
     });
 
     collector.on('end', async () => {
       try {
-        if (msg) {
+          if (msg) {
           const container = new ContainerBuilder();
           if (emojiUrl) {
             addV2TitleWithImageThumbnail({ container, title: 'Hunt Success', imageUrl: emojiUrl });
@@ -459,7 +460,7 @@ async function performHunt(interaction, client) {
             new TextDisplayBuilder().setContent(flavor),
             new TextDisplayBuilder().setContent(`You acquired: **${hostDisplay}** (ID: ${host.id})`)
           );
-          await msg.edit({ components: [container] });
+          await componentsService.updateInteraction(msg, { components: [container] });
         }
       } catch (_) { /* ignore */ void 0; }
     });

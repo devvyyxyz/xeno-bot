@@ -645,7 +645,7 @@ module.exports = {
                       currentListTypeFilter = matches[0];
                       currentListPage = 0;
                       const list = allXenos;
-                      try { await msg.edit({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) { /* ignore */ }
+                      try { await componentsService.updateInteraction(msg, { components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) { /* ignore */ }
                       await modalInteraction.followUp({ content: `Filtered to type: ${matches[0]}`, ephemeral: true });
                     } else {
                       // Present paginated select on the main view so user can pick from matches
@@ -668,7 +668,7 @@ module.exports = {
                         new SecondaryButtonBuilder().setCustomId('evolve-type-search-next').setLabel('Next').setDisabled(nextDisabled)
                       );
                       try {
-                        await msg.edit({ components: [...baseComponents, selectRow, navRow] });
+                        await componentsService.updateInteraction(msg, { components: [...baseComponents, selectRow, navRow] });
                         await modalInteraction.followUp({ content: `Found ${matchResults.length} matches. Use the select to pick one.`, ephemeral: true });
                       } catch (e) {
                         await modalInteraction.followUp({ content: `Failed to present matches: ${e && (e.message || e)}`, ephemeral: true });
@@ -688,7 +688,7 @@ module.exports = {
               currentListTypeFilter = chosen;
               currentListPage = 0;
               const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
-              await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
+              await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
             }
             return;
           }
@@ -696,7 +696,7 @@ module.exports = {
           if (String(i.customId).startsWith('evolve-list-info:')) {
             const selected = String(i.customId).split(':')[1];
             const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
-            await i.update({ components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: selected, client: interaction.client }) });
+            await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: selected, client: interaction.client }) });
             return;
           }
 
@@ -710,16 +710,16 @@ module.exports = {
               matchResults = null;
               matchPage = 0;
               const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
-              try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) { /* ignore */ }
+                      try { await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) { /* ignore */ }
             } else {
-              try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) { /* ignore */ }
+              try { await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) { /* ignore */ }
             }
             return;
           }
 
           if (i.customId === 'evolve-type-search-prev' || i.customId === 'evolve-type-search-next') {
             if (!matchResults) {
-              try { await i.update({ components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId, true), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) { /* ignore */ }
+              try { await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId, true), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) }); } catch (_) { /* ignore */ }
               return;
             }
             const pageSize = 25;
@@ -741,7 +741,7 @@ module.exports = {
             );
             try {
                       const baseComponents = buildEvolveView({ screen: 'list', xenos: await xenoModel.listByOwner(userIdInner, interaction.guildId), listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client });
-              await i.update({ components: [...baseComponents, selectRow, navRow] });
+              await componentsService.updateInteraction(i, { components: [...baseComponents, selectRow, navRow] });
             } catch (_) { /* ignore */ }
             return;
           }
@@ -749,21 +749,21 @@ module.exports = {
           if (String(i.customId).startsWith('evolve-cancel-job:')) {
             const jobId = Number(String(i.customId).split(':')[1]);
             if (!jobId) {
-              try { await i.update({ components: buildEvolveView({ screen: 'result', message: 'Invalid job id.', client: interaction.client }) }); } catch (_) { /* ignore */ }
+              try { await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'result', message: 'Invalid job id.', client: interaction.client }) }); } catch (_) { /* ignore */ }
               return;
             }
             // Load job
             const job = await db.knex('evolution_queue').where({ id: jobId }).first();
             if (!job) {
-              await i.update({ components: buildEvolveView({ screen: 'result', message: 'Job not found.', client: interaction.client }) });
+              await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'result', message: 'Job not found.', client: interaction.client }) });
               return;
             }
             if (String(job.user_id) !== userIdInner) {
-              await i.update({ components: buildEvolveView({ screen: 'result', message: 'You do not own this job.', client: interaction.client }) });
+              await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'result', message: 'You do not own this job.', client: interaction.client }) });
               return;
             }
             if (job.status !== 'queued') {
-              await i.update({ components: buildEvolveView({ screen: 'result', message: 'Job has already started or completed and cannot be cancelled.', client: interaction.client }) });
+              await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'result', message: 'Job has already started or completed and cannot be cancelled.', client: interaction.client }) });
               return;
             }
 
@@ -792,7 +792,7 @@ module.exports = {
 
             // Refresh cancel screen
             const jobs = await loadJobs(userIdInner);
-            await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, cancelPage: 0, client: interaction.client }) });
+            await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'cancel', jobs, cancelPage: 0, client: interaction.client }) });
             return;
           }
 
@@ -800,46 +800,46 @@ module.exports = {
             const isPrev = i.customId === 'evolve-list-prev-page';
             currentListPage = isPrev ? currentListPage - 1 : currentListPage + 1;
             const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
-            await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
+            await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'list', xenos: list, listPage: currentListPage, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-nav-list') {
             currentListPage = 0;
             const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
-            await i.update({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
+            await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, listTypeFilter: currentListTypeFilter, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-nav-info') {
             const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
             const firstId = list.length ? list[0].id : null;
-            await i.update({ components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: firstId, client: interaction.client }) });
+            await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: firstId, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-nav-cancel') {
             currentCancelPage = 0;
             const jobs = await loadJobs(userIdInner);
-            await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, cancelPage: currentCancelPage, client: interaction.client }) });
+            await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'cancel', jobs, cancelPage: currentCancelPage, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-cancel-prev-page' || i.customId === 'evolve-cancel-next-page') {
             const isPrev = i.customId === 'evolve-cancel-prev-page';
             currentCancelPage = isPrev ? currentCancelPage - 1 : currentCancelPage + 1;
             const jobs = await db.knex('evolution_queue').where({ user_id: userIdInner, status: 'queued' }).orderBy('id', 'asc');
-            await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, cancelPage: currentCancelPage, client: interaction.client }) });
+            await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'cancel', jobs, cancelPage: currentCancelPage, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-nav-start') {
-            await i.update({ components: buildEvolveView({ screen: 'start-help', client: interaction.client }) });
+            await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'start-help', client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-new-xeno') {
-            await i.update({ components: buildEvolveView({ screen: 'start-help', client: interaction.client }) });
+            await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'start-help', client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-info-select') {
             const selected = i.values && i.values[0] ? i.values[0] : null;
             const list = await xenoModel.listByOwner(userIdInner, interaction.guildId);
-            await i.update({ components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: selected, client: interaction.client }) });
+            await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'info', xenos: list, selectedXenoId: selected, client: interaction.client }) });
             return;
           }
           if (i.customId === 'evolve-cancel-select') {
@@ -847,12 +847,12 @@ module.exports = {
             const job = await db.knex('evolution_queue').where({ id: selectedJobId }).first();
             if (!job || String(job.user_id) !== userIdInner || job.status !== 'queued') {
               const jobs = await db.knex('evolution_queue').where({ user_id: userIdInner, status: 'queued' }).orderBy('id', 'asc');
-              await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, cancelPage: currentCancelPage, message: 'Selected job is no longer cancellable.', client: interaction.client }) });
+              await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'cancel', jobs, cancelPage: currentCancelPage, message: 'Selected job is no longer cancellable.', client: interaction.client }) });
               return;
             }
             await db.knex('evolution_queue').where({ id: selectedJobId }).del();
             const jobs = await db.knex('evolution_queue').where({ user_id: userIdInner, status: 'queued' }).orderBy('id', 'asc');
-            await i.update({ components: buildEvolveView({ screen: 'cancel', jobs, cancelPage: currentCancelPage, message: `Cancelled job #${selectedJobId}.`, client: interaction.client }) });
+            await componentsService.updateInteraction(i, { components: buildEvolveView({ screen: 'cancel', jobs, cancelPage: currentCancelPage, message: `Cancelled job #${selectedJobId}.`, client: interaction.client }) });
             return;
           }
         } catch (err) {
@@ -864,7 +864,7 @@ module.exports = {
         try {
             const list = await xenoModel.listByOwner(userId, guildId);
           if (msg) {
-            await msg.edit({ components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, expired: true, client: interaction.client }) });
+            await componentsService.updateInteraction(msg, { components: buildEvolveView({ screen: 'list', xenos: list, listPage: 0, expired: true, client: interaction.client }) });
           }
         } catch (_) { /* ignore */ }
       });

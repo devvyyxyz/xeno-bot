@@ -11,6 +11,7 @@ const emojis = require('../../../config/emojis.json');
 const { getPaginationState, buildPaginationRow } = require('../../utils/pagination');
 const db = require('../../db');
 const { formatNumber } = require('../../utils/numberFormat');
+const componentsService = require('../../services/components');
 
 const logger = require('../../utils/logger').get('command:hive');
 
@@ -649,6 +650,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
   if (!msg || typeof msg.createMessageComponentCollector !== 'function' || !initialHive) return;
 
   const safeReply = require('../../utils/safeReply');
+  const componentsService = require('../../services/components');
   let viewHive = initialHive;
   const canAct = true;
 
@@ -676,7 +678,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
         await hiveModel.updateHiveById(viewHive.id, { data: newData }).catch(() => {});
         viewHive = { ...viewHive, data: newData };
         // Refresh the message so UI reflects updated pricing label
-        try { await msg.edit({ components: buildHiveScreen({ screen: 'stats', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, client: interaction.client }), flags: MessageFlags.IsComponentsV2 }).catch(() => {}); } catch (_) { /* ignore */ }
+        try { await componentsService.updateInteraction(msg, { components: buildHiveScreen({ screen: 'stats', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, client: interaction.client }), flags: MessageFlags.IsComponentsV2 }).catch(() => {}); } catch (_) { /* ignore */ }
       }
     }
   } catch (e) {
@@ -702,7 +704,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
         xenos = await xenomorphModel.getXenosByOwner(String(userId), guildId).catch(() => xenos);
         let rjRefresh = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
         resources = { royal_jelly: rjRefresh };
-        await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: 'Refreshed hive data.', membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+        await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: 'Refreshed hive data.', membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
         return;
       }
 
@@ -715,7 +717,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
         let rj = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
         if (rj < cost) {
           resources = { royal_jelly: rj };
-          await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Not enough Royal Jelly. Need ${formatNumber(cost)}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+          await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Not enough Royal Jelly. Need ${formatNumber(cost)}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
           return;
         }
         await userModel.modifyCurrencyForGuild(String(userId), guildId, 'royal_jelly', -cost);
@@ -727,21 +729,21 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
         viewHive = { ...viewHive, jelly_production_per_hour: newProduction, data: newData };
         rj = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
         resources = { royal_jelly: rj };
-        await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Queen upgraded. +1 jelly/hour (spent ${formatNumber(cost)} RJ).`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+        await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Queen upgraded. +1 jelly/hour (spent ${formatNumber(cost)} RJ).`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
         return;
       }
 
       if (i.customId === HIVE_ACTION_UPGRADE_CAPACITY_ID) {
         const capacityUpgrade = getCapacityUpgradeInfo(viewHive.capacity);
         if (!capacityUpgrade) {
-          await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: 'Hive capacity is already at maximum level.', membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+          await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: 'Hive capacity is already at maximum level.', membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
           return;
         }
         const cost = capacityUpgrade.cost;
         let rj = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
         if (rj < cost) {
           resources = { royal_jelly: rj };
-          await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Not enough Royal Jelly. Need ${formatNumber(cost)}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+          await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Not enough Royal Jelly. Need ${formatNumber(cost)}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
           return;
         }
         await userModel.modifyCurrencyForGuild(String(userId), guildId, 'royal_jelly', -cost);
@@ -749,7 +751,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
         viewHive = { ...viewHive, capacity: capacityUpgrade.nextCapacity };
         rj = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
         resources = { royal_jelly: rj };
-        await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Capacity upgraded to ${capacityUpgrade.nextCapacity}. ${capacityUpgrade.unlockNote}`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+          await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Capacity upgraded to ${capacityUpgrade.nextCapacity}. ${capacityUpgrade.unlockNote}`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
         return;
       }
 
@@ -768,14 +770,14 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
         }
 
         if (!candidate) {
-          await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: 'All modules are already at max level.', membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+          await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: 'All modules are already at max level.', membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
           return;
         }
 
         let rj = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
         if (rj < candidate.cost) {
           resources = { royal_jelly: rj };
-          await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Not enough Royal Jelly for ${candidate.cfg.display}. Need ${formatNumber(candidate.cost)}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+          await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Not enough Royal Jelly for ${candidate.cfg.display}. Need ${formatNumber(candidate.cost)}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
           return;
         }
 
@@ -788,7 +790,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
         modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => modules);
         let rjAfterModuleUpgrade = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
         resources = { royal_jelly: rjAfterModuleUpgrade };
-        await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Upgraded ${candidate.cfg.display} to level ${candidate.level + 1}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+        await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Upgraded ${candidate.cfg.display} to level ${candidate.level + 1}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
         return;
       }
 
@@ -804,7 +806,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
         let rj = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
         if (rj < moduleToUpgrade.cost) {
           resources = { royal_jelly: rj };
-          await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Not enough Royal Jelly for ${moduleToUpgrade.cfg.display}. Need ${formatNumber(moduleToUpgrade.cost)}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+          await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Not enough Royal Jelly for ${moduleToUpgrade.cfg.display}. Need ${formatNumber(moduleToUpgrade.cost)}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
           return;
         }
 
@@ -817,7 +819,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
         modules = await db.knex('hive_modules').where({ hive_id: viewHive.id }).select('*').catch(() => modules);
         let rjAfter = await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly');
         resources = { royal_jelly: rjAfter };
-        await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Upgraded ${moduleToUpgrade.cfg.display} to level ${moduleToUpgrade.level + 1}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+        await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Upgraded ${moduleToUpgrade.cfg.display} to level ${moduleToUpgrade.level + 1}.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
         return;
       }
 
@@ -842,7 +844,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
 
         viewHive = { ...viewHive, queen_xeno_id: queenId };
         xenos = await xenomorphModel.getXenosByOwner(String(userId), guildId).catch(() => xenos);
-        await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Assigned xenomorph #${queenId} as hive queen.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+        await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Assigned xenomorph #${queenId} as hive queen.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
         return;
       }
 
@@ -866,12 +868,12 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
         const xenosToAdd = finalIds.slice(0, remainingCapacity);
 
         if (remainingCapacity <= 0) {
-          await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Your hive is at capacity (${currentMembers.length}/${capacity}).`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+          await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Your hive is at capacity (${currentMembers.length}/${capacity}).`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
           return;
         }
 
         if (xenosToAdd.length < finalIds.length) {
-          await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Only ${remainingCapacity} slot(s) available. Adding first ${xenosToAdd.length} xenomorph(s).`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+          await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Only ${remainingCapacity} slot(s) available. Adding first ${xenosToAdd.length} xenomorph(s).`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
           return;
         }
 
@@ -887,7 +889,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
           });
 
         xenos = await xenomorphModel.getXenosByOwner(String(userId), guildId).catch(() => xenos);
-        await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Added ${formatNumber(updatedCount || xenosToAdd.length)} xenomorph(s) to this hive.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+        await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Added ${formatNumber(updatedCount || xenosToAdd.length)} xenomorph(s) to this hive.`, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
         return;
       }
 
@@ -926,7 +928,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
         }
 
         xenos = await xenomorphModel.getXenosByOwner(String(userId), guildId).catch(() => xenos);
-        await i.update({ components: buildHiveScreen({ screen: 'members', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Removed ${finalIds.length} member(s) from the hive.`, membersPage: currentMembersPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+        await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: 'members', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, notice: `Removed ${finalIds.length} member(s) from the hive.`, membersPage: currentMembersPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
         return;
       }
 
@@ -947,7 +949,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
         const pagination = getPaginationState({ items: members, pageIdx: currentMembersPage, pageSize: HIVE_MEMBERS_PAGE_SIZE });
         const maxPage = Math.max(1, pagination.totalPages);
         currentMembersPage = Math.max(0, Math.min(maxPage - 1, currentMembersPage - 1));
-        await i.update({ components: buildHiveScreen({ screen: 'members', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, membersPage: currentMembersPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+        await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: 'members', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, membersPage: currentMembersPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
         return;
       }
       else if (i.customId === HIVE_MEMBERS_NEXT_PAGE) {
@@ -955,7 +957,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
         const pagination = getPaginationState({ items: members, pageIdx: currentMembersPage, pageSize: HIVE_MEMBERS_PAGE_SIZE });
         const maxPage = Math.max(1, pagination.totalPages);
         currentMembersPage = Math.max(0, Math.min(maxPage - 1, currentMembersPage + 1));
-        await i.update({ components: buildHiveScreen({ screen: 'members', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, membersPage: currentMembersPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+        await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: 'members', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, membersPage: currentMembersPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
         return;
       }
       else if (i.customId === HIVE_MODULES_PREV_PAGE) {
@@ -964,7 +966,7 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
         const pagination = getPaginationState({ items: allModules, pageIdx: currentModulesPage, pageSize: 5 });
         const maxPage = Math.max(1, pagination.totalPages);
         currentModulesPage = Math.max(0, Math.min(maxPage - 1, currentModulesPage - 1));
-        await i.update({ components: buildHiveScreen({ screen: 'modules', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+        await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: 'modules', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
         return;
       }
       else if (i.customId === HIVE_MODULES_NEXT_PAGE) {
@@ -973,31 +975,31 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
         const pagination = getPaginationState({ items: allModules, pageIdx: currentModulesPage, pageSize: 5 });
         const maxPage = Math.max(1, pagination.totalPages);
         currentModulesPage = Math.max(0, Math.min(maxPage - 1, currentModulesPage + 1));
-        await i.update({ components: buildHiveScreen({ screen: 'modules', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+        await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: 'modules', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, modulesPage: currentModulesPage, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
         return;
       }
       else if (i.customId === HIVE_NAV_ASSIGN_QUEEN_ID) currentScreen = 'assign-queen';
       else if (i.customId === HIVE_NAV_ADD_XENOS_ID) currentScreen = 'add-xenos';
       else if (i.customId === HIVE_NAV_DELETE_ID) {
-        await i.update(buildHiveDeleteV2Payload({ hiveName: viewHive.name || 'your hive', hiveId: viewHive.id, state: 'confirm', includeFlags: false, client: interaction.client }));
+        await componentsService.updateInteraction(i, buildHiveDeleteV2Payload({ hiveName: viewHive.name || 'your hive', hiveId: viewHive.id, state: 'confirm', includeFlags: false, client: interaction.client }));
         return;
       }
       else if (i.customId === HIVE_DELETE_CONFIRM_ID) {
         await hiveModel.deleteHiveById(viewHive.id);
-        await i.update(buildHiveDeleteV2Payload({ hiveName: viewHive.name || 'your hive', hiveId: viewHive.id, state: 'deleted', includeFlags: false, client: interaction.client }));
+        await componentsService.updateInteraction(i, buildHiveDeleteV2Payload({ hiveName: viewHive.name || 'your hive', hiveId: viewHive.id, state: 'deleted', includeFlags: false, client: interaction.client }));
         collector.stop('deleted');
         return;
       }
       else if (i.customId === HIVE_DELETE_CANCEL_ID) {
-        await i.update(buildHiveDeleteV2Payload({ hiveName: viewHive.name || 'your hive', hiveId: viewHive.id, state: 'cancelled', includeFlags: false, client: interaction.client }));
+        await componentsService.updateInteraction(i, buildHiveDeleteV2Payload({ hiveName: viewHive.name || 'your hive', hiveId: viewHive.id, state: 'cancelled', includeFlags: false, client: interaction.client }));
         return;
       }
       else if (i.customId === HIVE_DELETE_BACK_ID) {
-        await i.update({ components: buildHiveScreen({ screen: 'stats', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+        await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: 'stats', hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
         return;
       }
 
-      await i.update({ components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
+      await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: currentScreen, hive: viewHive, targetUser, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct, membersPage: currentMembersPage, modulesPage: currentModulesPage, client: interaction.client }) });
     } catch (err) {
       try { await safeReply(i, { content: `Error: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hive' }); } catch (_) { /* ignore */ }
     }
@@ -1065,7 +1067,7 @@ module.exports = {
                 resources = { royal_jelly: await userModel.getCurrencyForGuild(String(userId), guildId, 'royal_jelly') }; 
               } catch (e) { /* ignore */ }
 
-              await i.update({ components: buildHiveScreen({ screen: 'stats', hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct: true, client: interaction.client }) });
+              await componentsService.updateInteraction(i, { components: buildHiveScreen({ screen: 'stats', hive: viewHive, targetUser: interaction.user, userId, rows: { modules, milestones, resources, xenos }, expired: false, canAct: true, client: interaction.client }) });
               collector.stop();
               await attachHiveDashboardCollector({ interaction, msg: i.message, userId, guildId, targetUser: interaction.user, initialHive: viewHive });
               return;
@@ -1087,7 +1089,7 @@ module.exports = {
                   new PrimaryButtonBuilder().setLabel('Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
                 )
               );
-              await i.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
+              await componentsService.updateInteraction(i, { components: [container], flags: MessageFlags.IsComponentsV2 });
               return;
             }
 
@@ -1103,7 +1105,7 @@ module.exports = {
                   new PrimaryButtonBuilder().setLabel('Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
                 )
               );
-              await i.update({ components: [container], flags: MessageFlags.IsComponentsV2 });
+              await componentsService.updateInteraction(i, { components: [container], flags: MessageFlags.IsComponentsV2 });
               return;
             }
 
@@ -1133,7 +1135,7 @@ module.exports = {
               typeSelectContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent('_Pathogen hive requires at least one Pathogen Queen in your collection._'));
             }
 
-            await i.update({ components: [typeSelectContainer], flags: MessageFlags.IsComponentsV2 });
+            await componentsService.updateInteraction(i, { components: [typeSelectContainer], flags: MessageFlags.IsComponentsV2 });
 
             // Create a short-lived collector for the select menu
               try {
@@ -1197,7 +1199,7 @@ module.exports = {
                 new PrimaryButtonBuilder().setLabel('Create Hive').setCustomId('hive-create-prompt').setDisabled(true)
               )
             );
-            try { await i.update({ components: [container], flags: MessageFlags.IsComponentsV2 }); } catch (_) { /* ignore */ }
+            try { await componentsService.updateInteraction(i, { components: [container], flags: MessageFlags.IsComponentsV2 }); } catch (_) { /* ignore */ }
           }
         });
 
