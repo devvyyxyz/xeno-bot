@@ -1,3 +1,4 @@
+/* eslint-env node, commonjs */
 const { getCommandConfig, buildSubcommandOptions, isCommandEphemeral } = require('../../utils/commandsConfig');
 void buildSubcommandOptions;
 const safeReply = require('../../utils/safeReply');

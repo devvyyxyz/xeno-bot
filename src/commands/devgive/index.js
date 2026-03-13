@@ -1,3 +1,4 @@
+/* eslint-env node, commonjs */
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const eggTypes = require('../../../config/eggTypes.json');
 const evolutions = require('../../../config/evolutions.json');

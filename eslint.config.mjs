@@ -21,6 +21,8 @@ export default defineConfig([
       globals: {
         ...globals.node,
         ...globals.jest,
+        require: 'readonly',
+        module: 'readonly',
       },
 
       ecmaVersion: 12,

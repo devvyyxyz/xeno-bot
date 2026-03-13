@@ -1,3 +1,4 @@
+/* eslint-env node, commonjs */
 const { getCommandConfig, buildSubcommandOptions } = require('../../utils/commandsConfig');
 const eggTypes = require('../../../config/eggTypes.json');
 const userModel = require('../../models/user');
