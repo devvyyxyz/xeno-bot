@@ -23,6 +23,7 @@ const emojisCfg = require('../../../config/emojis.json');
 const userModel = require('../../models/user');
 const hostModel = require('../../models/host');
 const xenoModel = require('../../models/xenomorph');
+const itemsService = require('../../services/items');
 const safeReply = require('../../utils/safeReply');
 const { formatNumber } = require('../../utils/numberFormat');
 
@@ -460,13 +461,14 @@ module.exports = {
       // Build item list with metadata for sorting
       const itemList = [];
       for (const [itemId, qty] of itemEntries) {
-        const shopItem = (shopConfig.items || []).find(it => it.id === itemId);
+        const shopItem = itemsService.findItem(itemId) || (shopConfig.items || []).find(it => it.id === itemId);
         const label = shopItem ? shopItem.name : itemId;
         itemList.push({ 
           name: label, 
           value: String(qty), 
           inline: true,
-          quantity: qty
+          quantity: qty,
+          key: itemId
         });
       }
       

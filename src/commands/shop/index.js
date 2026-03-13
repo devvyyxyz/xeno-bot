@@ -17,6 +17,7 @@ const {
 } = require('@discordjs/builders');
 const userModel = require('../../models/user');
 const safeReply = require('../../utils/safeReply');
+const itemsService = require('../../services/items');
 const { buildNoticeV2Payload, addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 
 const logger = require('../../utils/logger').get('command:shop');
@@ -236,7 +237,7 @@ module.exports = {
           const [, type, itemId] = raw.split(':');
           let item = null;
           if (type === 'egg') item = (eggTypes || []).find(e => e.id === itemId);
-          else item = (shopConfig.items || []).find(it => it.id === itemId);
+          else item = itemsService.findItem(itemId) || (shopConfig.items || []).find(it => it.id === itemId);
           if (!item) {
             await safeReply(i, { content: 'Selected item not found.', ephemeral: true }, { loggerName: 'command:shop' });
             return;
