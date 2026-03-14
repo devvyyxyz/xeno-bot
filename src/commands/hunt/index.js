@@ -317,7 +317,8 @@ async function performHunt(interaction, client) {
           const qty = Math.floor(Math.random() * 5) + 1;
           try {
             await userModel.addItemForGuild(userId, guildId, 'scrap', qty);
-            spawned.push(`${qty} <:scrap:1479934663882576053>`);
+            const emojis = require('../../../config/emojis.json');
+            spawned.push(`${qty} ${emojis.scrap || '<:scrap:1479934663882576053>'}`);
           } catch (e) {
             logger.warn('Failed to add scrap to user inventory', { userId, guildId, error: e && e.message });
           }

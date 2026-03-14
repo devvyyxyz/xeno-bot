@@ -9,6 +9,7 @@ const {
   MessageFlags
 } = require('discord.js');
 const fallbackLogger = require('../../utils/fallbackLogger');
+const emojis = require('../../../config/emojis.json');
 const db = require('../../db');
 const safeReply = require('../../utils/safeReply');
 const { formatNumber } = require('../../utils/numberFormat');
@@ -164,7 +165,7 @@ module.exports = {
       );
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `**Performance**\nCatches: ${formatNumber(stats.catches || 0)}\nAvg: ${msToHuman(stats.avg || null)}\nFastest: ${msToHuman(stats.fastest || null)}\nSlowest: ${msToHuman(stats.slowest || null)}\nLeaderboard: ${rankInfo}`
+          `${emojis.stopwatch || ''} **Performance**\nCatches: ${formatNumber(stats.catches || 0)}\nAvg: ${msToHuman(stats.avg || null)}\nFastest: ${msToHuman(stats.fastest || null)}\nSlowest: ${msToHuman(stats.slowest || null)}\nLeaderboard: ${rankInfo}`
         )
       );
 
@@ -174,7 +175,7 @@ module.exports = {
       );
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `**Inventory**\n<:house:1482505377441644736> server Eggs: ${formatNumber(totalEggs)} | Items: ${formatNumber(totalItems)}\n<:globe:1482504992823840798> global Eggs: ${formatNumber(globalEggs)} | Items: ${formatNumber(globalItems)}`
+          `${emojis.backpack || ''} **Inventory**\n${emojis.house || '<:house:1482505377441644736>'} server Eggs: ${formatNumber(totalEggs)} | Items: ${formatNumber(totalItems)}\n${emojis.globe || '<:globe:1482504992823840798>'} global Eggs: ${formatNumber(globalEggs)} | Items: ${formatNumber(globalItems)}`
         )
       );
 
@@ -186,7 +187,7 @@ module.exports = {
       const topEggsGlobalText = topEggs.length ? topEggs.map(e => `${e.k}: ${formatNumber(e.v)} (${fmtRate(e.v)})`).join('\n') : 'none';
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `**Top Eggs**\n<:house:1482505377441644736> server\n${topEggsServerText}\n\n<:globe:1482504992823840798> global\n${topEggsGlobalText}`
+          `${emojis.info || ''} **Top Eggs**\n${emojis.house || '<:house:1482505377441644736>'} server\n${topEggsServerText}\n\n${emojis.globe || '<:globe:1482504992823840798>'} global\n${topEggsGlobalText}`
         )
       );
 
@@ -198,7 +199,7 @@ module.exports = {
       const globalCurrencyText = globalCurrencyLines.length ? globalCurrencyLines.map(c => `${c.k}: ${formatNumber(c.v)}`).join(', ') : 'none';
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `**Currency**\n<:house:1482505377441644736> server ${guildCurrencyText}\n<:globe:1482504992823840798> global ${globalCurrencyText}`
+          `**Currency**\n${emojis.house || '<:house:1482505377441644736>'} server ${guildCurrencyText}\n${emojis.globe || '<:globe:1482504992823840798>'} global ${globalCurrencyText}`
         )
       );
 
@@ -208,7 +209,7 @@ module.exports = {
       );
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `**Misc**\nAccount created: ${accountCreated}\nUser ID: ${target.id}`
+          `${emojis.person || ''} **Misc**\nAccount created: ${accountCreated}\n${emojis.ID || ''} User ID: ${target.id}`
         )
       );
 

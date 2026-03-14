@@ -144,7 +144,8 @@ module.exports = {
                 // Queens become pathogen queens
                 await xenoModel.updateXenoById(xeno.id, { pathway: 'pathogen', role: 'pathogen_queen', stage: 'pathogen_queen', data: newData });
                 await userModel.updateUserDataRawById(targetUserId, data);
-                const PATHOGEN_EMOJI = '<:pathogen_queen:1479910616411148519>';
+                const emojis = require('../../../config/emojis.json');
+                const PATHOGEN_EMOJI = emojis.pathogen_queen || '<:pathogen_queen:1479910616411148519>';
                 return respond({ content: `Used one ${item.name} on Queen ${PATHOGEN_EMOJI} #${xeno.id}. It has been transformed into a Pathogen Queen.` });
               } else {
                 // Drones are switched to the pathogen pathway but retain their drone stage
@@ -268,7 +269,8 @@ module.exports = {
             if (filtered.length >= 25) break;
           }
 
-          const PATHOGEN_EMOJI = '<:pathogen_queen:1479910616411148519>';
+          const emojis = require('../../../config/emojis.json');
+          const PATHOGEN_EMOJI = emojis.pathogen_queen || '<:pathogen_queen:1479910616411148519>';
           const candidates = filtered.map(x => {
             const roleLabel = (x.role || x.stage || x.pathway || 'xeno');
             let display;
