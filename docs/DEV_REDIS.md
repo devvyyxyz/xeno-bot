@@ -72,5 +72,3 @@ Project behavior and env vars
   - `REDIS_PASSWORD` — password (optional)
   - `AUTO_START_REDIS` — when set to `1`, the project will attempt to auto-start Redis for development (Docker or local `redis-server` binary)
   - `REDIS_REQUIRED` — when set, startup will fail if Redis is not reachable
-
-If you need me to validate a `REDIS_URL` from here, paste a redacted value (keep the host and port, redact the password) and I can run a connectivity check for you.
