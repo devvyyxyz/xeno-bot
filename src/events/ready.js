@@ -110,53 +110,12 @@ module.exports = {
           activityTypeMap[String(k).toLowerCase()] = v;
         }
 
-        // Generate dynamic status messages based on config
+        // Generate a single status showing server and user counts
         const generateActivities = () => {
-          const activities = [];
-          
-          // Member count across all guilds (if enabled in config)
-          if (statusCycling?.displayMembers !== false) {
-            const memberCount = client.guilds.cache.reduce((total, guild) => total + guild.memberCount, 0);
-            activities.push({ name: `${memberCount.toLocaleString()} members`, type: ActivityType.Watching });
-          }
-          
-          // Server/guild count (if enabled in config)
-          if (statusCycling?.displayServers !== false) {
-            const serverCount = client.guilds.cache.size;
-            activities.push({ name: `${serverCount.toLocaleString()} servers`, type: ActivityType.Watching });
-          }
-          
-          // Shard info (if sharded and enabled in config)
-          if (client.shard && statusCycling?.displayShard !== false) {
-            const shardId = client.shard.ids[0];
-            const shardCount = client.shard.count;
-            activities.push({ name: `Shard ${shardId}/${shardCount - 1}`, type: ActivityType.Playing });
-          }
-          
-          // Add custom activities from config if any
-          if (statusCycling?.customActivities && Array.isArray(statusCycling.customActivities) && statusCycling.customActivities.length > 0) {
-            for (const item of statusCycling.customActivities) {
-              let activity = null;
-              if (typeof item === 'string') {
-                activity = { name: item, type: ActivityType.Playing };
-              } else if (item && typeof item === 'object') {
-                const name = item.name || item.text || '';
-                let typeVal = undefined;
-                if (item.type !== undefined && item.type !== null) {
-                  if (typeof item.type === 'number') {
-                    typeVal = item.type;
-                  } else {
-                    const tKey = String(item.type).replace(/[_-]/g, '').toLowerCase();
-                    typeVal = activityTypeMap[tKey] !== undefined ? activityTypeMap[tKey] : undefined;
-                  }
-                }
-                activity = { name, type: typeVal !== undefined ? typeVal : ActivityType.Playing };
-              }
-              if (activity) activities.push(activity);
-            }
-          }
-          
-          return activities.length > 0 ? activities : [];
+          const serverCount = client.guilds.cache.size || 0;
+          const userCount = client.guilds.cache.reduce((total, g) => total + (g.memberCount || 0), 0);
+          const name = `${serverCount.toLocaleString()} servers | ${userCount.toLocaleString()} users`;
+          return [{ name, type: ActivityType.Watching }];
         };
         
         const setPresence = async () => {

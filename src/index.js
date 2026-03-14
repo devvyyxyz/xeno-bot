@@ -138,15 +138,41 @@ function createStartupProgress(totalSteps) {
   const startedAt = Date.now();
   const width = 20;
 
+  // If running in an interactive TTY, update a single terminal line
+  // to avoid spamming the logs with repeated progress entries. When
+  // not running in a TTY (logs), fall back to emitting logger.info.
+  const isTTY = process.stdout && process.stdout.isTTY;
+  let maxLineLength = 0;
+
   const render = (label, state) => {
     const ratio = totalSteps > 0 ? completed / totalSteps : 0;
     const filled = Math.max(0, Math.min(width, Math.round(ratio * width)));
     const empty = width - filled;
     const percent = Math.round(ratio * 100);
     const bar = `${'█'.repeat(filled)}${'░'.repeat(empty)}`;
-    baseLogger.info(
-      `[startup] [${bar}] ${percent}% (${completed}/${totalSteps}) ${state} - ${label}`
-    );
+    const message = `[startup] [${bar}] ${percent}% (${completed}/${totalSteps}) ${state} - ${label}`;
+
+    if (isTTY) {
+      // Update same terminal line and pad to clear previous content
+      if (message.length > maxLineLength) maxLineLength = message.length;
+      const padded = message.padEnd(maxLineLength, ' ');
+      try {
+        process.stdout.write('\r' + padded);
+      } catch (_) {
+        // Fallback to logger if stdout write fails
+        baseLogger.info(message);
+      }
+
+      // For final states, emit a persistent log entry and newline
+      if (state && (state.startsWith('DONE') || state.startsWith('FAILED'))) {
+        try {
+          process.stdout.write('\n');
+        } catch (_) {}
+        baseLogger.info(message);
+      }
+    } else {
+      baseLogger.info(message);
+    }
   };
 
   return {
