@@ -148,24 +148,50 @@ Xeno Bot can use Redis for background job queues, caching, and faster pub/sub op
 	- `AUTO_START_REDIS_TIMEOUT_MS` — timeout for auto-start helper (milliseconds)
 	- `REDIS_REQUIRED` — when set to `1|true|yes`, startup will fail if Redis is not reachable.
 
-If you don't run Docker on your machine, the auto-start helper will try to spawn a local `redis-server` binary (if installed). To run Redis manually:
+If you don't run Docker on your machine, the auto-start helper will try to spawn a local `redis-server` binary (if installed).
+
+Platform-specific quick-start
+
+- macOS (Homebrew)
 
 ```bash
-# Docker (recommended if available)
-docker compose up -d
-
-# Or run redis-server locally (Homebrew/macOS)
+# If you don't have Homebrew, install it first:
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+# Install and start Redis:
 brew install redis
 brew services start redis
-
-# Quick one-off with Docker
-docker run -p 6379:6379 --name xeno-redis -d redis:7-alpine
-
 # Verify
-redis-cli ping   # should reply PONG
+redis-cli ping  # should reply PONG
+```
+
+- Linux (Debian/Ubuntu)
+
+```bash
+sudo apt update
+sudo apt install redis-server
+sudo systemctl enable --now redis-server
+redis-cli ping
+```
+
+- Windows
+
+Use WSL and follow the Linux steps inside the WSL shell, or run Redis via Docker:
+
+```bash
+docker run -p 6379:6379 --name xeno-redis -d redis:7-alpine
+redis-cli -h 127.0.0.1 ping
+```
+
+- Docker (cross-platform)
+
+```bash
+docker run -p 6379:6379 --name xeno-redis -d redis:7-alpine
+redis-cli -h 127.0.0.1 ping
 ```
 
 To disable auto-start in development, set `AUTO_START_REDIS=0` in your `.env` file.
+
+- Dev note: See the developer Redis guide for local-dev limitations and recommendations: [docs/DEV_REDIS.md](docs/DEV_REDIS.md)
 
 
 # 🤝 Contributing

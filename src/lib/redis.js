@@ -126,6 +126,7 @@ if (IORedis) {
 } else {
   // No real Redis configured/available — use in-memory stub
   console.info('[redis] no Redis configured; using in-memory stub');
+  console.info('[redis] To enable real Redis locally: install Redis (Homebrew: "brew install redis"), then either run "brew services start redis" or set AUTO_START_REDIS=1 to let the helper try to spawn redis-server. Alternatively set REDIS_HOST/REDIS_URL to a reachable Redis instance.');
   client = new InMemoryRedis();
 }
 
