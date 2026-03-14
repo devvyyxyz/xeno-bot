@@ -25,7 +25,7 @@ coverage/
 tmp/
 
 # data files
-data/*.json
+data/
 
 # backups and other generated files
 *.bak
@@ -36,3 +36,23 @@ backups/*.json
 
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
+
+# Build / cache artifacts
+dist/
+build/
+.next/
+.parcel-cache/
+.cache/
+
+# Test / coverage
+.nyc_output/
+.eslintcache
+
+# npm / yarn logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Misc
+Thumbs.db
+.pnp.*
