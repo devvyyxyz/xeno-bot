@@ -174,7 +174,7 @@ module.exports = {
       );
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `**Inventory**\n(this server) Eggs: ${formatNumber(totalEggs)} | Items: ${formatNumber(totalItems)}\n(global) Eggs: ${formatNumber(globalEggs)} | Items: ${formatNumber(globalItems)}`
+          `**Inventory**\n<:house:1482505377441644736> server Eggs: ${formatNumber(totalEggs)} | Items: ${formatNumber(totalItems)}\n<:globe:1482504992823840798> global Eggs: ${formatNumber(globalEggs)} | Items: ${formatNumber(globalItems)}`
         )
       );
 
@@ -186,7 +186,7 @@ module.exports = {
       const topEggsGlobalText = topEggs.length ? topEggs.map(e => `${e.k}: ${formatNumber(e.v)} (${fmtRate(e.v)})`).join('\n') : 'none';
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `**Top Eggs**\n(this server)\n${topEggsServerText}\n\n(global)\n${topEggsGlobalText}`
+          `**Top Eggs**\n<:house:1482505377441644736> server\n${topEggsServerText}\n\n<:globe:1482504992823840798> global\n${topEggsGlobalText}`
         )
       );
 
@@ -198,7 +198,7 @@ module.exports = {
       const globalCurrencyText = globalCurrencyLines.length ? globalCurrencyLines.map(c => `${c.k}: ${formatNumber(c.v)}`).join(', ') : 'none';
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
-          `**Currency**\n(this server) ${guildCurrencyText}\n(global) ${globalCurrencyText}`
+          `**Currency**\n<:house:1482505377441644736> server ${guildCurrencyText}\n<:globe:1482504992823840798> global ${globalCurrencyText}`
         )
       );
 
