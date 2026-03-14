@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "@discordjs/builders": "^2.0.0-dev.1771286636-ccce987fa",
-    "@discordjs/rest": "^1.4.0",
+    "@discordjs/rest": "^2.6.0",
     "@sentry/node": "^7.16.0",
     "cors": "^2.8.5",
     "discord-api-types": "^0.38.42",
@@ -37,7 +37,7 @@
     "mysql2": "^3.19.1",
     "pg": "^8.20.0",
     "session-file-store": "^1.5.0",
-    "sqlite3": "^5.1.6",
+    "sqlite3": "^6.0.1",
     "winston": "^3.8.2",
     "winston-daily-rotate-file": "^5.0.0"
   },
