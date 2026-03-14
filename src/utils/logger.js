@@ -156,6 +156,27 @@ const logger = createLogger({
   exitOnError: false
 });
 
+// Attach error handlers to each transport so transport-level I/O errors
+// (for example EIO when stdout/stderr are unavailable) do not throw
+// uncaught exceptions and instead are recorded to the fallback logger.
+try {
+  const fallback = require('./fallbackLogger');
+  for (const t of logger.transports || []) {
+    // Some transports emit 'error' events when writes fail.
+    // Forward those errors to the fallback logger to avoid throwing.
+    t.on && t.on('error', (err) => {
+      try {
+        const msg = err && (err.stack || String(err));
+        fallback.error('Logger transport error', msg);
+      } catch (_) {
+        try { process.stderr.write(`Logger transport error: ${String(err)}\n`); } catch (_) {}
+      }
+    });
+  }
+} catch (e) {
+  try { process.stderr.write(`Failed to attach logger transport error handlers: ${e}\n`); } catch (_) {}
+}
+
 // Console with colors and stack printing in non-production
 if (process.env.NODE_ENV !== 'production') {
   if (forceColor) {
