@@ -9,6 +9,15 @@
     "Evolution": "<:compas:1477478738412179706>",
     "Administration": "<:wrench:1477478743974084859>"
   },
+  "categoryEmojiKeys": {
+    "General": "globe",
+    "Developer": "wrench",
+    "Social": "people",
+    "Hive": "house",
+    "Gameplay": "controller",
+    "Evolution": "compas",
+    "Administration": "wrench"
+  },
   "Gameplay": {
     "hunt": {
       "name": "hunt",

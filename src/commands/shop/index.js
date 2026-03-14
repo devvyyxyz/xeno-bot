@@ -36,7 +36,10 @@ function buildPages(items) {
 
 function resolveEmoji(it) {
   if (!it) return '';
-  return it.emoji && emojiMap && emojiMap[it.emoji] ? emojiMap[it.emoji] : '';
+  if (!emojiMap) return '';
+  const key = it.emoji_key || it.emoji;
+  if (!key) return '';
+  return emojiMap[key] || (typeof it.emoji === 'string' ? it.emoji : '');
 }
 
 function makeShopComponents({

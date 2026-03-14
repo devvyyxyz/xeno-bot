@@ -299,7 +299,8 @@ module.exports = {
         } else if (sortOpt.startsWith('hosttype_')) {
           const t = sortOpt.replace('hosttype_', '');
           const hostType = hostsConfig.hosts[t];
-          const emoji = hostType && hostType.emoji && emojiMap[hostType.emoji] ? emojiMap[hostType.emoji] : '';
+          const hostEmojiKey = hostType && (hostType.emoji_key || hostType.emoji);
+          const emoji = hostEmojiKey && emojiMap[hostEmojiKey] ? emojiMap[hostEmojiKey] : (hostType && hostType.emoji ? hostType.emoji : '');
           value = `${emoji} **${entry.info.hostsByType[t] || 0}**`;
         } else if (sortOpt === 'fastest') value = (entry.info.best !== null && typeof entry.info.best === 'number') ? `**${(entry.info.best/1000).toFixed(2)}s**` : 'No data';
         else if (sortOpt === 'slowest') value = (entry.info.worst !== null && typeof entry.info.worst === 'number') ? `**${(entry.info.worst/1000/3600).toFixed(2)}h**` : 'No data';
@@ -511,7 +512,8 @@ module.exports = {
       } else if (sort.startsWith('hosttype_')) {
         const type = sort.replace('hosttype_', '');
         const hostType = hostsConfig.hosts[type];
-        const emoji = hostType && hostType.emoji && emojiMap[hostType.emoji] ? emojiMap[hostType.emoji] : '';
+        const hostEmojiKey = hostType && (hostType.emoji_key || hostType.emoji);
+        const emoji = hostEmojiKey && emojiMap[hostEmojiKey] ? emojiMap[hostEmojiKey] : (hostType && hostType.emoji ? hostType.emoji : '');
         desc += `#${i + 1} ${userTag} — ${emoji} **${entry.hosts[type] || 0}**\n`;
       }
     }

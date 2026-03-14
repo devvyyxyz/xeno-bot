@@ -92,5 +92,13 @@
     ,"stopwatch": "<:stopwatch:1482506533416997057>"
     ,"person": "<:person:1482506534926811319>"
     ,"backpack": "<:backpack:1482506531965636608>"
-    ,"scrap": "<:scrap:1479934663882576053>"
+    ,"scrap": "<:scrap:1479934663882576053>",
+    "sections": {
+        "primary": ["house", "globe", "info", "ID", "stopwatch", "person", "backpack", "scrap"],
+        "eggs": ["egg", "egg_detailed", "egg_hidden", "egg_open"],
+        "arrows": ["up_arrow", "down_arrow", "left_arrow", "right_arrow"],
+        "rarities": ["common", "rare", "very_rare"],
+        "currencies": ["Royal_jelly"],
+        "roles": ["king", "prince", "knight"]
+    }
 }

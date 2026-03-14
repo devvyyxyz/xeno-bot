@@ -14,6 +14,7 @@ const { getCommandsObject, isCommandEphemeral } = require('../../utils/commandsC
 const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
 const fallbackLogger = require('../../utils/fallbackLogger');
 const safeReply = require('../../utils/safeReply');
+const emojis = require('../../utils/emojis');
 // Reload cmd each time to get fresh config (in case it changes)
 // `getCmd` removed — reload config on-demand via `getCommandsObject()` where needed
 
@@ -257,11 +258,22 @@ module.exports = {
             value: category,
             default: category === cat
           };
-          const raw = catEmojis[category];
-          if (raw && typeof raw === 'string') {
-            const m = raw.match(/^<:([^:>]+):([0-9]+)>$/);
-            if (m) opt.emoji = { name: m[1], id: m[2] };
-            else opt.emoji = raw;
+          // Prefer categoryEmojiKeys mapping when available (references keys in config/emojis.json)
+          const key = (commandsCfg && commandsCfg.categoryEmojiKeys && commandsCfg.categoryEmojiKeys[category]) || null;
+          if (key) {
+            const lit = emojis.get(key);
+            if (lit && typeof lit === 'string') {
+              const m = lit.match(/^<:([^:>]+):([0-9]+)>$/);
+              if (m) opt.emoji = { name: m[1], id: m[2] };
+              else opt.emoji = lit;
+            }
+          } else {
+            const raw = catEmojis[category];
+            if (raw && typeof raw === 'string') {
+              const m = raw.match(/^<:([^:>]+):([0-9]+)>$/);
+              if (m) opt.emoji = { name: m[1], id: m[2] };
+              else opt.emoji = raw;
+            }
           }
           return opt;
         });

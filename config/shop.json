@@ -13,6 +13,7 @@
       "sellable": false,
       "rarity": "legendary",
       "emoji": "Black_goo"
+      ,"emoji_key": "Black_goo"
     },
     {
       "id": "scrap",
@@ -23,7 +24,8 @@
       "sellPrice": 0,
       "sellable": false,
       "rarity": "common",
-      "emoji": "<:scrap:1479934663882576053>"
+      "emoji": "<:scrap:1479934663882576053>",
+      "emoji_key": "scrap"
     },
     {
       "id": "incubation_accelerator",
@@ -34,7 +36,8 @@
       "sellPrice": 0,
       "sellable": false,
       "rarity": "rare",
-      "emoji": "<:incubation:1479930000000000000>"
+      "emoji": "<:incubation:1479930000000000000>",
+      "emoji_key": "incubation"
     }
   ]
 }

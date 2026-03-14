@@ -132,7 +132,8 @@ module.exports = {
         
         const hostChoices = hosts.map(h => {
           const hostType = hostsConfig.hosts[h.host_type];
-          const emoji = hostType?.emoji && emojiMap[hostType.emoji] ? emojiMap[hostType.emoji] : '';
+          const hostEmojiKey = hostType?.emoji_key || hostType?.emoji;
+          const emoji = hostEmojiKey && emojiMap[hostEmojiKey] ? emojiMap[hostEmojiKey] : (hostType?.emoji || '');
           const hostName = hostType?.display || h.host_type;
           return {
             id: String(h.id),
@@ -288,7 +289,8 @@ module.exports = {
             if (!consumed || !consumed.success) {
               const senderQty = consumed && consumed.qty ? consumed.qty : 0;
               const emojiMap = require('../../../config/emojis.json');
-              const emoji = item.emoji && emojiMap[item.emoji] ? emojiMap[item.emoji] : '';
+              const itemEmojiKey = item.emoji_key || item.emoji;
+              const emoji = itemEmojiKey && emojiMap[itemEmojiKey] ? emojiMap[itemEmojiKey] : (item.emoji || '');
               await safeReply(interaction, { content: `You don't have enough ${emoji} ${item.name}! You have ${senderQty}, but need ${amount}.`, ephemeral: true }, { loggerName: 'command:gift' });
               return;
             }
@@ -301,7 +303,8 @@ module.exports = {
         await userModel.addItemForGuild(recipient.id, guildId, itemId, amount);
 
         const emojiMap = require('../../../config/emojis.json');
-        const emoji = item.emoji && emojiMap[item.emoji] ? emojiMap[item.emoji] : '';
+        const itemEmojiKey = item.emoji_key || item.emoji;
+        const emoji = itemEmojiKey && emojiMap[itemEmojiKey] ? emojiMap[itemEmojiKey] : (item.emoji || '');
         await safeReply(interaction, buildStatsV2Payload({
           title: '🎁 Gift Sent',
           rows: [
@@ -353,7 +356,8 @@ module.exports = {
 
         const hostType = hostsConfig.hosts[host.host_type];
         const emojiMap = require('../../../config/emojis.json');
-        const emoji = hostType?.emoji && emojiMap[hostType.emoji] ? emojiMap[hostType.emoji] : '';
+        const hostEmojiKey = hostType?.emoji_key || hostType?.emoji;
+        const emoji = hostEmojiKey && emojiMap[hostEmojiKey] ? emojiMap[hostEmojiKey] : (hostType?.emoji || '');
         const hostName = hostType?.display || host.host_type;
 
         await safeReply(interaction, buildStatsV2Payload({
@@ -423,7 +427,8 @@ module.exports = {
         const roleKey = String(xeno.role || xeno.stage || 'xenomorph').toLowerCase();
         const roleInfo = rolesMap[roleKey] || {};
         const displayName = roleInfo.display || roleKey;
-        const roleEmoji = roleInfo.emoji && emojiMap[roleInfo.emoji] ? emojiMap[roleInfo.emoji] : '';
+        const roleEmojiKey = roleInfo.emoji_key || roleInfo.emoji;
+        const roleEmoji = roleEmojiKey && emojiMap[roleEmojiKey] ? emojiMap[roleEmojiKey] : (roleInfo.emoji || '');
 
         await safeReply(interaction, buildStatsV2Payload({
           title: '🎁 Xenomorph Gifted',
