@@ -223,7 +223,34 @@ if (process.env.LOG_REMOTE_URL) {
   }
 }
 
-// Helper to get a namespaced child logger
-logger.get = (label) => logger.child({ label });
+// Helper to emit a boxed section header in logs
+logger.section = (title, opts = {}) => {
+  try {
+    const level = opts.level || 'info';
+    const width = Math.max(20, Math.min(120, opts.width || 60));
+    const safeTitle = String(title || '').trim();
+    const padSize = Math.max(0, width - safeTitle.length - 2);
+    const leftPad = Math.floor(padSize / 2);
+    const rightPad = padSize - leftPad;
+    const top = '┌' + '─'.repeat(width) + '┐';
+    const middle = '│ ' + ' '.repeat(leftPad) + safeTitle + ' '.repeat(rightPad) + ' │';
+    const bottom = '└' + '─'.repeat(width) + '┘';
+    logger.log({ level, message: `\n${top}\n${middle}\n${bottom}` });
+  } catch (e) {
+    try { logger.info(`[${title}]`); } catch (_) { /* ignore */ }
+  }
+};
+
+// Helper to get a namespaced child logger with convenience `section()`
+logger.get = (label) => {
+  const child = logger.child({ label });
+  child.section = (title, opts = {}) => {
+    const prefix = label ? `${label} ` : '';
+    const merged = Object.assign({}, opts);
+    // Prepend label to title for clarity
+    logger.section(`${prefix}- ${title}`, merged);
+  };
+  return child;
+};
 
 module.exports = logger;
