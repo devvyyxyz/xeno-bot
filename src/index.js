@@ -147,13 +147,17 @@ function createStartupProgress(totalSteps) {
     const empty = width - filled;
     const percent = Math.round(ratio * 100);
 
-    const action = state && state.startsWith('DONE') ? 'Completed' : state && state.startsWith('FAILED') ? 'Failed' : 'Starting';
-    baseLogger.info(`[startup] ${action} - ${label}`, {
-      percent,
-      completed,
-      totalSteps,
-      detail: state,
-    });
+    // Emit a compact progress line (bar) and also a concise completion log for final states
+    baseLogger.progress(label, completed, totalSteps, { meta: { detail: state } });
+    if (state && (state.startsWith('DONE') || state.startsWith('FAILED'))) {
+      const action = state.startsWith('DONE') ? 'Completed' : 'Failed';
+      baseLogger.info(`[startup] ${action} - ${label}`, {
+        percent,
+        completed,
+        totalSteps,
+        detail: state,
+      });
+    }
   };
 
   return {
@@ -209,6 +213,7 @@ function startMemoryWatchdog() {
 }
 
 async function startup() {
+  baseLogger.section('Startup');
   const startupProgress = createStartupProgress(5);
 
   try {

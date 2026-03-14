@@ -253,4 +253,43 @@ logger.get = (label) => {
   return child;
 };
 
+// Progress helper: emits a single-line progress bar with metadata.
+logger.progress = (title, current, total, opts = {}) => {
+  try {
+    const width = Math.max(10, Math.min(60, opts.width || 20));
+    const safeTitle = String(title || '').trim();
+    const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+    const filled = Math.max(0, Math.min(width, Math.round((pct / 100) * width)));
+    const empty = width - filled;
+    const bar = `${'█'.repeat(filled)}${'░'.repeat(empty)}`;
+    logger.info(`[${safeTitle}] [${bar}] ${pct}% (${current}/${total})`, {
+      title: safeTitle,
+      percent: pct,
+      current,
+      total,
+      ...opts.meta,
+    });
+  } catch (e) {
+    try { logger.info(`${title} - ${current}/${total}`); } catch (_) { /* ignore */ }
+  }
+};
+
+// Attach progress to child loggers as well
+const _origGet = logger.get;
+logger.get = (label) => {
+  const child = _origGet(label);
+  child.progress = (title, current, total, opts = {}) => {
+    const pref = label ? `${label}: ` : '';
+    logger.progress(pref + title, current, total, opts);
+  };
+  // preserve section helper already attached earlier
+  if (!child.section) {
+    child.section = (title, opts = {}) => {
+      const prefix = label ? `${label} ` : '';
+      logger.section(`${prefix}- ${title}`, opts);
+    };
+  }
+  return child;
+};
+
 module.exports = logger;

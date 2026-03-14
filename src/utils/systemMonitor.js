@@ -12,6 +12,7 @@ const PERSIST_PATH = path.join(__dirname, '..', '..', 'data', 'system-monitor.js
 
 // Load persisted state (statusMessageId) early so restarts reuse the same message
 loadPersist();
+logger.section('System Monitor');
 logger.info('systemMonitor loaded persisted state', { statusMessageId });
 
 function loadPersist() {
@@ -155,6 +156,7 @@ async function updateStatusMessage() {
     if (ctx.message) {
       try {
         await ctx.message.edit({ embeds: [buildStatusEmbed()] });
+        logger.section(`Edited existing status message (${ctx.message.id})`);
         logger.info('Edited existing status message', { messageId: ctx.message.id });
         return;
       } catch (e) {
@@ -166,6 +168,7 @@ async function updateStatusMessage() {
           persist();
           const sent = await createStatusMessage(ctx.channel);
           if (sent) {
+            logger.section(`Recreated status message after missing on update (${sent.id})`);
             logger.info('Recreated status message after missing on update', { messageId: sent.id });
             return;
           }
