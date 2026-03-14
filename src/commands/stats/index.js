@@ -1,4 +1,3 @@
-/* eslint-env node, commonjs */
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const userModel = require('../../models/user');
 const {

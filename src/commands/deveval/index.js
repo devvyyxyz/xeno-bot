@@ -1,4 +1,3 @@
-/* eslint-env node, commonjs */
 module.exports = {
   name: 'deveval',
   description: 'Evaluate JS code in bot context (disabled stub).',

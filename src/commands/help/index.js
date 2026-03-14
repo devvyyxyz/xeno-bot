@@ -1,4 +1,3 @@
-/* eslint-env node, commonjs */
 const {
   ContainerBuilder,
   TextDisplayBuilder,

@@ -1,4 +1,3 @@
-/* eslint-env node, commonjs */
 const { EmbedBuilder } = require('discord.js');
 const path = require('path');
 const fs = require('fs');
