@@ -8,6 +8,7 @@ let clientRef = null;
 let channelId = null;
 let statusMessageId = null;
 const systems = {};
+const SHUTDOWN_HOOK_TIMEOUT_MS = Number(process.env.SHUTDOWN_HOOK_TIMEOUT_MS) || 5000;
 const PERSIST_PATH = path.join(__dirname, '..', '..', 'data', 'system-monitor.json');
 
 // Load persisted state (statusMessageId) early so restarts reuse the same message
@@ -204,7 +205,20 @@ async function markDown(key, reason) {
   // Attempt to invoke shutdown hook if present
   try {
     if (systems[key] && typeof systems[key].shutdown === 'function') {
-      await Promise.resolve(systems[key].shutdown()).catch(e => logger.warn('Shutdown hook failed', { key, error: e && (e.stack || e) }));
+      try {
+        const shutdownPromise = Promise.resolve(systems[key].shutdown());
+        const res = await Promise.race([
+          shutdownPromise.then(() => ({ ok: true })).catch(e => ({ ok: false, error: e })),
+          new Promise(resolve => setTimeout(() => resolve({ ok: false, timeout: true }), SHUTDOWN_HOOK_TIMEOUT_MS))
+        ]);
+        if (res.timeout) {
+          logger.warn('Shutdown hook timed out', { key, timeoutMs: SHUTDOWN_HOOK_TIMEOUT_MS });
+        } else if (!res.ok) {
+          logger.warn('Shutdown hook failed', { key, error: res.error && (res.error.stack || res.error) });
+        }
+      } catch (e) {
+        logger.warn('Shutdown hook invocation error', { key, error: e && (e.stack || e) });
+      }
     }
   } catch (e) { logger.warn('markDown shutdown failed', { key, error: e && (e.stack || e) }); }
   try {

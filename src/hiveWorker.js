@@ -7,8 +7,10 @@ const userModel = models.user;
 const hiveModel = models.hive;
 
 let _interval = null;
+let shuttingDown = false;
 
 async function processHives() {
+  if (shuttingDown) return 0;
   try {
     const now = Date.now();
     const msPerHour = 3600000;
@@ -76,6 +78,10 @@ async function processHives() {
 }
 
 async function start(opts = {}) {
+  if (shuttingDown) {
+    logger.info('Hive worker start called while shutting down; ignoring');
+    return;
+  }
   const pollMs = opts.pollMs || 60 * 1000; // default once per minute
   if (_interval) clearInterval(_interval);
   _interval = setInterval(() => {
@@ -93,6 +99,7 @@ async function start(opts = {}) {
 }
 
 async function stop() {
+  shuttingDown = true;
   try {
     if (_interval) clearInterval(_interval);
     _interval = null;

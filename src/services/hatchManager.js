@@ -32,6 +32,7 @@ function getGuildName(guildId) {
 
 let timers = new Map();
 let client = null;
+let shuttingDown = false;
 
 async function init(botClient) {
   client = botClient || null;
@@ -57,6 +58,10 @@ async function init(botClient) {
 }
 
 function scheduleTimer(hatchId, delay) {
+  if (shuttingDown) {
+    try { logger && logger.info && logger.info('Skipping scheduleTimer: system is shutting down', { hatchId }); } catch (_) { /* ignore */ }
+    return;
+  }
   if (timers.has(hatchId)) {
     clearTimeout(timers.get(hatchId));
   }
@@ -68,6 +73,7 @@ function scheduleTimer(hatchId, delay) {
 }
 
 async function startHatch(discordId, guildId, eggTypeId, durationMs) {
+  if (shuttingDown) throw new Error('hatchManager is shutting down, cannot start new hatch');
   const user = await userModel.getUserByDiscordId(discordId);
   if (!user) throw new Error('User not found');
   const data = user.data || {};
@@ -185,6 +191,7 @@ async function listHatches(discordId, guildId) {
 module.exports = { init, startHatch, skipHatch, collectHatch, listHatches };
 
 async function shutdown() {
+  shuttingDown = true;
   try {
     for (const [, t] of timers.entries()) {
       try { clearTimeout(t); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing hatch timer during shutdown', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger && fallbackLogger.warn && fallbackLogger.warn('Failed logging timer clear error during hatchManager shutdown', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }

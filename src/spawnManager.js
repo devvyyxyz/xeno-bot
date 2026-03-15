@@ -47,6 +47,7 @@ let client = null;
 // activeEggs: guildId -> Map(messageId -> { messageId, channelId, value, spawnedAt })
 let activeEggs = new Map();
 let timers = new Map();
+let shuttingDown = false;
 const pendingReschedule = new Set();
 // nextSpawnAt: guildId -> timestamp (ms since epoch) when the next spawn is scheduled
 let nextSpawnAt = new Map();
@@ -141,6 +142,7 @@ function isPermissionError(error) {
 }
 
 function enqueueSpawn(guildId, forcedEggTypeId, isForced = false) {
+  if (shuttingDown) return Promise.reject(new Error('spawnManager is shutting down, cannot enqueue spawn'));
   // Prevent queue from growing unbounded during failure cascades
   if (spawnQueue.length >= maxSpawnQueueDepth) {
     logger.warn('Spawn queue depth limit reached; dropping new spawn request', {
@@ -353,6 +355,10 @@ async function init(botClient) {
 }
 
 function scheduleNext(guildId) {
+  if (shuttingDown) {
+    try { logger && logger.info && logger.info('Skipping scheduleNext: system is shutting down', { guildId }); } catch (_) { /* ignore */ }
+    return;
+  }
   // clear existing timer
   if (timers.has(guildId)) {
     clearTimeout(timers.get(guildId));
@@ -1295,6 +1301,7 @@ module.exports.forceSpawn = forceSpawn;
 
 // Shutdown helper: clear any pending timers used for scheduling
 async function shutdown() {
+  shuttingDown = true;
   try {
     for (const [, t] of timers.entries()) {
       try {

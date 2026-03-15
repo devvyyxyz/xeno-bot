@@ -13,7 +13,9 @@ function getRoleDisplay(roleId) {
   const emojiKey = roleInfo.emoji;
   const emoji = emojiKey && emojisCfg[emojiKey] ? `${emojisCfg[emojiKey]} ` : '';
   return `${emoji}${display}`.trim();
+  let shuttingDown = false;
 }
+    if (shuttingDown) return 0;
 
 function buildEvolutionCompleteV2Dm(job, fromRole, toRole) {
   const container = new ContainerBuilder();
@@ -76,6 +78,10 @@ async function processDueJobs(client) {
           }
         } catch (dmErr) {
           logger.warn('Failed to DM user about evolution completion', { jobId: job.id, error: dmErr && (dmErr.stack || dmErr) });
+    if (shuttingDown) {
+      logger.info('Evolution worker start called while shutting down; ignoring');
+      return;
+    }
         }
       } else {
         await db.knex('evolution_queue').where({ id: job.id }).update({ status: 'failed', result: 'failure', updated_at: db.knex.fn.now() });
@@ -88,6 +94,7 @@ async function processDueJobs(client) {
       logger.error('Failed processing evolution job', { job, error: e && (e.stack || e) });
     }
   }
+    shuttingDown = true;
   return jobs.length;
 }
 

@@ -104,10 +104,13 @@ async function safeReply(interaction, payload = {}, opts = {}) {
         try {
           return await interaction.editReply(payload);
         } catch (e) {
+          logger && logger.warn && logger.warn('safeReply: editReply failed, will attempt followUp or original payload', { error: e && (e.stack || e), interaction: dumpInteractionState(interaction) });
           if (usingStyledPayload) {
             try {
               return await interaction.editReply(originalPayload);
-            } catch (_) { /* ignore */ }
+            } catch (errOrig) {
+              logger && logger.warn && logger.warn('safeReply: editReply(originalPayload) also failed', { error: errOrig && (errOrig.stack || errOrig), interaction: dumpInteractionState(interaction) });
+            }
           }
           // fallthrough to followUp
             try {
@@ -122,7 +125,9 @@ async function safeReply(interaction, payload = {}, opts = {}) {
             if (usingStyledPayload) {
               try {
                 if (typeof interaction.followUp === 'function') return await interaction.followUp(originalPayload);
-              } catch (_) { /* ignore */ }
+              } catch (errFollowOrig) {
+                logger && logger.warn && logger.warn('safeReply: followUp(originalPayload) failed', { error: errFollowOrig && (errFollowOrig.stack || errFollowOrig), interaction: dumpInteractionState(interaction) });
+              }
             }
             logger && logger.warn && logger.warn('safeReply: editReply/followUp failed', {
               error: e2 && (e2.stack || e2),
@@ -153,25 +158,30 @@ async function safeReply(interaction, payload = {}, opts = {}) {
     try {
       return await interaction.reply(payload);
     } catch (e) {
-      if (usingStyledPayload) {
-        try {
-          return await interaction.reply(originalPayload);
-        } catch (_) { /* ignore */ }
-      }
       logger && logger.warn && logger.warn('safeReply: reply failed, attempting defer+edit', {
         error: e && (e.stack || e),
         payload: (typeof payload === 'object') ? payload : String(payload),
         interaction: dumpInteractionState(interaction)
       });
+      if (usingStyledPayload) {
+        try {
+          return await interaction.reply(originalPayload);
+        } catch (errReplyOrig) {
+          logger && logger.warn && logger.warn('safeReply: reply(originalPayload) failed', { error: errReplyOrig && (errReplyOrig.stack || errReplyOrig), interaction: dumpInteractionState(interaction) });
+        }
+      }
       try {
         if (!interaction.deferred) await interaction.deferReply({ ephemeral: payload.ephemeral || false });
         return await interaction.editReply(payload);
       } catch (e2) {
+        logger && logger.warn && logger.warn('safeReply: defer+edit failed, attempting followUp', { error: e2 && (e2.stack || e2), interaction: dumpInteractionState(interaction) });
         if (usingStyledPayload) {
           try {
             if (!interaction.deferred) await interaction.deferReply({ ephemeral: originalPayload && originalPayload.ephemeral ? true : false });
             return await interaction.editReply(originalPayload);
-          } catch (_) { /* ignore */ }
+          } catch (errDeferOrig) {
+            logger && logger.warn && logger.warn('safeReply: defer+edit(originalPayload) failed', { error: errDeferOrig && (errDeferOrig.stack || errDeferOrig), interaction: dumpInteractionState(interaction) });
+          }
         }
         try {
           if (typeof interaction.followUp === 'function') {
@@ -185,7 +195,9 @@ async function safeReply(interaction, payload = {}, opts = {}) {
           if (usingStyledPayload) {
             try {
               if (typeof interaction.followUp === 'function') return await interaction.followUp(originalPayload);
-            } catch (_) { /* ignore */ }
+            } catch (errFollowOrig) {
+              logger && logger.warn && logger.warn('safeReply: followUp(originalPayload) failed', { error: errFollowOrig && (errFollowOrig.stack || errFollowOrig), interaction: dumpInteractionState(interaction) });
+            }
           }
             logger && logger.error && logger.error('safeReply: all reply strategies failed', {
             error: e3 && (e3.stack || e3),

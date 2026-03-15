@@ -554,6 +554,29 @@ async function migrate() {
     logger.error('Failed ensuring evolution_queue table', { error: err.stack || err });
     throw err;
   }
+
+  // trades: player-to-player trade proposals and history
+  try {
+    const hasTrades = await knex.schema.hasTable('trades');
+    if (!hasTrades) {
+      await knex.schema.createTable('trades', (table) => {
+        table.increments('id').primary();
+        table.string('initiator_id').notNullable().index();
+        table.string('recipient_id').notNullable().index();
+        table.string('guild_id').notNullable().index();
+        table.json('initiator_offer');
+        table.json('recipient_offer');
+        table.string('status').defaultTo('pending'); // pending, accepted, cancelled, failed
+        table.timestamps(true, true);
+      });
+      logger.info('Created `trades` table');
+    } else {
+      logger.info('`trades` table already exists');
+    }
+  } catch (err) {
+    logger.error('Failed ensuring trades table', { error: err.stack || err });
+    throw err;
+  }
 }
 
 module.exports = {
