@@ -13,6 +13,7 @@ const { PermissionsBitField } = require('discord.js');
 const { ContainerBuilder, TextDisplayBuilder } = require('@discordjs/builders');
 const { MessageFlags } = require('discord.js');
 const db = require('./db');
+const { Duration } = require('luxon');
 
 // Helper: Get guild name for logging
 function getGuildName(guildId) {
@@ -1000,9 +1001,13 @@ async function handleMessage(message) {
       eggEvent.eggType.id,
       catchTimeMs
     );
-    const catchTimeSec = (catchTimeMs / 1000).toFixed(2);
+
+    const catchTime = Duration.fromMillis(catchTimeMs)
+      .shiftTo('years', 'months', 'days', 'hours', 'minutes', 'seconds')
+      .toHuman({ maximumFractionDigits: 2, showZeros: false });
+
     await message.channel.send(
-      `${message.author} caught ${eggEvent.numEggs} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${eggEvent.numEggs > 1 ? 's' : ''}! (${catchTimeSec}s)\n\-# You now have ${result} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${result > 1 ? 's' : ''}.`
+      `${message.author} caught ${eggEvent.numEggs} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${eggEvent.numEggs > 1 ? 's' : ''}! (${catchTime})\n\-# You now have ${result} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${result > 1 ? 's' : ''}.`
     );
     logger.info('Egg(s) caught', {
       guildId: gid,
