@@ -5,6 +5,7 @@ const userModel = require('../../models/user');
 const emojis = require('../../../config/emojis.json');
 const { buildNoticeV2Payload, buildStatsV2Payload } = require('../../utils/componentsV2');
 const createInteractionCollector = require('../../utils/collectorHelper');
+const { encodeCustomId, parseCustomId, isExpired, disableMessageComponents } = require('../../utils/buttonExpiry');
 const db = require('../../db');
 const {
   ContainerBuilder,
@@ -127,7 +128,7 @@ module.exports = {
       container.addTextDisplayComponents(new TextDisplayBuilder().setContent('\nGlobal stats\n' + `${globalStats.spins.toLocaleString()} spins\n${globalStats.wins.toLocaleString()} wins\n${globalStats.big_wins.toLocaleString()} big wins`));
 
       // Action row with Play button
-      const playBtn = new ButtonBuilder().setCustomId('slots-play').setLabel('Play').setStyle(ButtonStyle.Primary).setDisabled(false);
+      const playBtn = new ButtonBuilder().setCustomId(encodeCustomId('slots-play')).setLabel('Play').setStyle(ButtonStyle.Primary).setDisabled(false);
       container.addActionRowComponents(new ActionRowBuilder().addComponents(playBtn));
       return { components: [container.toJSON()], flags: MessageFlags.IsComponentsV2 };
     };
@@ -158,7 +159,16 @@ module.exports = {
     if (!collector) return;
     collector.on('collect', async i => {
       try {
-        if (i.customId !== 'slots-play') return;
+        // validate expiry-aware customId while still supporting legacy ids
+        if (isExpired(i.customId)) {
+          try { await i.reply({ content: 'This button has expired (buttons expire after 5 minutes).', ephemeral: true }); } catch (_) { /* ignore */ void 0;
+          }
+          try { await disableMessageComponents(i.message); } catch (_) { /* ignore */ void 0; }
+          return;
+        }
+        const parsed = parseCustomId(i.customId);
+        const baseId = parsed ? parsed.baseId : i.customId;
+        if (baseId !== 'slots-play') return;
         // only allow the command user to press play
         if (i.user.id !== userId) { try { await i.reply({ content: 'Only the command invoker can start this spin.', ephemeral: true }); } catch (_) { /* ignore */ void 0; } return; }
         try { await i.deferUpdate(); } catch (_) { /* ignore */ void 0; }
@@ -218,7 +228,14 @@ module.exports = {
         if (!gridCollector) return;
         gridCollector.on('collect', async i2 => {
           try {
-            if (i2.customId === 'slots-betagain') {
+            if (isExpired(i2.customId)) {
+              try { await i2.reply({ content: 'This button has expired (buttons expire after 5 minutes).', ephemeral: true }); } catch (_) { /* ignore */ void 0; }
+              try { await disableMessageComponents(i2.message); } catch (_) { /* ignore */ void 0; }
+              return;
+            }
+            const parsed2 = parseCustomId(i2.customId);
+            const base2 = parsed2 ? parsed2.baseId : i2.customId;
+            if (base2 === 'slots-betagain') {
                 if (i2.user.id !== userId) {
                 try { await i2.reply({ content: 'Only the original bettor can press this.', ephemeral: true }); } catch (_) { /* ignore */ void 0; }
                 return;
@@ -227,7 +244,7 @@ module.exports = {
               i2.options = { getInteger: (name) => (name === 'amount' ? amount : null) };
               try { i2.guildId = interaction.guildId; } catch (e) { /* ignore */ void 0; }
               await module.exports.executeInteraction(i2);
-            } else if (i2.customId === 'slots-paytable') {
+            } else if (base2 === 'slots-paytable') {
               const payContainer = new ContainerBuilder();
               payContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent('## 🎰 Slots — Paytable'));
               payContainer.addTextDisplayComponents(new TextDisplayBuilder().setContent('Triple Royal: x10 (🍯 🍯 🍯)\nTriple Any: x5\nTwo of a Kind: x2\nLoss: No payout'));
@@ -309,9 +326,9 @@ module.exports = {
 
       // Action row (enabled)
       container.addActionRowComponents(
-        new ActionRowBuilder().addComponents(
-          btn(null, `slots-betagain`, false, ButtonStyle.Primary, 'Bet Again'),
-          btn(null, `slots-paytable`, false, ButtonStyle.Secondary, 'Paytable')
+          new ActionRowBuilder().addComponents(
+          btn(null, encodeCustomId('slots-betagain'), false, ButtonStyle.Primary, 'Bet Again'),
+          btn(null, encodeCustomId('slots-paytable'), false, ButtonStyle.Secondary, 'Paytable')
         )
       );
 
