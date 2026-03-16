@@ -46,7 +46,20 @@ async function processDueJobs(client) {
         try {
           const models = require('../models');
           const xenoModel = models.xenomorph;
-          targetRole = xenoModel.canonicalizeFacehugger(currentXeno?.pathway || 'standard', job.target_role);
+          // Prefer pathway-specific next-stage mapping from evolutions config (robust against generic target names)
+          try {
+            const evolveCmd = require('../commands/evolve');
+            const fromRole = currentXeno?.role || currentXeno?.stage || '';
+            const pathwayKey = currentXeno?.pathway || 'standard';
+            const stepReq = evolveCmd.findRequirement(evolutionsCfg, pathwayKey, fromRole);
+            if (stepReq && stepReq.to) {
+              targetRole = String(stepReq.to);
+            } else {
+              targetRole = xenoModel.canonicalizeFacehugger(pathwayKey, job.target_role);
+            }
+          } catch (_) {
+            targetRole = xenoModel.canonicalizeFacehugger(currentXeno?.pathway || 'standard', job.target_role);
+          }
         } catch (e) { /* ignore */ void 0; }
         // Determine whether the target role belongs to a different pathway and update pathway as well
         const updates = { role: targetRole, updated_at: db.knex.fn.now() };
