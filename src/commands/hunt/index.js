@@ -228,6 +228,7 @@ void buildStatsPage;
 const cmd = getCommandConfig('hunt') || { name: 'hunt', description: 'Hunt for hosts to use in evolutions' };
 
 async function performHunt(interaction, client) {
+  const isEphemeral = !!(cmd && Object.prototype.hasOwnProperty.call(cmd, 'ephemeral') ? !!cmd.ephemeral : false);
   // Rate limit check - prevents spam and abuse
   if (!await checkCommandRateLimit(interaction, 'expensive')) {
     return; // Rate limit message already sent to user
@@ -262,7 +263,7 @@ async function performHunt(interaction, client) {
     }
     if (!user) {
       // Give a helpful ephemeral error rather than crashing due to null access.
-      return safeReply(interaction, { content: 'Unable to initialize your user profile right now; please try again shortly.', ephemeral: true }, { loggerName: 'command:hunt' });
+      return safeReply(interaction, { content: 'Unable to initialize your user profile right now; please try again shortly.', flags: MessageFlags.Ephemeral }, { loggerName: 'command:hunt' });
     }
     const userData = user.data || {};
     userData.guilds = userData.guilds || {};
@@ -284,7 +285,7 @@ async function performHunt(interaction, client) {
           new TextDisplayBuilder().setContent(`You need to wait **${remainingSeconds}s** before hunting again.`),
           new TextDisplayBuilder().setContent(`Ready: <t:${readyAtUnix}:R>`) 
         );
-        const payload = { components: [container], flags: MessageFlags.IsComponentsV2, ephemeral: true };
+        const payload = { components: [container], flags: isEphemeral ? (MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral) : MessageFlags.IsComponentsV2 };
         return safeReply(interaction, payload, { loggerName: 'command:hunt' });
       }
     }
@@ -341,7 +342,7 @@ async function performHunt(interaction, client) {
         container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`You also found: ${spawned.join(', ')}`));
       }
 
-      const payload = { components: [container], flags: MessageFlags.IsComponentsV2, ephemeral: true };
+      const payload = { components: [container], flags: isEphemeral ? (MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral) : MessageFlags.IsComponentsV2 };
       return safeReply(interaction, payload, { loggerName: 'command:hunt' });
     }
 
@@ -448,7 +449,7 @@ async function performHunt(interaction, client) {
             if (currentPage >= totalPages && currentPage > 0) currentPage = totalPages - 1;
           }
         } catch (err) {
-          try { await safeReply(i, { content: `Failed releasing hosts: ${err && (err.message || err)}`, ephemeral: true }, { loggerName: 'command:hunt' }); } catch (_) { /* ignore */ void 0; }
+          try { await safeReply(i, { content: `Failed releasing hosts: ${err && (err.message || err)}`, flags: MessageFlags.Ephemeral }, { loggerName: 'command:hunt' }); } catch (_) { /* ignore */ void 0; }
         }
         await componentsService.updateInteraction(i, { components: buildHostListPage({ rows, pageIdx: currentPage, cfgHosts, emojis: emojisCfg, client }), flags: MessageFlags.IsComponentsV2 });
         return;
@@ -472,9 +473,9 @@ async function performHunt(interaction, client) {
         }
       } catch (_) { /* ignore */ void 0; }
     });
-  } catch (e) {
+    } catch (e) {
     const formatErrorMessage = require('../../utils/formatErrorMessage');
-    return safeReply(interaction, { content: formatErrorMessage(e), ephemeral: true }, { loggerName: 'command:hunt' });
+    return safeReply(interaction, { content: formatErrorMessage(e), flags: MessageFlags.Ephemeral }, { loggerName: 'command:hunt' });
   }
 }
 

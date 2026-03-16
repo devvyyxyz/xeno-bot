@@ -1,5 +1,7 @@
 // Rate limiter using token bucket algorithm
 // Prevents abuse and protects bot resources under high load
+const { MessageFlags } = require('discord.js');
+const safeReply = require('./safeReply');
 
 class RateLimiter {
   constructor(options = {}) {
@@ -173,10 +175,10 @@ async function checkCommandRateLimit(interaction, type = 'general') {
   const result = await limiter.checkLimit(interaction.user.id);
   
   if (!result.allowed) {
-    await interaction.reply({
+    await safeReply(interaction, {
       content: `⏱️ **Rate Limit Exceeded**\n\nYou're using commands too quickly. Please wait ${result.retryAfter} second(s) before trying again.`,
-      ephemeral: true
-    });
+      flags: MessageFlags.Ephemeral
+    }, { loggerName: 'utils:rateLimiter' });
     return false;
   }
   
