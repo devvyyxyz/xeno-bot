@@ -119,7 +119,23 @@ function buildEggsListPage({ pageIdx = 0, hatches = [], client = null, showColle
     new StringSelectMenuBuilder().setCustomId('eggs-sort').setPlaceholder('Sort').setOptions(eggsSortOptions)
   );
 
-  const filterOptions = [{ label: 'All', value: 'all' }].concat(availableFilters || []).map(f => new StringSelectMenuOptionBuilder().setLabel(f.label || f.value).setValue(f.value));
+  const filterOptions = [];
+  // All option
+  filterOptions.push({ label: 'All', value: 'all', emoji: { name: '🔎' } });
+  for (const f of (availableFilters || [])) {
+    try {
+      const eggMeta = eggTypes.find(e => e.id === f.value) || {};
+      const raw = eggMeta.emoji || '';
+      const opt = { label: f.label || f.value, value: f.value };
+      const m = String(raw || '').match(/^<a?:([a-zA-Z0-9_]+):([0-9]+)>$/);
+      if (m) opt.emoji = { id: m[2], name: m[1] };
+      else if (raw) opt.emoji = { name: raw };
+      else opt.emoji = { name: '🥚' };
+      filterOptions.push(opt);
+    } catch (_) {
+      filterOptions.push({ label: f.label || f.value, value: f.value, emoji: { name: '🥚' } });
+    }
+  }
   const filterRow = new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder().setCustomId('eggs-filter').setPlaceholder('Filter').setOptions(filterOptions.slice(0, 25))
   );

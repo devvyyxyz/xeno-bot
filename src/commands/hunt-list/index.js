@@ -137,12 +137,30 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
   container.addActionRowComponents(sortRow);
 
   if (availableFilters && availableFilters.length > 0) {
-    const filterOptions = [
-      new StringSelectMenuOptionBuilder().setLabel('All Types').setValue('all').setDefault(!currentFilter || currentFilter === 'all')
-    ];
+    const filterOptions = [];
+    // All types option
+    filterOptions.push({ label: 'All Types', value: 'all', default: !currentFilter || currentFilter === 'all', emoji: { name: '🔎' } });
+
     for (const f of availableFilters) {
-      filterOptions.push(new StringSelectMenuOptionBuilder().setLabel(f.label).setValue(f.value).setDefault(currentFilter === f.value));
+      try {
+        const hostInfo = cfgHosts && cfgHosts[f.value] ? cfgHosts[f.value] : {};
+        const emojiKey = hostInfo.emoji;
+        const rawEmoji = emojiKey && emojis[emojiKey] ? emojis[emojiKey] : '';
+        const opt = { label: f.label, value: f.value, default: currentFilter === f.value };
+        const m = String(rawEmoji || '').match(/^<a?:([a-zA-Z0-9_]+):([0-9]+)>$/);
+        if (m) {
+          opt.emoji = { id: m[2], name: m[1] };
+        } else if (rawEmoji) {
+          opt.emoji = { name: rawEmoji };
+        } else {
+          opt.emoji = { name: '⬜' };
+        }
+        filterOptions.push(opt);
+      } catch (_) {
+        filterOptions.push({ label: f.label, value: f.value, default: currentFilter === f.value, emoji: { name: '⬜' } });
+      }
     }
+
     container.addActionRowComponents(
       new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder()
