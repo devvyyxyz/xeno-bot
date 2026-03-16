@@ -416,9 +416,11 @@ module.exports = {
               return;
             }
 
+            let availableFilters = Array.from(new Set((rows || []).map(r => r.egg_type))).map(t => ({ label: getEggDisplay(t), value: t }));
+
             await safeReply(
               interaction,
-              { components: buildEggsView({ screen: 'list', pageIdx: 0, hatches: rows, client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true },
+              { components: buildEggsView({ screen: 'list', pageIdx: 0, hatches: rows, client: interaction.client, availableFilters }), flags: MessageFlags.IsComponentsV2, ephemeral: true },
               { loggerName: 'command:eggs' }
             );
 
@@ -433,7 +435,7 @@ module.exports = {
             let rowsDisplayed = allRows.slice();
             let currentSort = null;
             let currentFilter = null;
-            const availableFilters = Array.from(new Set((allRows || []).map(r => r.egg_type))).map(t => ({ label: getEggDisplay(t), value: t }));
+            availableFilters = Array.from(new Set((allRows || []).map(r => r.egg_type))).map(t => ({ label: getEggDisplay(t), value: t }));
 
             const collector = msg.createMessageComponentCollector({
               time: 300_000
@@ -446,15 +448,15 @@ module.exports = {
                   return;
                 }
                 // Pagination
-                if (i.customId === 'eggs-prev-page') {
+                  if (i.customId === 'eggs-prev-page') {
                   currentPage = Math.max(0, currentPage - 1);
-                  await componentsService.updateInteraction(i, { components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+                  await componentsService.updateInteraction(i, { components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client, availableFilters }), flags: MessageFlags.IsComponentsV2 });
                   return;
                 }
                 if (i.customId === 'eggs-next-page') {
                   const totalPages = Math.max(1, Math.ceil(getVisibleHatches(rows).length / HATCHES_PER_PAGE));
                   currentPage = Math.min(totalPages - 1, currentPage + 1);
-                  await componentsService.updateInteraction(i, { components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });
+                  await componentsService.updateInteraction(i, { components: buildEggsView({ screen: 'list', pageIdx: currentPage, hatches: rows, client: interaction.client, availableFilters }), flags: MessageFlags.IsComponentsV2 });
                   return;
                 }
 
@@ -556,6 +558,10 @@ module.exports = {
                 if (i.customId === 'eggs-filter') {
                   try {
                     currentFilter = i.values && i.values[0];
+                    const logger = require('../../utils/logger').get('command:eggs');
+                    const matchCount = (allRows || []).filter(r => String(r.egg_type) === String(currentFilter)).length;
+                    logger.info('eggs-filter selected', { selected: currentFilter, matchCount });
+                    try { await i.reply({ content: `Debug: filter=${currentFilter} matches=${matchCount}`, ephemeral: true }); } catch (_) { /* ignore */ }
                     rowsDisplayed = (!currentFilter || currentFilter === 'all') ? allRows.slice() : allRows.filter(r => r.egg_type === currentFilter);
                     if (currentSort) {
                       rowsDisplayed.sort((a, b) => {
