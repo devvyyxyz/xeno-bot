@@ -126,7 +126,7 @@ function buildEggsListPage({ pageIdx = 0, hatches = [], client = null, showColle
     try {
       const eggMeta = eggTypes.find(e => e.id === f.value) || {};
       const raw = eggMeta.emoji || '';
-      const opt = { label: f.label || f.value, value: f.value };
+      const opt = { label: eggMeta.name || (typeof f.label === 'string' ? f.label.replace(/^<a?:[^>]+:\d+>\s*/, '').trim() : f.value), value: f.value };
       const m = String(raw || '').match(/^<a?:([a-zA-Z0-9_]+):([0-9]+)>$/);
       if (m) opt.emoji = { id: m[2], name: m[1] };
       else if (raw) opt.emoji = { name: raw };

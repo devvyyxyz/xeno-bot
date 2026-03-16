@@ -146,7 +146,7 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
         const hostInfo = cfgHosts && cfgHosts[f.value] ? cfgHosts[f.value] : {};
         const emojiKey = hostInfo.emoji;
         const rawEmoji = emojiKey && emojis[emojiKey] ? emojis[emojiKey] : '';
-        const opt = { label: f.label, value: f.value, default: currentFilter === f.value };
+        const opt = { label: hostInfo.display || (typeof f.label === 'string' ? f.label.replace(/^<a?:[^>]+:\d+>\s*/, '').trim() : f.value), value: f.value, default: currentFilter === f.value };
         const m = String(rawEmoji || '').match(/^<a?:([a-zA-Z0-9_]+):([0-9]+)>$/);
         if (m) {
           opt.emoji = { id: m[2], name: m[1] };
@@ -157,7 +157,7 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
         }
         filterOptions.push(opt);
       } catch (_) {
-        filterOptions.push({ label: f.label, value: f.value, default: currentFilter === f.value, emoji: { name: '⬜' } });
+        filterOptions.push({ label: (typeof f.label === 'string' ? f.label.replace(/^<a?:[^>]+:\d+>\s*/, '').trim() : f.value), value: f.value, default: currentFilter === f.value, emoji: { name: '⬜' } });
       }
     }
 
