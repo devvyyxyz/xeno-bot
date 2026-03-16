@@ -533,13 +533,13 @@ module.exports = {
                   const id = Array.isArray(inserted) ? inserted[0] : inserted;
                   const hostPart = hostId ? `Host #${hostId} consumed.` : '';
                   const evolCfg = require('../../../config/evolutions.json');
-                  const emojisUtil = emojisCfg; // already loaded at top
+                  const emojiUtil = require('../../utils/emojis');
                   const getRoleDisplayLocal = (roleId) => {
                     const key = String(roleId || '').toLowerCase();
                     const roleInfo = (evolCfg && evolCfg.roles && evolCfg.roles[key]) ? evolCfg.roles[key] : {};
                     const display = roleInfo.display || roleId || 'Unknown';
                     const emojiKey = roleInfo.emoji;
-                    const emoji = emojiKey && emojisUtil[emojiKey] ? `${emojisUtil[emojiKey]} ` : '';
+                    const emoji = emojiKey ? `${emojiUtil.get(emojiKey, interaction.client)} ` : '';
                     return `${emoji}${display}`.trim();
                   };
 

@@ -30,13 +30,41 @@ function buildPathwayListView({ client = null }) {
     new TextDisplayBuilder().setContent('Select a pathway below to view its evolution stages and requirements.')
   );
 
-  // Create select menu with pathway options
+  // Create select menu with pathway options (use pathway's final-stage emoji when available)
   const pathwayOptions = Object.entries(evolutions.pathways).map(([id, pathway]) => {
-    return new StringSelectMenuOptionBuilder()
-      .setLabel(id.charAt(0).toUpperCase() + id.slice(1))
-      .setValue(id)
+    const label = id.charAt(0).toUpperCase() + id.slice(1);
+    const description = (pathway.description || '').slice(0, 100);
+    const stages = pathway.stages || [];
+    const lastStage = stages.length ? stages[stages.length - 1] : null;
+    const roleInfo = lastStage ? (evolutions.roles && evolutions.roles[lastStage] ? evolutions.roles[lastStage] : null) : null;
+    const emojiKey = roleInfo && roleInfo.emoji ? roleInfo.emoji : null;
 
-  .setDescription(pathway.description.slice(0, 100));
+    const option = { label, value: id, description };
+    try {
+      const raw = emojiKey && emojis[emojiKey] ? emojis[emojiKey] : null;
+      if (raw && typeof raw === 'string') {
+        const m = String(raw).match(/^<a?:([a-zA-Z0-9_]+):([0-9]+)>$/);
+        if (m) {
+          const name = m[1];
+          const emId = m[2];
+          // Prefer guild-available custom emoji when client provided
+          if (client && client.emojis && client.emojis.cache && client.emojis.cache.get && client.emojis.cache.get(emId)) {
+            option.emoji = { id: emId, name };
+          } else {
+            option.emoji = { name: '🔳' };
+          }
+        } else {
+          // plain unicode or other string - use as name
+          option.emoji = { name: raw };
+        }
+      } else {
+        option.emoji = { name: '🔳' };
+      }
+    } catch (_) {
+      option.emoji = { name: '🔳' };
+    }
+
+    return option;
   });
 
   container.addActionRowComponents(

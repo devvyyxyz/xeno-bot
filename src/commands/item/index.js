@@ -159,8 +159,7 @@ module.exports = {
                 // Queens become pathogen queens
                 await xenoModel.updateXenoById(xeno.id, { pathway: 'pathogen', role: 'pathogen_queen', stage: 'pathogen_queen', data: newData });
                 await userModel.updateUserDataRawById(targetUserId, data);
-                const emojis = require('../../../config/emojis.json');
-                const PATHOGEN_EMOJI = emojis.pathogen_queen;
+                const PATHOGEN_EMOJI = require('../../utils/emojis').get('pathogen_queen', interaction.client);
                 return respond({ content: `Used one ${item.name} on Queen ${PATHOGEN_EMOJI} #${xeno.id}. It has been transformed into a Pathogen Queen.` });
               } else {
                 // Drones are switched to the pathogen pathway but retain their drone stage

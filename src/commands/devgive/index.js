@@ -133,11 +133,18 @@ module.exports = {
       if (type === 'xenomorph' && focused.name === 'pathway') {
         const q = String(focused.value || '').toLowerCase();
         const pathways = Object.keys(evolutions.pathways || {});
+        const emojiUtil = require('../../utils/emojis');
         const items = pathways
           .filter(p => !q || p.toLowerCase().includes(q))
           .map(p => {
             const desc = evolutions.pathways[p]?.description || '';
-            const label = desc ? `${p} [${p}] - ${desc}` : `${p} [${p}]`;
+            // derive emoji from the pathway's final stage role (if available)
+            const stages = evolutions.pathways[p]?.stages || [];
+            const lastStage = stages.length ? stages[stages.length - 1] : null;
+            const roleInfo = lastStage ? (evolutions.roles && evolutions.roles[lastStage] ? evolutions.roles[lastStage] : null) : null;
+            const emojiKey = roleInfo && roleInfo.emoji ? roleInfo.emoji : null;
+            const emoji = emojiKey ? `${emojiUtil.get(emojiKey)} ` : '';
+            const label = desc ? `${emoji}${p} [${p}] - ${desc}` : `${emoji}${p} [${p}]`;
             return { name: String(label).substring(0, 100), value: p };
           })
           .slice(0, 25);

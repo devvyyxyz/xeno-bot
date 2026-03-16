@@ -48,12 +48,32 @@ function isEvolvedXeno(x) {
   return role !== 'egg' && stage !== 'egg';
 }
 
-function toXenoOption(x) {
+function toXenoOption(x, client = null) {
   const role = x?.role || x?.stage || 'xeno';
   const label = `${String(role)} [${x.id}]`.slice(0, 100);
   const descriptor = [x?.pathway ? `Path: ${x.pathway}` : null, `Lv ${Number(x?.level || 1)}`].filter(Boolean).join(' • ');
   const description = descriptor.slice(0, 100);
-  return { label, value: String(x.id), description };
+
+  const option = { label, value: String(x.id), description };
+  try {
+    const rawEmoji = getEmojiForMember(x) || '';
+    const m = String(rawEmoji).match(/^<a?:([a-zA-Z0-9_]+):([0-9]+)>$/);
+    if (m) {
+      const name = m[1];
+      const emId = m[2];
+      if (client && client.emojis && client.emojis.cache && client.emojis.cache.get && client.emojis.cache.get(emId)) {
+        option.emoji = { id: emId, name };
+      } else {
+        option.emoji = { name: '🔳' };
+      }
+    } else {
+      option.emoji = { name: String(rawEmoji) || '🔳' };
+    }
+  } catch (_) {
+    option.emoji = { name: '🔳' };
+  }
+
+  return option;
 }
 
 function getEmojiForMember(member) {
@@ -463,7 +483,7 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, rows = {}, expire
 
       // Single select for removing members on this page
       if (canAct && pageMembers.length > 0) {
-        const removeOptions = pageMembers.map(toXenoOption);
+        const removeOptions = pageMembers.map(m => toXenoOption(m, client));
         container.addActionRowComponents(
           new ActionRowBuilder().addComponents(
             new StringSelectMenuBuilder()
@@ -533,7 +553,7 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, rows = {}, expire
             .setDisabled(!canAct || assignable.length === 0)
             .setMaxValues(1)
             .setMinValues(1)
-            .addOptions(assignable.length ? assignable.map(toXenoOption) : [{ label: 'No eligible xenomorphs', value: 'none', description: 'Evolve or assign xenos first' }])
+            .addOptions(assignable.length ? assignable.map(q => toXenoOption(q, client)) : [{ label: 'No eligible xenomorphs', value: 'none', description: 'Evolve or assign xenos first' }])
         )
       );
     }
@@ -551,7 +571,7 @@ function buildHiveScreen({ screen = 'stats', hive, targetUser, rows = {}, expire
             .setDisabled(!canAct || addable.length === 0)
             .setMinValues(1)
             .setMaxValues(maxValues)
-            .addOptions(addable.length ? addable.map(toXenoOption) : [{ label: 'No xenomorphs available', value: 'none', description: 'All eligible xenos are already in this hive' }])
+            .addOptions(addable.length ? addable.map(a => toXenoOption(a, client)) : [{ label: 'No xenomorphs available', value: 'none', description: 'All eligible xenos are already in this hive' }])
         )
       );
     }
