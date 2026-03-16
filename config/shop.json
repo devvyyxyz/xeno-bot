@@ -12,8 +12,9 @@
       "sellPrice": 0,
       "sellable": false,
       "rarity": "legendary",
-      "emoji": "Black_goo"
-      ,"emoji_key": "Black_goo"
+      "emoji": "Black_goo",
+      "emoji_key": "Black_goo",
+      "allowed_pathways": ["standard"]
     },
     {
       "id": "scrap",

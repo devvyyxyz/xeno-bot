@@ -124,6 +124,21 @@ module.exports = {
               if (String(xeno.pathway || '').toLowerCase() === 'pathogen' || String(xeno.role || xeno.stage || '').toLowerCase().includes('pathogen')) {
                 throw new Error('Target xenomorph is already a Pathogen; reagent cannot be applied.');
               }
+              // Only allow applying the reagent to xenomorphs on compatible pathways
+              // Preference: read allowed pathways from the item config (added to shop.json or items service)
+              const pathway = String(xeno.pathway || '').toLowerCase();
+              const allowedRaw = item && (item.allowed_pathways || item.allowedPathways || item.allowed_pathway || item.allowedPathway || item.allowed);
+              if (Array.isArray(allowedRaw) && allowedRaw.length > 0) {
+                const allowed = allowedRaw.map(p => String(p || '').toLowerCase());
+                if (pathway && !allowed.includes(pathway)) {
+                  throw new Error('Target xenomorph is not on a compatible pathway for this reagent.');
+                }
+              } else {
+                // Legacy fallback: restrict to the standard pathway when no config is present
+                if (pathway && pathway !== 'standard') {
+                  throw new Error('Target xenomorph is not on a compatible pathway for this reagent.');
+                }
+              }
               if (String(xeno.owner_id || xeno.owner) !== String(userId)) {
                 throw new Error('You do not own that xenomorph.');
               }
