@@ -37,6 +37,18 @@ function maybeBuildStyledNoticePayload(payload = {}, opts = {}) {
 
 async function safeReply(interaction, payload = {}, opts = {}) {
   const logger = (baseLogger && baseLogger.get) ? baseLogger.get(opts.loggerName || 'utils:safeReply') : console;
+  const applyEphemeralFlag = (p) => {
+    try {
+      if (!p || typeof p !== 'object') return;
+      const { MessageFlags } = require('discord.js');
+      const EPHEMERAL_BIT = (MessageFlags && typeof MessageFlags.Ephemeral === 'number') ? MessageFlags.Ephemeral : 64;
+      if (p.flags && (p.flags & EPHEMERAL_BIT)) p.ephemeral = true;
+      if (p.ephemeral === true) {
+        if (typeof p.flags === 'number') p.flags = p.flags | EPHEMERAL_BIT;
+        else p.flags = EPHEMERAL_BIT;
+      }
+    } catch (_) { /* ignore */ }
+  };
   const dumpInteractionState = (it) => {
     try {
       if (!it) return null;
@@ -54,15 +66,10 @@ async function safeReply(interaction, payload = {}, opts = {}) {
   const styledPayload = maybeBuildStyledNoticePayload(payload, opts);
   const usingStyledPayload = !!styledPayload;
   if (usingStyledPayload) payload = styledPayload;
-  // Map legacy `flags` ephemeral bit to explicit `ephemeral` property so callers
-  // using `flags: MessageFlags.Ephemeral` still result in an ephemeral reply.
-  try {
-    const { MessageFlags } = require('discord.js');
-    const EPHEMERAL_BIT = (MessageFlags && typeof MessageFlags.Ephemeral === 'number') ? MessageFlags.Ephemeral : 64;
-    if (payload && typeof payload === 'object' && payload.flags && (payload.flags & EPHEMERAL_BIT)) {
-      payload.ephemeral = true;
-    }
-  } catch (_) { /* ignore */ }
+  // Normalize ephemeral payloads both directions:
+  // - `flags` -> `ephemeral`
+  // - `ephemeral` -> `flags`
+  applyEphemeralFlag(payload);
   try {
     // Attach reminder before any reply/edit path so deferred interactions also receive it.
     try {
@@ -162,6 +169,9 @@ async function safeReply(interaction, payload = {}, opts = {}) {
         if (inferred && Object.prototype.hasOwnProperty.call(inferred, 'ephemeral')) payload.ephemeral = !!inferred.ephemeral;
       }
     } catch (e) { /* ignore config lookup failures */ }
+
+    // Ensure config-inferred `ephemeral` is converted to message flags for v15.
+    applyEphemeralFlag(payload);
 
     // Not replied yet — try reply
     try {

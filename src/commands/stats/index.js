@@ -46,7 +46,7 @@ module.exports = {
   },
   async executeInteraction(interaction) {
     try {
-      await interaction.deferReply({ ephemeral: false });
+      await interaction.deferReply({ ephemeral: cmd.ephemeral === true });
       const target = interaction.options.getUser('user') || interaction.user;
       const baseLogger = require('../../utils/logger');
       if (baseLogger && baseLogger.sentry) {

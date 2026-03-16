@@ -60,6 +60,7 @@
       "name": "stats",
       "description": "View stats about a user.",
       "group": "Rankings",
+      "ephemeral": true,
       "examples": ["/stats @user - View another player's statistics"]
     },
     "encyclopedia": {
