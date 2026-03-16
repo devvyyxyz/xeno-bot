@@ -31,6 +31,36 @@ module.exports = {
   name: 'interactionCreate',
   async execute(interaction, client) {
     try {
+      // Instrument deferReply/reply to record whether ephemeral was requested.
+      try {
+        if (interaction && typeof interaction.deferReply === 'function' && !interaction.__deferWrapped) {
+          const _origDefer = interaction.deferReply.bind(interaction);
+          interaction.deferReply = async (opts) => {
+            try {
+              const ephemeralFlag = !!(opts && (opts.ephemeral === true || opts.flags === 64));
+              interaction._deferredEphemeral = ephemeralFlag;
+            } catch (_) { /* ignore */ }
+            return _origDefer(opts);
+          };
+          interaction.__deferWrapped = true;
+        }
+      } catch (_) { /* ignore instrumentation failures */ }
+
+      try {
+        if (interaction && typeof interaction.reply === 'function' && !interaction.__replyWrapped) {
+          const _origReply = interaction.reply.bind(interaction);
+          interaction.reply = async (payload) => {
+            try {
+              if (payload && typeof payload === 'object') {
+                const ephemeralDetected = (payload.ephemeral === true) || (payload.flags && (payload.flags & 64));
+                if (ephemeralDetected) interaction._repliedEphemeral = true;
+              }
+            } catch (_) { /* ignore */ }
+            return _origReply(payload);
+          };
+          interaction.__replyWrapped = true;
+        }
+      } catch (_) { /* ignore reply instrumentation failures */ }
       // Handle modal submissions for devmenu blacklist/unblacklist
       if (typeof interaction.isModalSubmit === 'function' && interaction.isModalSubmit()) {
         if (interaction.customId === 'devmenu-blacklist-modal' || interaction.customId === 'devmenu-unblacklist-modal') {

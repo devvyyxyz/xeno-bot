@@ -65,7 +65,7 @@
       "name": "encyclopedia",
       "description": "Show all eggs and their stats.",
       "group": "Information",
-      "ephemeral": false,
+      "ephemeral": true,
       "examples": ["/encyclopedia - Browse all available eggs and xenomorphs"]
     },
     "pathway": {

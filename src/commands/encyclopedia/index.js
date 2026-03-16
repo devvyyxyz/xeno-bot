@@ -20,7 +20,7 @@ module.exports = {
   async executeInteraction(interaction) {
     try {
       if (cmd.ephemeral === true) {
-        await interaction.deferReply({ flags: 64 });
+        await interaction.deferReply({ ephemeral: true });
       } else {
         await interaction.deferReply();
       }
@@ -164,7 +164,7 @@ module.exports = {
       new SecondaryButtonBuilder().setCustomId('view-hosts').setLabel('Hosts').setDisabled(currentView === 'hosts'),
       new SecondaryButtonBuilder().setCustomId('view-xenos').setLabel('Xenos').setDisabled(currentView === 'xenos')
     );
-    await safeReply(interaction, { embeds: [getEmbed(page)], components: [row] }, { loggerName: 'command:encyclopedia' });
+    await safeReply(interaction, { embeds: [getEmbed(page)], components: [row], ephemeral: cmd.ephemeral === true }, { loggerName: 'command:encyclopedia' });
     if (pages.length === 1) return;
     const { collector } = await createInteractionCollector(interaction, { embeds: [getEmbed(page)], components: [row], time: 120_000, ephemeral: cmd.ephemeral === true, edit: true, collectorOptions: { componentType: 2 } });
     if (!collector) {

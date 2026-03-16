@@ -8,7 +8,7 @@ const {
 const {
   ActionRowBuilder,
   StringSelectMenuBuilder,
-  SecondaryButtonBuilder
+  SecondaryButtonBuilder,
 } = require('@discordjs/builders');
 const { getCommandsObject, isCommandEphemeral } = require('../../utils/commandsConfig');
 const { addV2TitleWithBotThumbnail } = require('../../utils/componentsV2');
@@ -261,7 +261,7 @@ module.exports = {
           // Prefer categoryEmojiKeys mapping when available (references keys in config/emojis.json)
           const key = (commandsCfg && commandsCfg.categoryEmojiKeys && commandsCfg.categoryEmojiKeys[category]) || null;
           if (key) {
-            const lit = emojis.get(key);
+            const lit = emojis.get(key, client);
             if (lit && typeof lit === 'string') {
               const m = lit.match(/^<:([^:>]+):([0-9]+)>$/);
               if (m) opt.emoji = { name: m[1], id: m[2] };
@@ -293,12 +293,13 @@ module.exports = {
         );
 
         const pageText = pages.length > 1 ? `Page ${pageIndex + 1} of ${pages.length}` : '';
-        const navRow = new ActionRowBuilder().addComponents(
-          new SecondaryButtonBuilder().setCustomId('help-prev').setLabel('Previous').setDisabled(pageIndex === 0),
-          new SecondaryButtonBuilder().setCustomId('help-page-info').setLabel(pageText || 'Navigation').setDisabled(true),
-          new SecondaryButtonBuilder().setCustomId('help-next').setLabel('Next').setDisabled(pageIndex >= pages.length - 1)
+        container.addActionRowComponents(
+          new ActionRowBuilder().addComponents(
+            new SecondaryButtonBuilder().setCustomId('help-prev').setLabel('Previous').setDisabled(pageIndex === 0),
+            new SecondaryButtonBuilder().setCustomId('help-page-info').setLabel(pageText || 'Navigation').setDisabled(true),
+            new SecondaryButtonBuilder().setCustomId('help-next').setLabel('Next').setDisabled(pageIndex >= pages.length - 1)
+          )
         );
-        container.addActionRowComponents(navRow);
       }
 
       const footer = expired
@@ -318,8 +319,7 @@ module.exports = {
     try {
       await safeReply(interaction, {
         components: buildHelpComponents(currentCategory, pages, page, false, interaction.client),
-        flags: MessageFlags.IsComponentsV2,
-        ephemeral: isEphemeral
+        flags: isEphemeral ? (MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral) : MessageFlags.IsComponentsV2
       }, { loggerName: 'command:help' });
     } catch (e) {
       try {
@@ -327,7 +327,7 @@ module.exports = {
       } catch (_) { /* ignore */ void 0; }
       await safeReply(interaction, {
         content: 'Help UI failed to render with components. Please try again.',
-        ephemeral: isEphemeral
+        flags: isEphemeral ? MessageFlags.Ephemeral : 0
       }, { loggerName: 'command:help' });
       return;
     }
@@ -344,7 +344,7 @@ module.exports = {
     collector.on('collect', async i => {
       try {
         if (i.user.id !== interaction.user.id) {
-          try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:help' }); } catch (e) { /* ignore */ }
+          try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', flags: MessageFlags.Ephemeral }, { loggerName: 'command:help' }); } catch (e) { /* ignore */ }
           return;
         }
 
@@ -364,7 +364,7 @@ module.exports = {
           return;
         }
       } catch (err) {
-        try { const formatErrorMessage = require('../../utils/formatErrorMessage'); await safeReply(i, { content: formatErrorMessage('Failed to update help view.', { includeDetails: false }), ephemeral: true }, { loggerName: 'command:help' }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to send failure safeReply in help command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging safeReply failure in help', le && (le.stack || le)); } }
+        try { const formatErrorMessage = require('../../utils/formatErrorMessage'); await safeReply(i, { content: formatErrorMessage('Failed to update help view.', { includeDetails: false }), flags: MessageFlags.Ephemeral }, { loggerName: 'command:help' }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to send failure safeReply in help command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging safeReply failure in help', le && (le.stack || le)); } }
       }
     });
 

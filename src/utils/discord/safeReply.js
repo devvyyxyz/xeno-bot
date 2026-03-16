@@ -54,6 +54,15 @@ async function safeReply(interaction, payload = {}, opts = {}) {
   const styledPayload = maybeBuildStyledNoticePayload(payload, opts);
   const usingStyledPayload = !!styledPayload;
   if (usingStyledPayload) payload = styledPayload;
+  // Map legacy `flags` ephemeral bit to explicit `ephemeral` property so callers
+  // using `flags: MessageFlags.Ephemeral` still result in an ephemeral reply.
+  try {
+    const { MessageFlags } = require('discord.js');
+    const EPHEMERAL_BIT = (MessageFlags && typeof MessageFlags.Ephemeral === 'number') ? MessageFlags.Ephemeral : 64;
+    if (payload && typeof payload === 'object' && payload.flags && (payload.flags & EPHEMERAL_BIT)) {
+      payload.ephemeral = true;
+    }
+  } catch (_) { /* ignore */ }
   try {
     // Attach reminder before any reply/edit path so deferred interactions also receive it.
     try {

@@ -220,7 +220,7 @@ module.exports = {
   name: cmd.name,
   description: cmd.description,
   requiredPermissions: cmd.requiredPermissions,
-  hidden: cmd.hidden === true,
+  hidden: true,
   ephemeral: cmd.ephemeral === true,
   data: {
     name: cmd.name,
