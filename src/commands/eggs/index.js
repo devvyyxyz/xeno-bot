@@ -14,6 +14,7 @@ const {
 const { MessageFlags } = require('discord.js');
 const { ContainerBuilder, TextDisplayBuilder, SectionBuilder, SeparatorBuilder, SeparatorSpacingSize } = require('@discordjs/builders');
 const componentsService = require('../../services/components');
+const { getPaginationState, buildPaginationRow } = require('../../utils/pagination');
 
 const cmd = getCommandConfig('eggs') || { name: 'eggs', description: 'Manage your eggs' };
 
@@ -88,19 +89,16 @@ function buildEggsHatchPage({ userEggs = {}, client = null }) {
 }
 
 function buildEggsListPage({ pageIdx = 0, hatches = [], client = null, showCollected = false, availableFilters = [] }) {
-  const totalPages = Math.max(1, Math.ceil(getVisibleHatches(hatches, showCollected).length / HATCHES_PER_PAGE));
-  const safePageIdx = Math.max(0, Math.min(pageIdx, totalPages - 1));
-  const start = safePageIdx * HATCHES_PER_PAGE;
-  const end = start + HATCHES_PER_PAGE;
-  const page = (hatches || []).slice(start, end);
+  const visible = getVisibleHatches(hatches, showCollected);
+  const { totalItems, totalPages, safePageIdx, pageItems } = getPaginationState({ items: visible, pageIdx, pageSize: HATCHES_PER_PAGE });
 
   const container = new ContainerBuilder();
   addV2TitleWithBotThumbnail({ container, title: 'Egg Hatches', client });
 
-  if (!page || page.length === 0) {
+  if (!pageItems || pageItems.length === 0) {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent('No active hatches.'));
   } else {
-    for (const hatch of page) {
+    for (const hatch of pageItems) {
       const eggDisplay = getEggDisplay(hatch.egg_type);
       const section = new SectionBuilder()
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(`**#${hatch.id}** — ${eggDisplay} — ${hatch.collected ? 'Collected' : `<t:${Math.floor((hatch.finishes_at || 0) / 1000)}:R>`}`))
@@ -128,13 +126,15 @@ function buildEggsListPage({ pageIdx = 0, hatches = [], client = null, showColle
   container.addActionRowComponents(sortRow);
   container.addActionRowComponents(filterRow);
 
-  // Navigation / actions
-  const navRow = new ActionRowBuilder().addComponents(
-    new SecondaryButtonBuilder().setCustomId('eggs-prev-page').setLabel('Prev').setDisabled(safePageIdx === 0),
-    new PrimaryButtonBuilder().setCustomId('eggs-next-page').setLabel('Next').setDisabled(safePageIdx >= totalPages - 1),
+  // Navigation / actions — use pagination helper for Prev/Info/Next
+  const navRow = buildPaginationRow({ prefix: 'eggs', pageIdx: safePageIdx, totalPages, totalItems, showPageInfo: true });
+  container.addActionRowComponents(navRow);
+
+  // Collect all button stays as a separate action
+  const collectRow = new ActionRowBuilder().addComponents(
     new PrimaryButtonBuilder().setCustomId('eggs-collect-all').setLabel('Collect All')
   );
-  container.addActionRowComponents(navRow);
+  container.addActionRowComponents(collectRow);
 
   const bottomRow = new ActionRowBuilder().addComponents(
     new SecondaryButtonBuilder().setCustomId('eggs-view-stats').setLabel('Stats'),
