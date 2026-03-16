@@ -108,14 +108,15 @@ function buildEggsListPage({ pageIdx = 0, hatches = [], client = null, showColle
   }
 
   // Sort & Filter row
-  const sortOptions = [
-    new StringSelectMenuOptionBuilder().setLabel('Date desc').setValue('date_desc'),
-    new StringSelectMenuOptionBuilder().setLabel('Date asc').setValue('date_asc'),
-    new StringSelectMenuOptionBuilder().setLabel('Type asc').setValue('type_asc'),
-    new StringSelectMenuOptionBuilder().setLabel('Type desc').setValue('type_desc')
+  const eggsSortOptions = [
+    { label: 'Date (Newest)', value: 'date_desc', emoji: { name: '🆕' } },
+    { label: 'Date (Oldest)', value: 'date_asc', emoji: { name: '📜' } },
+    { label: 'Type (A-Z)', value: 'type_asc', emoji: { name: '🥚' } },
+    { label: 'Type (Z-A)', value: 'type_desc', emoji: { name: '🥚' } }
   ];
+
   const sortRow = new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder().setCustomId('eggs-sort').setPlaceholder('Sort').setOptions(sortOptions)
+    new StringSelectMenuBuilder().setCustomId('eggs-sort').setPlaceholder('Sort').setOptions(eggsSortOptions)
   );
 
   const filterOptions = [{ label: 'All', value: 'all' }].concat(availableFilters || []).map(f => new StringSelectMenuOptionBuilder().setLabel(f.label || f.value).setValue(f.value));

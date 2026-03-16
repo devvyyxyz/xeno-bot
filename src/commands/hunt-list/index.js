@@ -119,18 +119,20 @@ function buildHostListPage({ pageIdx = 0, rows = [], expired = false, cfgHosts =
   );
 
   // Sorting / Filter row (show before pagination)
+  const huntSortOptions = [
+    { label: 'Newest First', value: 'date_desc', default: currentSort === 'date_desc', emoji: { name: '🆕' } },
+    { label: 'Oldest First', value: 'date_asc', default: currentSort === 'date_asc', emoji: { name: '📜' } },
+    { label: 'Type (A-Z)', value: 'type_asc', default: currentSort === 'type_asc', emoji: { name: '🔤' } },
+    { label: 'Type (Z-A)', value: 'type_desc', default: currentSort === 'type_desc', emoji: { name: '🔡' } },
+    { label: 'ID (Low to High)', value: 'id_asc', default: currentSort === 'id_asc', emoji: { name: '🔢' } },
+    { label: 'ID (High to Low)', value: 'id_desc', default: currentSort === 'id_desc', emoji: { name: '🔢' } }
+  ];
+
   const sortRow = new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
       .setCustomId('hunt-sort')
       .setPlaceholder('Sort by')
-      .addOptions(
-        new StringSelectMenuOptionBuilder().setLabel('Newest First').setValue('date_desc').setDefault(currentSort === 'date_desc'),
-        new StringSelectMenuOptionBuilder().setLabel('Oldest First').setValue('date_asc').setDefault(currentSort === 'date_asc'),
-        new StringSelectMenuOptionBuilder().setLabel('Type (A-Z)').setValue('type_asc').setDefault(currentSort === 'type_asc'),
-        new StringSelectMenuOptionBuilder().setLabel('Type (Z-A)').setValue('type_desc').setDefault(currentSort === 'type_desc'),
-        new StringSelectMenuOptionBuilder().setLabel('ID (Low to High)').setValue('id_asc').setDefault(currentSort === 'id_asc'),
-        new StringSelectMenuOptionBuilder().setLabel('ID (High to Low)').setValue('id_desc').setDefault(currentSort === 'id_desc')
-      )
+      .addOptions(...huntSortOptions)
   );
   container.addActionRowComponents(sortRow);
 
