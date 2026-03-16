@@ -171,7 +171,8 @@ function buildTutorialComponents({ categoryKey, pageIdx, expired = false, client
         label: cat.label,
         value: catKey,
         default: catKey === key,
-        emoji: { name: cat.emoji }
+        // Avoid attaching emoji objects for single-codepoint unicode; prefix label instead when rendering.
+        // Keep the option label as-is; UI render can include emoji from the label string.
       };
     });
 

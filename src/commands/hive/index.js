@@ -57,28 +57,27 @@ function toXenoOption(x, client = null) {
   const option = { label, value: String(x.id), description };
   try {
     const rawEmoji = getEmojiForMember(x) || '';
-    const m = String(rawEmoji).match(/^<a?:([a-zA-Z0-9_]+):([0-9]+)>$/);
+    let emojiText = '';
+    const m = String(rawEmoji).match(/^<a?:([a-zA-Z0-9_]+):(\d+)>$/);
     if (m) {
-      const name = m[1];
       const emId = m[2];
       if (client && client.emojis && client.emojis.cache && client.emojis.cache.get && client.emojis.cache.get(emId)) {
-        option.emoji = { id: emId, name };
-      } else {
-        option.emoji = { name: '🔳' };
+        try { emojiText = client.emojis.cache.get(emId).toString(); } catch (_) { emojiText = ''; }
       }
-    } else {
-      option.emoji = { name: String(rawEmoji) || '🔳' };
+    } else if (rawEmoji) {
+      emojiText = String(rawEmoji);
     }
-  } catch (_) {
-    option.emoji = { name: '🔳' };
-  }
+    if (emojiText) {
+      option.label = (`${emojiText} ${option.label}`).slice(0, 100);
+    }
+  } catch (_) { /* keep original label */ }
 
   return option;
 }
 
 function getEmojiForMember(member) {
   const key = String(member?.role || member?.stage || 'unknown').toLowerCase();
-  return emojis[key] || '⬜';
+  return emojis[key] || '';
 }
 
 function getEmojiThumbnailUrl(emojiValue) {

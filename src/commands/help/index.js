@@ -265,14 +265,14 @@ module.exports = {
             if (lit && typeof lit === 'string') {
               const m = lit.match(/^<:([^:>]+):([0-9]+)>$/);
               if (m) opt.emoji = { name: m[1], id: m[2] };
-              else opt.emoji = lit;
+              else opt.emoji = { name: lit };
             }
           } else {
             const raw = catEmojis[category];
             if (raw && typeof raw === 'string') {
               const m = raw.match(/^<:([^:>]+):([0-9]+)>$/);
               if (m) opt.emoji = { name: m[1], id: m[2] };
-              else opt.emoji = raw;
+              else opt.emoji = { name: raw };
             }
           }
           return opt;
