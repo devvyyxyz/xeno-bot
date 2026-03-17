@@ -12,6 +12,14 @@ let shuttingDown = false;
 async function processHives() {
   if (shuttingDown) return 0;
   try {
+    // Snapshot memory for diagnostics
+    try {
+      const mu = process.memoryUsage();
+      logger.info('processHives memory start', {
+        heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
+        rssMb: Math.round((mu.rss / 1024 / 1024) * 10) / 10,
+      });
+    } catch (e) { /* ignore */ }
     const now = Date.now();
     const msPerHour = 3600000;
     // load all hives with production > 0
@@ -20,6 +28,11 @@ async function processHives() {
     let processed = 0;
     for (const r of rows) {
       try {
+        // per-row memory debug
+        try {
+          const mu = process.memoryUsage();
+          logger.debug('processHives per-row memory', { rowId: r && r.id, heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10 });
+        } catch (e) { /* ignore */ }
         const hive = r;
         const ownerId = String(hive.user_id || hive.owner_discord_id || '');
         const guildId = hive.guild_id || null;
@@ -70,6 +83,10 @@ async function processHives() {
         logger.warn('Failed processing hive row', { row: r && r.id, error: e && (e.stack || e) });
       }
     }
+    try {
+      const mu = process.memoryUsage();
+      logger.info('processHives memory end', { heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10 });
+    } catch (e) { /* ignore */ }
     return processed;
   } catch (e) {
     logger.error('Hive worker failed', { error: e && (e.stack || e) });

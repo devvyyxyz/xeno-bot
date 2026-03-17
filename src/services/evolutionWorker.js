@@ -32,11 +32,30 @@ function buildEvolutionCompleteV2Dm(job, fromRole, toRole) {
 }
 
 async function processDueJobs(client) {
+  // Snapshot memory at start for debugging memory growth during processing
+  try {
+    const mu = process.memoryUsage();
+    logger.info('processDueJobs memory start', {
+      heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
+      rssMb: Math.round((mu.rss / 1024 / 1024) * 10) / 10,
+    });
+  } catch (e) {
+    /* ignore logging errors */
+  }
+
   const now = Date.now();
   const jobs = await db.knex('evolution_queue').where({ status: 'queued' }).andWhere('finishes_at', '<=', now).limit(20);
   if (!jobs || jobs.length === 0) return 0;
   for (const job of jobs) {
     try {
+        // log memory before each job to help locate leaks
+        try {
+          const mu = process.memoryUsage();
+          logger.debug('memory before job', {
+            jobId: job && job.id,
+            heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
+          });
+        } catch (e) { /* ignore */ }
       await db.knex('evolution_queue').where({ id: job.id }).update({ status: 'processing', updated_at: db.knex.fn.now() });
       const success = true;
       if (success) {
@@ -108,6 +127,13 @@ async function processDueJobs(client) {
     }
   }
     shuttingDown = true;
+    try {
+      const mu = process.memoryUsage();
+      logger.info('processDueJobs memory end', {
+        heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
+        rssMb: Math.round((mu.rss / 1024 / 1024) * 10) / 10,
+      });
+    } catch (e) { /* ignore */ }
   return jobs.length;
 }
 
