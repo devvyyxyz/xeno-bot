@@ -176,6 +176,13 @@ async function init(botClient) {
   client = botClient;
   // start schedules for guilds that belong to this shard
   try {
+    try {
+      const mu = process.memoryUsage();
+      logger.info('spawnManager.init memory start', {
+        heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
+        rssMb: Math.round((mu.rss / 1024 / 1024) * 10) / 10,
+      });
+    } catch (e) { /* ignore */ }
     const knex = db.knex;
     const shardGuildIds = Array.from(client.guilds.cache.keys());
     const guildIdSet = new Set(shardGuildIds);
@@ -188,6 +195,14 @@ async function init(botClient) {
       const chunkRows = await knex('guild_settings').whereIn('guild_id', ids).select('*');
       rows = rows.concat(chunkRows);
     }
+
+    try {
+      const mu = process.memoryUsage();
+      logger.info('spawnManager.init after guild_settings load', {
+        heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
+        loadedGuildRows: rows.length,
+      });
+    } catch (e) { /* ignore */ }
 
     // restore any active spawns from DB
     try {
@@ -288,6 +303,10 @@ async function init(botClient) {
           }
         }
       }
+      try {
+        const mu = process.memoryUsage();
+        logger.info('spawnManager.init after active_spawns restore', { heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10, restoredActiveRows: activeRows.length });
+      } catch (e) { /* ignore */ }
     } catch (e) {
       try {
         logger.warn('Failed loading active_spawns table', { error: e && (e.stack || e) });
