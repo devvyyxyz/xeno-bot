@@ -3,15 +3,65 @@ const logger = utils.logger.get('guildJoinWorker');
 const guildJoinLib = require('../lib/guildJoin');
 
 let client = null;
-const queue = [];
+let queue = [];
 let active = 0;
 const concurrency = Math.max(1, Number(process.env.GUILD_JOIN_WORKER_CONCURRENCY) || 2);
 
+// Batching/debounce: buffer incoming join requests for a short window and flush together
+const batchWindowMs = Math.max(0, Number(process.env.GUILD_JOIN_BATCH_MS) || 30000);
+let batchTimer = null;
+// bufferedJobs: guildId -> array of { resolve, reject }
+const bufferedJobs = new Map();
+
 function enqueueGuildJoin(job) {
+  // If batching is disabled (0), push directly to queue
+  if (!batchWindowMs) {
+    return new Promise((resolve, reject) => {
+      queue.push({ job, resolve, reject });
+      processQueue();
+    });
+  }
+
   return new Promise((resolve, reject) => {
-    queue.push({ job, resolve, reject });
-    processQueue();
+    const gid = String(job.guildId);
+    const arr = bufferedJobs.get(gid) || [];
+    arr.push({ resolve, reject });
+    bufferedJobs.set(gid, arr);
+
+    // start or reset batch timer
+    if (!batchTimer) {
+      batchTimer = setTimeout(() => {
+        flushBufferedJobs();
+      }, batchWindowMs);
+      if (typeof batchTimer.unref === 'function') batchTimer.unref();
+    }
   });
+}
+
+function flushBufferedJobs() {
+  batchTimer = null;
+  const guildIds = Array.from(bufferedJobs.keys());
+  if (!guildIds.length) return;
+  for (const gid of guildIds) {
+    const waiters = bufferedJobs.get(gid) || [];
+    bufferedJobs.delete(gid);
+    // For each buffered guild, enqueue a single job instance and wire up all waiters to its promise
+    const job = { guildId: gid };
+    const promise = new Promise((resolve, reject) => {
+      queue.push({ job, resolve, reject });
+    });
+    // When the job completes, resolve/reject all waiters
+    promise.then((res) => {
+      for (const w of waiters) {
+        try { w.resolve(res); } catch (_) { /* ignore */ }
+      }
+    }).catch((err) => {
+      for (const w of waiters) {
+        try { w.reject(err); } catch (_) { /* ignore */ }
+      }
+    });
+  }
+  processQueue();
 }
 
 function processQueue() {
