@@ -479,6 +479,20 @@ try {
   logger.warn('hiveWorker module not available', { error: e && (e.stack || e) });
 }
 
+// Guild join worker: offload join handling (webhook + welcome messages)
+try {
+  const guildJoinWorker = require('./workers/guildJoinWorker');
+  client.once('clientReady', () => {
+    try {
+      guildJoinWorker.init(client);
+    } catch (e) {
+      logger.warn('Failed initializing guildJoinWorker', { error: e && (e.stack || e) });
+    }
+  });
+} catch (e) {
+  logger.warn('guildJoinWorker module not available', { error: e && (e.stack || e) });
+}
+
 // Load commands (support both flat files and directory-based commands)
 const commandsPath = path.join(__dirname, 'commands');
 if (fs.existsSync(commandsPath)) {
