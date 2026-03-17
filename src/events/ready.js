@@ -114,7 +114,17 @@ module.exports = {
         const generateActivities = () => {
           const serverCount = client.guilds.cache.size || 0;
           const userCount = client.guilds.cache.reduce((total, g) => total + (g.memberCount || 0), 0);
-          const name = `${serverCount.toLocaleString()} servers | ${userCount.toLocaleString()} users`;
+          let shardPrefix = '';
+          try {
+            if (statusCycling?.displayShard !== false) {
+              if (client.shard && Array.isArray(client.shard.ids) && client.shard.count) {
+                shardPrefix = `Shard ${client.shard.ids[0]}/${client.shard.count} | `;
+              } else if (process.env.SHARD_ID) {
+                shardPrefix = `Shard ${process.env.SHARD_ID} | `;
+              }
+            }
+          } catch (_) { shardPrefix = ''; }
+          const name = `${shardPrefix}${serverCount.toLocaleString()} servers | ${userCount.toLocaleString()} users`;
           return [{ name, type: ActivityType.Watching }];
         };
         

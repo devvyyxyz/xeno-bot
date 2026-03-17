@@ -10,6 +10,7 @@ let statusMessageId = null;
 const systems = {};
 const SHUTDOWN_HOOK_TIMEOUT_MS = Number(process.env.SHUTDOWN_HOOK_TIMEOUT_MS) || 5000;
 const PERSIST_PATH = path.join(__dirname, '..', '..', 'data', 'system-monitor.json');
+let statusUpdateTimer = null;
 
 // Load persisted state (statusMessageId) early so restarts reuse the same message
 loadPersist();
@@ -69,6 +70,39 @@ function buildStatusEmbed() {
     const name = s.name || k;
     const line = s.reason ? `${icon} **${name}** — ${s.reason}` : `${icon} **${name}**`;
     embed.addFields({ name: '\u200B', value: line });
+  }
+
+  // Add shard / server / user summary if client available
+  try {
+    if (clientRef && clientRef.user) {
+      const serverCount = clientRef.guilds?.cache?.size || 0;
+      const userCount = clientRef.guilds?.cache ? clientRef.guilds.cache.reduce((total, g) => total + (g.memberCount || 0), 0) : 0;
+      let shardLabel = '';
+      if (clientRef.shard && Array.isArray(clientRef.shard.ids) && clientRef.shard.count) {
+        shardLabel = `Shard ${clientRef.shard.ids[0]}/${clientRef.shard.count}`;
+      } else if (process.env.SHARD_ID) {
+        shardLabel = `Shard ${process.env.SHARD_ID}`;
+      }
+      const summary = `${shardLabel ? shardLabel + ' | ' : ''}${serverCount.toLocaleString()} servers | ${userCount.toLocaleString()} users`;
+      embed.addFields({ name: 'Status', value: summary });
+    }
+  } catch (e) {
+    logger.warn('Failed adding shard/server/user summary to status embed', { error: e && (e.stack || e) });
+  }
+
+  // Include basic metrics from guildJoinWorker if available
+  try {
+    const gj = require('../workers/guildJoinWorker');
+    if (gj && typeof gj.getMetrics === 'function') {
+      const m = gj.getMetrics();
+      const parts = [];
+      if (typeof m.totalBatchesFlushed === 'number') parts.push(`batches ${m.totalBatchesFlushed}`);
+      if (typeof m.totalJobsProcessed === 'number') parts.push(`jobs ${m.totalJobsProcessed}`);
+      if (typeof m.totalEnqueued === 'number') parts.push(`enqueued ${m.totalEnqueued}`);
+      if (parts.length) embed.addFields({ name: 'Join Worker', value: parts.join(' | ') });
+    }
+  } catch (e) {
+    // ignore if worker not available
   }
 
   return embed;
@@ -272,6 +306,19 @@ async function init(client, chId) {
     }
   } catch (e) {
     logger.warn('Failed editing/creating status message on init', { messageId: ctx.message?.id, error: e && (e.stack || e) });
+  }
+
+  // Start periodic status updates so counts/metrics stay fresh
+  try {
+    const intervalMs = Number(process.env.SYSTEM_MONITOR_UPDATE_MS) || 30000;
+    if (statusUpdateTimer) clearInterval(statusUpdateTimer);
+    statusUpdateTimer = setInterval(() => {
+      try { updateStatusMessage().catch(() => {}); } catch (_) { /* ignore */ }
+    }, intervalMs);
+    if (typeof statusUpdateTimer.unref === 'function') statusUpdateTimer.unref();
+    logger.info('Started periodic system monitor updates', { intervalMs });
+  } catch (e) {
+    logger.warn('Failed starting periodic system monitor updates', { error: e && (e.stack || e) });
   }
 }
 

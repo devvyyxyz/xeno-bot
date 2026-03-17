@@ -23,6 +23,8 @@ function enqueueGuildJoin(job) {
   if (!batchWindowMs) {
     return new Promise((resolve, reject) => {
       queue.push({ job, resolve, reject });
+      totalEnqueued += 1;
+      logger.debug('Enqueued guild join (no-batch)', { guildId: String(job.guildId), totalEnqueued });
       processQueue();
     });
   }
@@ -65,6 +67,8 @@ function flushBufferedJobs() {
     const job = { guildId: gid };
     const promise = new Promise((resolve, reject) => {
       queue.push({ job, resolve, reject });
+      totalEnqueued += 1;
+      logger.debug('Enqueued guild join (flush)', { guildId: gid, totalEnqueued });
     });
     // When the job completes, resolve/reject all waiters
     promise
