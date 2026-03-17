@@ -5,13 +5,18 @@ const guildJoinLib = require('../lib/guildJoin');
 let client = null;
 let queue = [];
 let active = 0;
-const concurrency = Math.max(1, Number(process.env.GUILD_JOIN_WORKER_CONCURRENCY) || 2);
+const concurrency = Math.max(1, Number(process.env.GUILD_JOIN_WORKER_CONCURRENCY) || 3);
 
 // Batching/debounce: buffer incoming join requests for a short window and flush together
-const batchWindowMs = Math.max(0, Number(process.env.GUILD_JOIN_BATCH_MS) || 30000);
+// Tuned default is 10s to reduce burst load while keeping welcomes timely.
+const batchWindowMs = Math.max(0, Number(process.env.GUILD_JOIN_BATCH_MS) || 10000);
 let batchTimer = null;
 // bufferedJobs: guildId -> array of { resolve, reject }
 const bufferedJobs = new Map();
+// Simple metrics
+let totalBatchesFlushed = 0;
+let totalJobsProcessed = 0;
+let totalEnqueued = 0;
 
 function enqueueGuildJoin(job) {
   // If batching is disabled (0), push directly to queue
@@ -28,9 +33,14 @@ function enqueueGuildJoin(job) {
     arr.push({ resolve, reject });
     bufferedJobs.set(gid, arr);
 
-    // start or reset batch timer
+    // start batch timer if not already running
+    logger.debug('Guild join buffered', { guildId: gid, buffered: arr.length, batchWindowMs });
     if (!batchTimer) {
+      logger.info('Starting guild join batch timer', { batchWindowMs });
+      const start = Date.now();
       batchTimer = setTimeout(() => {
+        const scheduledAt = Date.now();
+        logger.info('Flushing buffered guild joins', { batchWindowMs, scheduledAt, startedAt: start });
         flushBufferedJobs();
       }, batchWindowMs);
       if (typeof batchTimer.unref === 'function') batchTimer.unref();
@@ -41,9 +51,15 @@ function enqueueGuildJoin(job) {
 function flushBufferedJobs() {
   batchTimer = null;
   const guildIds = Array.from(bufferedJobs.keys());
-  if (!guildIds.length) return;
+  if (!guildIds.length) {
+    logger.debug('flushBufferedJobs: nothing to flush');
+    return;
+  }
+  const flushStart = Date.now();
+  let totalWaiters = 0;
   for (const gid of guildIds) {
     const waiters = bufferedJobs.get(gid) || [];
+    totalWaiters += waiters.length;
     bufferedJobs.delete(gid);
     // For each buffered guild, enqueue a single job instance and wire up all waiters to its promise
     const job = { guildId: gid };
@@ -51,17 +67,28 @@ function flushBufferedJobs() {
       queue.push({ job, resolve, reject });
     });
     // When the job completes, resolve/reject all waiters
-    promise.then((res) => {
-      for (const w of waiters) {
-        try { w.resolve(res); } catch (_) { /* ignore */ }
-      }
-    }).catch((err) => {
-      for (const w of waiters) {
-        try { w.reject(err); } catch (_) { /* ignore */ }
-      }
-    });
+    promise
+      .then((res) => {
+        for (const w of waiters) {
+          try { w.resolve(res); } catch (_) { /* ignore */ }
+        }
+      })
+      .catch((err) => {
+        for (const w of waiters) {
+          try { w.reject(err); } catch (_) { /* ignore */ }
+        }
+      });
   }
   processQueue();
+  const flushedAt = Date.now();
+  totalBatchesFlushed += 1;
+  logger.info('Buffered guild joins flushed', {
+    guildsFlushed: guildIds.length,
+    totalWaiters,
+    queueLength: queue.length,
+    flushMs: flushedAt - flushStart,
+    totalBatchesFlushed,
+  });
 }
 
 function processQueue() {
@@ -92,6 +119,7 @@ async function processJob({ guildId }) {
       return { ok: false, reason: 'guild_not_found' };
     }
 
+    totalJobsProcessed += 1;
     // Send webhook notification (non-blocking from caller; worker handles retries)
     try {
       await guildJoinLib.sendGuildJoinV2Webhook({ guild, client });
@@ -174,4 +202,8 @@ function init(botClient) {
   logger.info('guildJoinWorker initialized', { concurrency });
 }
 
-module.exports = { init, enqueueGuildJoin };
+function getMetrics() {
+  return { totalBatchesFlushed, totalJobsProcessed, totalEnqueued, concurrency, batchWindowMs };
+}
+
+module.exports = { init, enqueueGuildJoin, getMetrics };
