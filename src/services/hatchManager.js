@@ -37,6 +37,10 @@ let shuttingDown = false;
 async function init(botClient) {
   client = botClient || null;
   try {
+    const mu = process.memoryUsage();
+    logger.info('hatchManager.init memory start', { heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10 });
+  } catch (e) { /* ignore */ }
+  try {
     const rows = await db.knex('hatches').where({ collected: false }).select('*');
     for (const r of rows) {
       const now = Date.now();
@@ -52,6 +56,10 @@ async function init(botClient) {
   } catch (e) {
     logger.error('Failed initializing hatch manager', { error: e && (e.stack || e) });
   }
+  try {
+    const mu = process.memoryUsage();
+    logger.info('hatchManager.init memory end', { heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10, restoredHatches: (rows && rows.length) || 0 });
+  } catch (e) { /* ignore */ }
   try {
     utils.systemMonitor.registerSystem('hatchManager', { name: 'Hatch Manager', shutdown: shutdown });
   } catch (e) { logger.warn('Failed registering hatchManager with systemMonitor', { error: e && (e.stack || e) }); }
@@ -139,6 +147,10 @@ async function skipHatch(discordId, guildId, hatchId, costRoyalJelly = 5) {
 }
 
 async function collectHatch(discordId, guildId, hatchId) {
+  try {
+    const mu = process.memoryUsage();
+    logger.info('collectHatch memory start', { hatchId, heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10 });
+  } catch (e) { /* ignore */ }
   const row = await db.knex('hatches').where({ id: hatchId, discord_id: discordId, guild_id: guildId, collected: false }).first();
   if (!row) throw new Error('Hatch not found');
   const now = Date.now();
@@ -180,6 +192,10 @@ async function collectHatch(discordId, guildId, hatchId) {
   await db.knex('hatches').where({ id: hatchId }).update({ collected: true });
   const guildName = getGuildName(guildId);
   logger.info(`Hatch collected (${guildName})`, { hatchId, discordId, guildId });
+  try {
+    const mu = process.memoryUsage();
+    logger.info('collectHatch memory end', { hatchId, heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10 });
+  } catch (e) { /* ignore */ }
   return true;
 }
 
