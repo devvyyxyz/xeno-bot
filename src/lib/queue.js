@@ -19,6 +19,23 @@ function createQueue(name, opts = {}) {
 
 function createWorker(name, processor, opts = {}) {
   const worker = new Worker(name, processor, { connection: connectionOptions, ...opts });
+
+  // Guard against unhandled worker errors which crash the whole process
+  // Log the error and let external monitoring/restart handle recovery.
+  worker.on('error', (err) => {
+    console.error(`[queue:${name}] worker error:`, err);
+  });
+
+  // Log job failures handled by the worker for easier debugging/memory tracing
+  worker.on('failed', (job, err) => {
+    try {
+      const id = job && job.id ? job.id : 'unknown';
+      console.error(`[queue:${name}] job failed id=${id}:`, err);
+    } catch (e) {
+      console.error(`[queue:${name}] job failed (unable to read job id):`, err);
+    }
+  });
+
   return worker;
 }
 
