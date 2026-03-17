@@ -15,7 +15,7 @@ function getRoleDisplay(roleId) {
   const emoji = emojiKey && emojisCfg[emojiKey] ? `${emojisCfg[emojiKey]} ` : '';
   return `${emoji}${display}`.trim();
 }
-}
+ 
 
 function buildEvolutionCompleteV2Dm(job, fromRole, toRole) {
   const container = new ContainerBuilder();
