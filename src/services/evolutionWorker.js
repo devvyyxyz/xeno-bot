@@ -5,6 +5,7 @@ const { ContainerBuilder, TextDisplayBuilder } = require('@discordjs/builders');
 const { MessageFlags } = require('discord.js');
 const evolutionsCfg = require('../../config/evolutions.json');
 const emojisCfg = require('../../config/emojis.json');
+let shuttingDown = false;
 
 function getRoleDisplay(roleId) {
   const key = String(roleId || '').toLowerCase();
@@ -13,9 +14,8 @@ function getRoleDisplay(roleId) {
   const emojiKey = roleInfo.emoji;
   const emoji = emojiKey && emojisCfg[emojiKey] ? `${emojisCfg[emojiKey]} ` : '';
   return `${emoji}${display}`.trim();
-  let shuttingDown = false;
 }
-    if (shuttingDown) return 0;
+}
 
 function buildEvolutionCompleteV2Dm(job, fromRole, toRole) {
   const container = new ContainerBuilder();
@@ -32,6 +32,7 @@ function buildEvolutionCompleteV2Dm(job, fromRole, toRole) {
 }
 
 async function processDueJobs(client) {
+  if (shuttingDown) return 0;
   // Snapshot memory at start for debugging memory growth during processing
   try {
     const mu = process.memoryUsage();
@@ -126,7 +127,6 @@ async function processDueJobs(client) {
       logger.error('Failed processing evolution job', { job, error: e && (e.stack || e) });
     }
   }
-    shuttingDown = true;
     try {
       const mu = process.memoryUsage();
       logger.info('processDueJobs memory end', {
@@ -141,6 +141,7 @@ let _interval = null;
 async function start(client, opts = {}) {
   const pollMs = opts.pollMs || 30 * 1000;
   if (_interval) clearInterval(_interval);
+  shuttingDown = false;
   _interval = setInterval(() => {
     processDueJobs(client).catch(e => logger.error('Worker failed', { error: e && (e.stack || e) }));
   }, pollMs);
@@ -152,6 +153,7 @@ async function start(client, opts = {}) {
 
 async function stop() {
   try {
+    shuttingDown = true;
     if (_interval) clearInterval(_interval);
     _interval = null;
     logger.info('Evolution worker stopped');
