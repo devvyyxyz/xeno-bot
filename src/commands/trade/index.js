@@ -9,6 +9,7 @@ const hostModel = require('../../models/host');
 const xenoModel = require('../../models/xenomorph');
 const db = require('../../db');
 const safeReply = require('../../utils/safeReply');
+const { MessageFlags } = require('discord.js');
 const fallbackLogger = require('../../utils/fallbackLogger');
 const itemsService = require('../../services/items');
 const tradesUtil = require('../../utils/trades');
@@ -373,8 +374,8 @@ module.exports = {
           await tradesUtil.updateTrade(tradeId, { recipient_offer: JSON.stringify(offer) });
         }
 
-        // Reply to caller ephemerally confirming update
-        await safeReply(interaction, { content: `Offer updated for trade ${tradeId}:\n${formatOffer(offer)}`, ephemeral: true }, { loggerName: 'command:trade' });
+        // Reply to caller ephemerally confirming update (use flags like `hunt` does)
+        await safeReply(interaction, { content: `Offer updated for trade ${tradeId}:\n${formatOffer(offer)}`, flags: MessageFlags.Ephemeral }, { loggerName: 'command:trade' });
 
         // Attempt to find and update the original trade message in this channel so the displayed offer updates for viewers.
         try {
