@@ -168,11 +168,54 @@ const rest = new REST({ version: '10' }).setToken(token);
           logger.info('Global registration disabled by default; set ALLOW_GLOBAL_REGISTRATION=true to enable', { profile });
         } else {
           logger.info('Registering public global commands (best-effort)', { clientId, profile });
-          await rest.put(Routes.applicationCommands(clientId), { body: commands });
-          logger.info('Successfully registered public global commands.');
+          try {
+            await rest.put(Routes.applicationCommands(clientId), { body: commands });
+            logger.info('Successfully registered public global commands.');
+          } catch (regErr) {
+            // If Discord rejects the bulk update because an "Entry Point" command
+            // cannot be removed in a bulk update, attempt a safe merge: fetch the
+            // existing global commands and include any that would otherwise be
+            // removed (preserving the Entry Point command) before retrying.
+            const errCode = regErr && (regErr.code || (regErr.rawError && regErr.rawError.code));
+            if (errCode === 50240) {
+              logger.warn('Discord refused bulk update due to Entry Point command; attempting merge', { error: regErr && (regErr.stack || String(regErr)) });
+              try {
+                const existing = await rest.get(Routes.applicationCommands(clientId));
+                const newNames = new Set((commands || []).map(c => c && c.name));
+                const merged = (existing || []).filter(e => !newNames.has(e.name)).concat(commands || []);
+                await rest.put(Routes.applicationCommands(clientId), { body: merged });
+                logger.info('Successfully registered public global commands after merging existing commands.');
+              } catch (mergeErr) {
+                logger.warn('Merge retry failed', { error: mergeErr && (mergeErr.stack || String(mergeErr)) });
+                // Re-throw to be handled by outer catch and logged as failure
+                throw mergeErr;
+              }
+            } else {
+              // Not the Entry Point issue; propagate for outer handler to log
+              throw regErr;
+            }
+          }
         }
       } catch (globalErr) {
-        logger.warn('Global command registration failed (best-effort)', { error: globalErr && (globalErr.stack || globalErr) });
+        // Temporary: emit full error information to help diagnose registration failures
+        try {
+          logger.warn('Global command registration failed (best-effort)', {
+            error: globalErr && (globalErr.stack || String(globalErr)),
+            name: globalErr && globalErr.name,
+            status: globalErr && globalErr.status,
+            code: globalErr && globalErr.code
+          });
+          // If Discord returned a response body, log it too for inspection
+          if (globalErr && globalErr.body) {
+            logger.warn('Global command registration response body', { body: globalErr.body });
+          } else if (globalErr && globalErr.response && globalErr.response.body) {
+            logger.warn('Global command registration response body', { body: globalErr.response.body });
+          }
+        } catch (logErr) {
+          try { console.error('Failed to log global registration error via logger', logErr); } catch (_) { /* ignore */ }
+        }
+        // Always print to stderr so the terminal run shows the raw error object as well
+        try { console.error('Global command registration failed (best-effort):', globalErr); } catch (_) { /* ignore */ }
       }
     }
   } catch (error) {
