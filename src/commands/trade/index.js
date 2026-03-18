@@ -184,6 +184,17 @@ module.exports = {
           return;
         }
 
+        // Prevent creating a new offer if the recipient has already offered you one
+        try {
+          const existing = await db.knex('trades').where({ initiator_id: String(recipient.id), recipient_id: String(userId), status: 'pending' }).first();
+          if (existing) {
+            await safeReply(interaction, { content: `${recipient} has already offered you a trade (ID ${existing.id}). Accept or cancel that trade before creating a new offer.`, ephemeral: true }, { loggerName: 'command:trade' });
+            return;
+          }
+        } catch (e) {
+          fallbackLogger.warn('Failed checking for existing incoming trade', e);
+        }
+
         const tradeRow = await tradesUtil.createTrade(userId, recipient.id, guildId, offer);
         const componentsService = require('../../services/components');
         // Try to build a V2 container with action row buttons if builders are available
