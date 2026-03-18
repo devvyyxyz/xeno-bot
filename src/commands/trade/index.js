@@ -275,12 +275,24 @@ module.exports = {
                   try { await i.reply({ content: 'You cannot cancel this trade.', ephemeral: true }); } catch (_) { /* ignore */ }
                   return;
                 }
-                await tradesUtil.cancelTrade(tradeRow.id);
+                // Acknowledge interaction early to avoid "This interaction failed" and then perform cancel/edit
+                try { await i.deferUpdate(); } catch (_) { /* ignore */ }
                 try {
-                  await i.update({ content: `Trade ${tradeRow.id} cancelled.`, components: [ disabledActionRow ] });
-                } catch (uErr) {
-                  try { await i.deferUpdate(); } catch (_) { /* ignore */ }
-                  try { if (i.message && typeof i.message.edit === 'function') await i.message.edit({ content: `Trade ${tradeRow.id} cancelled.`, components: [ disabledActionRow ] }); else if (typeof i.followUp === 'function') await i.followUp({ content: `Trade ${tradeRow.id} cancelled.`, ephemeral: true }); } catch (_) { /* ignore */ }
+                  await tradesUtil.cancelTrade(tradeRow.id);
+                } catch (err) {
+                  try { if (typeof i.followUp === 'function') await i.followUp({ content: `Failed to cancel trade: ${err && (err.message || err)}`, ephemeral: true }); } catch (_) { /* ignore */ }
+                  collector.stop('cancelled');
+                  return;
+                }
+                // Edit original message to indicate cancellation and disable buttons
+                try {
+                  if (i.message && typeof i.message.edit === 'function') {
+                    await i.message.edit({ content: `Trade ${tradeRow.id} cancelled.`, components: [ disabledActionRow ] });
+                  } else if (typeof i.followUp === 'function') {
+                    await i.followUp({ content: `Trade ${tradeRow.id} cancelled.`, ephemeral: true });
+                  }
+                } catch (e) {
+                  try { if (typeof i.followUp === 'function') await i.followUp({ content: `Trade ${tradeRow.id} cancelled.`, ephemeral: true }); } catch (_) { /* ignore */ }
                 }
                 collector.stop('cancelled');
                 return;
