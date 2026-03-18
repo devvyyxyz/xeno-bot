@@ -241,8 +241,14 @@ module.exports = {
                   try { await i.reply({ content: 'Only the recipient can accept this trade.', ephemeral: true }); } catch (_) { /* ignore */ }
                   return;
                 }
-                // Update original message to indicate processing and remove buttons
-                try { await i.update({ content: 'Processing acceptance...', components: [ disabledActionRow ] }); } catch (_) { /* ignore */ }
+                // Update original message to indicate processing and remove buttons.
+                // Prefer `i.update`, but fall back to deferring + direct message edit if update fails
+                try {
+                  await i.update({ content: 'Processing acceptance...', components: [ disabledActionRow ] });
+                } catch (uErr) {
+                  try { await i.deferUpdate(); } catch (_) { /* ignore */ }
+                  try { if (i.message && typeof i.message.edit === 'function') await i.message.edit({ content: 'Processing acceptance...', components: [ disabledActionRow ] }); } catch (_) { /* ignore */ }
+                }
                 // call accept logic
                 await tradesUtil.updateTrade(tradeRow.id, { recipient_offer: JSON.stringify(tradesUtil.emptyOffer()) });
                 try {
@@ -267,7 +273,12 @@ module.exports = {
                   return;
                 }
                 await tradesUtil.cancelTrade(tradeRow.id);
-                try { await i.update({ content: `Trade ${tradeRow.id} cancelled.`, components: [ disabledActionRow ] }); } catch (err) { try { await i.followUp({ content: `Trade ${tradeRow.id} cancelled.`, ephemeral: true }); } catch (_) { /* ignore */ } }
+                try {
+                  await i.update({ content: `Trade ${tradeRow.id} cancelled.`, components: [ disabledActionRow ] });
+                } catch (uErr) {
+                  try { await i.deferUpdate(); } catch (_) { /* ignore */ }
+                  try { if (i.message && typeof i.message.edit === 'function') await i.message.edit({ content: `Trade ${tradeRow.id} cancelled.`, components: [ disabledActionRow ] }); else if (typeof i.followUp === 'function') await i.followUp({ content: `Trade ${tradeRow.id} cancelled.`, ephemeral: true }); } catch (_) { /* ignore */ }
+                }
                 collector.stop('cancelled');
                 return;
               }
