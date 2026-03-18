@@ -155,7 +155,9 @@ module.exports = {
     const guildId = interaction.guildId;
     const userId = interaction.user.id;
     if (!guildId) { await safeReply(interaction, { content: 'This command can only be used in a server.', ephemeral: true }); return; }
-    await interaction.deferReply({ ephemeral: false });
+    // Defer reply. Make `edit` subcommand ephemeral by default so responses are private.
+    const deferEphemeral = (sub === 'edit');
+    await interaction.deferReply({ ephemeral: deferEphemeral });
     try {
       if (sub === 'offer') {
         const recipient = interaction.options.getUser('user');
@@ -371,7 +373,49 @@ module.exports = {
           await tradesUtil.updateTrade(tradeId, { recipient_offer: JSON.stringify(offer) });
         }
 
+        // Reply to caller ephemerally confirming update
         await safeReply(interaction, { content: `Offer updated for trade ${tradeId}:\n${formatOffer(offer)}`, ephemeral: true }, { loggerName: 'command:trade' });
+
+        // Attempt to find and update the original trade message in this channel so the displayed offer updates for viewers.
+        try {
+          const initiatorOffer = tradeRow.initiator_offer ? JSON.parse(tradeRow.initiator_offer) : tradesUtil.emptyOffer();
+          const recipientOffer = tradeRow.recipient_offer ? JSON.parse(tradeRow.recipient_offer) : tradesUtil.emptyOffer();
+          const newInitiatorOffer = String(tradeRow.initiator_id) === caller ? offer : initiatorOffer;
+          const newRecipientOffer = String(tradeRow.recipient_id) === caller ? offer : recipientOffer;
+
+          const payload = buildStatsV2Payload({
+            title: '🔖 Trade Offered',
+            rows: [
+              { label: 'From', value: String(`<@${tradeRow.initiator_id}>`) },
+              { label: 'To', value: String(`<@${tradeRow.recipient_id}>`) },
+              { label: 'Initiator Offer', value: formatOffer(newInitiatorOffer) },
+              { label: 'Recipient Offer', value: formatOffer(newRecipientOffer) },
+              { label: 'Trade ID', value: String(tradeRow.id) }
+            ],
+            footer: 'Recipient must accept to complete trade',
+            client: interaction.client
+          });
+
+          // Attach action buttons (same as creation)
+          payload.components = payload.components || [];
+          payload.components.push({ type: 1, components: [ { type: 2, style: 1, custom_id: `trade-accept:${tradeRow.id}`, label: 'Accept' }, { type: 2, style: 4, custom_id: `trade-cancel:${tradeRow.id}`, label: 'Cancel' } ] });
+
+          // Search recent messages in the channel for the one with matching trade buttons
+          if (interaction.channel && interaction.channel.messages && typeof interaction.channel.messages.fetch === 'function') {
+            const msgs = await interaction.channel.messages.fetch({ limit: 100 });
+            const orig = msgs.find(m => {
+              try {
+                if (!m.components || !Array.isArray(m.components)) return false;
+                return m.components.some(row => Array.isArray(row.components) && row.components.some(c => c.customId === `trade-accept:${tradeRow.id}` || c.customId === `trade-cancel:${tradeRow.id}`));
+              } catch (_) { return false; }
+            });
+            if (orig && typeof orig.edit === 'function') {
+              try { await orig.edit(payload); } catch (e) { fallbackLogger.warn('Failed editing original trade message', e); }
+            }
+          }
+        } catch (e) {
+          fallbackLogger.warn('Failed to update original trade display', e);
+        }
         return;
       }
 
