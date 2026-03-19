@@ -260,7 +260,8 @@
     "price": 100000,
     "sell": 5,
     "hatch": 600,
-    "next_stage": "king_facehugger"
+    "next_stage": "k_facehugger",
+    "pathway": "k_series"
   },
   {
     "id": "colonist",

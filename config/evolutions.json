@@ -15,6 +15,11 @@
       "description": "High-tier King pathway requiring rare eggs and hosts",
       "time_ms": 7200000
     },
+    "k_series": {
+      "stages": ["k_facehugger", "k_runner", "k_soldier", "k_elite", "k_queen"],
+      "description": "K-Series Weyland pathway (Weyland-produced lineage)",
+      "time_ms": 7200000
+    },
     "deacon": {
       "stages": ["hammerpede", "trilobite", "deacon"],
       "description": "Mutation-focused deacon pathway",
@@ -75,7 +80,7 @@
     "android": "king",
     "spacejockey": "space_jockey",
     "engineer": "king",
-    "weyland": "king",
+    "weyland": "k_series",
     "giant": "king"
   },
   "requirements": {
@@ -97,6 +102,12 @@
       "knight": { "to": "grand_duke", "cost_jelly": 50 },
       "grand_duke": { "to": "prince", "cost_jelly": 75 },
       "prince": { "to": "king", "cost_jelly": 120 }
+    },
+    "k_series": {
+      "k_facehugger": { "to": "k_runner", "cost_jelly": 30, "requires_host_types": ["human", "engineer"] },
+      "k_runner": { "to": "k_soldier", "cost_jelly": 50 },
+      "k_soldier": { "to": "k_elite", "cost_jelly": 75 },
+      "k_elite": { "to": "k_queen", "cost_jelly": 120 }
     },
     "space_jockey": {
       "space_jockey_facehugger": { "to": "drone", "cost_jelly": 0, "requires_host_types": ["space_jockey"] },
@@ -151,5 +162,11 @@
     ,
     "predalien_facehugger": { "display": "Predalien Facehugger", "emoji": "facehugger", "rarity": 1 },
     "predalien": { "display": "Predalien", "emoji": "predalien", "rarity": 9 }
+    ,
+    "k_facehugger": { "display": "K-Series Facehugger", "emoji": "facehugger", "rarity": 7 },
+    "k_runner": { "display": "K-Series Runner", "emoji": "runner", "rarity": 7 },
+    "k_soldier": { "display": "K-Series Soldier", "emoji": "warrior", "rarity": 8 },
+    "k_elite": { "display": "K-Series Elite", "emoji": "praetorian", "rarity": 9 },
+    "k_queen": { "display": "K-Series Queen", "emoji": "queen", "rarity": 10 }
   }
 }
