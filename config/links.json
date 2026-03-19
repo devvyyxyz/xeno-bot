@@ -1,11 +1,11 @@
 {
   "general": {
-    "wiki": "https://xeno-bot-docs.devvyy.xyz/",
+    "wiki": "https://docs.xeno-bot.com/",
     "vote": "https://top.gg/bot/1476427270326583306/vote",
-    "invite": "https://discord.com/api/oauth2/authorize?client_id=1476427270326583306&permissions=274878286912&scope=bot%20applications.commands"
+    "invite": "https://xeno-bot.com/invite"
   },
   "community": {
-    "discord": "https://discord.gg/example",
-    "support": "https://discord.gg/WmFDeMKvzj"
+    "discord": "https://xeno-bot.com/discord",
+    "support": "https://xeno-bot.com/discord"
   }
 }
