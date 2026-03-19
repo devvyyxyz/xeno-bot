@@ -345,6 +345,7 @@
     "sell": 1000,
     "hatch": 172800,
     "next_stage": "facehugger",
-    "grantable_only": true
+    "grantable_only": true,
+    "developerOnly": true
   }
 ]

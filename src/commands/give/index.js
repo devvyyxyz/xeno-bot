@@ -42,7 +42,13 @@ module.exports = {
   async autocomplete(interaction) {
     const autocomplete = require('../../utils/autocomplete');
     const eggTypes = require('../../../config/eggTypes.json');
-    return autocomplete(interaction, eggTypes, { map: e => ({ name: e.name, value: e.id }), max: 25 });
+    const available = (Array.isArray(eggTypes) ? eggTypes : []).filter(e => {
+      if (e && e.developerOnly) {
+        return isDeveloper(interaction);
+      }
+      return true;
+    });
+    return autocomplete(interaction, available, { map: e => ({ name: e.name, value: e.id }), max: 25 });
   },
   async executeInteraction(interaction) {
     const sub = (() => { try { return interaction.options.getSubcommand(); } catch (e) { return null; } })();
@@ -69,6 +75,11 @@ module.exports = {
       if (!eggType) {
         const safeReply = require('../../utils/safeReply');
         await safeReply(interaction, { content: 'Invalid egg type.', ephemeral: true }, { loggerName: 'command:give' });
+        return;
+      }
+      if (eggType.developerOnly && !isDeveloper(interaction)) {
+        const safeReply = require('../../utils/safeReply');
+        await safeReply(interaction, { content: 'This egg is developer-only. Use /devgive to grant it.', ephemeral: true }, { loggerName: 'command:give' });
         return;
       }
       const baseLogger = require('../../utils/logger');
