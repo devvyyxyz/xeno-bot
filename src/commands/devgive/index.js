@@ -110,6 +110,19 @@ module.exports = {
         required: false,
         autocomplete: true
       }
+      ,
+      {
+        name: 'server_id',
+        description: 'Optional: server id to grant the egg in (overrides current server)',
+        type: 3,
+        required: false
+      },
+      {
+        name: 'reason',
+        description: 'Optional: reason to include in the spawn channel notification',
+        type: 3,
+        required: false
+      }
     ]
   },
   async autocomplete(interaction) {
@@ -232,26 +245,53 @@ module.exports = {
       if (type === 'egg') {
         const eggTypeId = interaction.options.getString('egg_type');
         const amount = Math.max(1, Number(interaction.options.getNumber('amount') || 1));
-        const guildId = interaction.guildId;
-        
+        const serverIdParam = interaction.options.getString('server_id');
+        const reason = interaction.options.getString('reason');
+        // prefer provided server id, fallback to current guild
+        const guildId = serverIdParam || interaction.guildId;
+
         if (!guildId) {
-          await safeReply(interaction, { content: 'This command can only be used in a server for eggs.', ephemeral: true }, { loggerName: 'command:devgive' });
+          await safeReply(interaction, { content: 'Please provide a `server_id` when running this command outside a server.', ephemeral: true }, { loggerName: 'command:devgive' });
           return;
         }
-        
+
         if (!target || !eggTypeId) {
           await safeReply(interaction, { content: 'User and egg_type are required for eggs.', ephemeral: true }, { loggerName: 'command:devgive' });
           return;
         }
-        
+
         const eggType = eggTypes.find(e => String(e.id) === String(eggTypeId));
         if (!eggType) {
           await safeReply(interaction, { content: 'Invalid egg type.', ephemeral: true }, { loggerName: 'command:devgive' });
           return;
         }
-        
+
         await userModel.addEggsForGuild(String(target.id), String(guildId), amount, String(eggTypeId));
-        await safeReply(interaction, { content: `Gave ${eggType.emoji || ''} ${eggType.name} x${amount} to ${target}.`, ephemeral: true }, { loggerName: 'command:devgive' });
+
+        // Send a notification in the server's configured spawn channel (if present)
+        if (serverIdParam) {
+          try {
+            const db = require('../../db');
+            const knex = db.knex;
+            const row = await knex('guild_settings').where({ guild_id: String(guildId) }).first('channel_id');
+            const channelId = row && row.channel_id ? String(row.channel_id) : null;
+            if (channelId && interaction.client) {
+              try {
+                const channel = await interaction.client.channels.fetch(channelId).catch(() => null);
+                if (channel && channel.send) {
+                  const mentionTarget = `<@${String(target.id)}>`;
+                  const giver = `<@${String(interaction.user.id)}>`;
+                  const msg = reason
+                    ? `${eggType.emoji || ''} ${eggType.name} x${amount} granted to ${mentionTarget} by ${giver}. Reason: ${reason}`
+                    : `${eggType.emoji || ''} ${eggType.name} x${amount} granted to ${mentionTarget} by ${giver}.`;
+                  await channel.send(msg).catch(() => null);
+                }
+              } catch (e) { /* ignore channel send errors */ }
+            }
+          } catch (e) { /* ignore db fetch errors */ }
+        }
+
+        await safeReply(interaction, { content: `Gave ${eggType.emoji || ''} ${eggType.name} x${amount} to ${target} in server ${guildId}.`, ephemeral: true }, { loggerName: 'command:devgive' });
         return;
       }
 
