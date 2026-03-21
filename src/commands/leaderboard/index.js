@@ -201,7 +201,7 @@ module.exports = {
         const userHosts = hostsByOwner[userId] || { hostsByType: {}, total: 0 };
         
         for (const [gid, gd] of Object.entries(g)) {
-          guildStats[gid] = guildStats[gid] || { eggsByType: {}, hostsByType: {}, total: 0, hostsTotal: 0, catchTimes: [] };
+            guildStats[gid] = guildStats[gid] || { eggsByType: {}, hostsByType: {}, total: 0, hostsTotal: 0, catchTimes: [], royalJelly: 0 };
           try {
             const eggsObj = (gd && gd.eggs) || {};
             for (const [etype, count] of Object.entries(eggsObj)) {
@@ -217,6 +217,12 @@ module.exports = {
               guildStats[gid].hostsByType[htype] = (guildStats[gid].hostsByType[htype] || 0) + count;
             }
             guildStats[gid].hostsTotal = (guildStats[gid].hostsTotal || 0) + userHosts.total;
+          } catch (e) { /* ignore */ void 0; }
+
+          // Aggregate royal jelly currency for this guild
+          try {
+            const rj = (gd && gd.currency && Number(gd.currency.royal_jelly)) || 0;
+            guildStats[gid].royalJelly = (guildStats[gid].royalJelly || 0) + (Number(rj) || 0);
           } catch (e) { /* ignore */ void 0; }
           
           // include user's catchTimes for this guild if user has presence here
@@ -243,6 +249,8 @@ module.exports = {
         entries.sort((a, b) => (b.info.total || 0) - (a.info.total || 0));
       } else if (sortOpt === 'hosts') {
         entries.sort((a, b) => (b.info.hostsTotal || 0) - (a.info.hostsTotal || 0));
+      } else if (sortOpt === 'royal_jelly') {
+        entries.sort((a, b) => (b.info.royalJelly || 0) - (a.info.royalJelly || 0));
       } else if (sortOpt === 'rarity') {
         entries.forEach(e => {
           let score = 0;
@@ -309,6 +317,7 @@ module.exports = {
         let value = '';
         if (sortOpt === 'eggs') value = `**${entry.info.total || 0} eggs**`;
         else if (sortOpt === 'hosts') value = `**${entry.info.hostsTotal || 0} hosts**`;
+        else if (sortOpt === 'royal_jelly') value = `**${require('../../utils/format/numberFormat').formatNumber(entry.info.royalJelly || 0)} RJ**`;
         else if (sortOpt === 'rarity') value = `**${entry.info.rarityScore || 0} rarity**`;
         else if (sortOpt.startsWith('eggtype_')) {
           const t = sortOpt.replace('eggtype_', '');
@@ -346,6 +355,7 @@ module.exports = {
       const sortChoices = [
         { label: 'Total Eggs', value: 'eggs' },
         { label: 'Total Hosts', value: 'hosts' },
+        { label: 'Royal Jelly', value: 'royal_jelly' },
         { label: 'Fastest Catch', value: 'fastest' },
         { label: 'Slowest Catch', value: 'slowest' },
         { label: 'Egg Rarity', value: 'rarity' }
@@ -481,8 +491,12 @@ module.exports = {
       // Get host data for this user scoped to this guild (from prefetched map)
       const userId = String(user.discord_id);
       const userHosts = hostsByOwner[userId] || { hostsByType: {}, total: 0 };
-      // Skip users with 0 eggs AND 0 hosts in this guild
-      if (eggsTotal === 0 && userHosts.total === 0) continue;
+
+      // Get royal jelly for this user in this guild (fallback to global currency if missing)
+      const royalJellyAmt = (guildData && guildData.currency && Number(guildData.currency.royal_jelly)) || (data && data.currency && Number(data.currency.royal_jelly)) || 0;
+
+      // Skip users with 0 eggs AND 0 hosts AND 0 royal jelly in this guild
+      if (eggsTotal === 0 && userHosts.total === 0 && royalJellyAmt === 0) continue;
       
       const stats = (guildData && guildData.stats) ? guildData.stats : (data.stats || {});
       let entry = {
@@ -491,6 +505,7 @@ module.exports = {
         eggs,
         hostsTotal: userHosts.total,
         hosts: userHosts.hostsByType,
+        royalJelly: royalJellyAmt,
         fastest: stats.catchTimes && stats.catchTimes.length ? Math.min(...stats.catchTimes) : null,
         slowest: stats.catchTimes && stats.catchTimes.length ? Math.max(...stats.catchTimes) : null
       };
@@ -501,6 +516,8 @@ module.exports = {
       leaderboard.sort((a, b) => b.eggsTotal - a.eggsTotal);
     } else if (sort === 'hosts') {
       leaderboard.sort((a, b) => b.hostsTotal - a.hostsTotal);
+    } else if (sort === 'royal_jelly') {
+      leaderboard.sort((a, b) => (b.royalJelly || 0) - (a.royalJelly || 0));
     } else if (sort === 'fastest') {
       leaderboard = leaderboard.filter(e => e.fastest !== null);
       leaderboard.sort((a, b) => a.fastest - b.fastest);
@@ -535,6 +552,8 @@ module.exports = {
         desc += `#${i + 1} ${userTag} — **${entry.eggsTotal} eggs**\n`;
       } else if (sort === 'hosts') {
         desc += `#${i + 1} ${userTag} — **${entry.hostsTotal} hosts**\n`;
+      } else if (sort === 'royal_jelly') {
+        desc += `#${i + 1} ${userTag} — **${require('../../utils/format/numberFormat').formatNumber(entry.royalJelly || 0)} RJ**\n`;
       } else if (sort === 'fastest') {
         desc += `#${i + 1} ${userTag} — **${(entry.fastest !== null && typeof entry.fastest === 'number') ? formatMs(entry.fastest) : 'No data'}**\n`;
       } else if (sort === 'slowest') {
@@ -555,7 +574,8 @@ module.exports = {
     }
      const sortChoices = [
        { label: 'Total Eggs', value: 'eggs' },
-       { label: 'Total Hosts', value: 'hosts' },
+      { label: 'Total Hosts', value: 'hosts' },
+      { label: 'Royal Jelly', value: 'royal_jelly' },
        { label: 'Fastest Catch', value: 'fastest' },
        { label: 'Slowest Catch', value: 'slowest' },
        { label: 'Egg Rarity', value: 'rarity' }
