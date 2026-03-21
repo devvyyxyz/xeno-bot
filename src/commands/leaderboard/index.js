@@ -412,23 +412,9 @@ module.exports = {
     }
 
     // Build per-user leaderboard data for the server
-    // First, query all hosts from the hosts table
+    // Use host model to count hosts scoped to this guild per user (handles legacy schema)
     const hostModel = require('../../models/host');
-    void hostModel;
     const hostsConfig = require('../../../config/hosts.json');
-    const allHosts = await db.knex('hosts').select('owner_id', 'host_type');
-    
-    // Build a map of owner_id -> {hostsByType: {type: count}, total: number}
-    const hostsByOwner = {};
-    for (const host of allHosts) {
-      const ownerId = String(host.owner_id);
-      if (!hostsByOwner[ownerId]) {
-        hostsByOwner[ownerId] = { hostsByType: {}, total: 0 };
-      }
-      const hostType = String(host.host_type);
-      hostsByOwner[ownerId].hostsByType[hostType] = (hostsByOwner[ownerId].hostsByType[hostType] || 0) + 1;
-      hostsByOwner[ownerId].total++;
-    }
     
     let leaderboard = [];
     for (const user of rows) {
@@ -441,10 +427,18 @@ module.exports = {
       const eggs = guildData.eggs || {};
       const eggsTotal = Object.values(eggs).reduce((a, b) => a + b, 0);
       
-      // Get host data for this user
+      // Get host data for this user scoped to this guild
       const userId = String(user.discord_id);
-      const userHosts = hostsByOwner[userId] || { hostsByType: {}, total: 0 };
-      
+      let userHosts = { hostsByType: {}, total: 0 };
+      try {
+        const hostRows = await hostModel.listHostsByOwner(userId, guildId);
+        for (const hr of hostRows) {
+          const ht = String(hr.host_type || hr.hostType || 'unknown');
+          userHosts.hostsByType[ht] = (userHosts.hostsByType[ht] || 0) + 1;
+          userHosts.total++;
+        }
+      } catch (e) { /* ignore host lookup failures */ }
+
       // Skip users with 0 eggs AND 0 hosts in this guild
       if (eggsTotal === 0 && userHosts.total === 0) continue;
       
