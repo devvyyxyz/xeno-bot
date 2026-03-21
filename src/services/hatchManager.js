@@ -184,7 +184,8 @@ async function collectHatch(discordId, guildId, hatchId) {
     logger.warn('Failed loading egg type config in collectHatch', { error: e && e.message });
   }
   try {
-    await xenoModel.createXeno(discordId, { pathway, role: nextStage, stage: nextStage, data: { fromEgg: row.egg_type }, guildId });
+    // Do not auto-attach hatched xenomorphs to hives; attaching should be done via hive commands
+    await xenoModel.createXeno(discordId, { pathway, role: nextStage, stage: nextStage, data: { fromEgg: row.egg_type }, guildId, attachToHive: false });
   } catch (e) {
     logger.warn('Failed creating xenomorph in collectHatch', { error: e && e.message });
     try { await userModel.addItemForGuild(discordId, guildId, 'facehugger', 1); } catch (_) { /* ignore */ void 0; }

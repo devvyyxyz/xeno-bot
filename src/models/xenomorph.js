@@ -84,12 +84,27 @@ async function createXeno(ownerId, opts = {}) {
     stats: opts.stats ? JSON.stringify(opts.stats) : null,
     data: opts.data ? JSON.stringify(opts.data) : null
   };
-  // If a guildId is provided and no explicit hive_id was set, try to attach to user's hive in that guild
-  if ((!payload.hive_id || payload.hive_id == null) && opts.guildId) {
+  // If attachToHive is not explicitly disabled, and a guildId is provided and no explicit hive_id was set, try to attach to user's hive in that guild
+  if (opts.attachToHive !== false && ((!payload.hive_id || payload.hive_id == null) && opts.guildId)) {
     try {
       const hiveModel = require('./hive');
       const hive = await hiveModel.getHiveByUser(String(ownerId), String(opts.guildId));
-      if (hive && hive.id) payload.hive_id = hive.id;
+      if (hive && hive.id) {
+        try {
+          const cntRow = await db.knex('xenomorphs').where({ hive_id: hive.id }).count('id as cnt').first();
+          const cnt = Number(cntRow && cntRow.cnt) || 0;
+          const cap = Number(hive.capacity) || 0;
+          if (cap > 0 && cnt >= cap) {
+            // Hive is full; do not attach to hive to avoid exceeding capacity
+            logger.info('Hive full, skipping attaching xenomorph to hive', { ownerId: ownerId, hiveId: hive.id, count: cnt, capacity: cap });
+          } else {
+            payload.hive_id = hive.id;
+          }
+        } catch (e) {
+          // On error while checking capacity, avoid attaching to hive to be safe
+          logger.warn('Failed checking hive capacity, skipping attach', { hiveId: hive.id, error: e && (e.stack || e) });
+        }
+      }
     } catch (_) { /* ignore */ void 0; }
   }
 
