@@ -164,10 +164,10 @@
     "predalien": { "display": "Predalien", "emoji": "predalien", "rarity": 9 }
     ,
     "k_facehugger": { "display": "K-Series Facehugger", "emoji": "facehugger", "rarity": 7 },
-    "k_runner": { "display": "K-Series Runner", "emoji": "runner", "rarity": 7 },
-    "k_soldier": { "display": "K-Series Soldier", "emoji": "warrior", "rarity": 8 },
-    "k_elite": { "display": "K-Series Elite", "emoji": "praetorian", "rarity": 9 },
-    "k_queen": { "display": "K-Series Queen", "emoji": "queen", "rarity": 10 }
+    "k_runner": { "display": "K-Series Runner", "emoji": "k-series", "rarity": 7 },
+    "k_soldier": { "display": "K-Series Soldier", "emoji": "k-series", "rarity": 8 },
+    "k_elite": { "display": "K-Series Elite", "emoji": "k-series", "rarity": 9 },
+    "k_queen": { "display": "K-Series Queen", "emoji": "k-series", "rarity": 10 }
     ,"tocellus": { "display": "T-Ocellus", "emoji": "tocellus", "rarity": 9 }
     ,"carrier": { "display": "Carrier", "emoji": "carrier", "rarity": 8 }
     ,"newborn": { "display": "Newborn", "emoji": "newborn", "rarity": 2 }
