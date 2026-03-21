@@ -82,7 +82,7 @@ async function processDueJobs(client) {
           }
         } catch (e) { /* ignore */ void 0; }
         // Determine whether the target role belongs to a different pathway and update pathway as well
-        const updates = { role: targetRole, updated_at: db.knex.fn.now() };
+        const updates = { role: targetRole, stage: targetRole, updated_at: db.knex.fn.now() };
         try {
           // Find pathway that contains the targetRole in its stages (if any)
           const pathKeys = Object.keys(evolutionsCfg.pathways || {});
