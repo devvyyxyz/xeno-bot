@@ -471,7 +471,7 @@ module.exports = {
       // Skip users with 0 eggs AND 0 hosts in this guild
       if (eggsTotal === 0 && userHosts.total === 0) continue;
       
-      const stats = guildData.stats || {};
+      const stats = (guildData && guildData.stats) ? guildData.stats : (data.stats || {});
       let entry = {
         id: user.discord_id,
         eggsTotal,
