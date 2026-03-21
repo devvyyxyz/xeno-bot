@@ -152,7 +152,7 @@ module.exports = {
           : null;
         if (avatarUrl) {
           container.addThumbnailComponents(
-            new ThumbnailBuilder().setImageURL(avatarUrl)
+            new ThumbnailBuilder().setURL(avatarUrl)
           );
         }
       } catch (e) {
