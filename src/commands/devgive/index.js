@@ -318,18 +318,39 @@ module.exports = {
         const stage = interaction.options.getString('stage');
         const amount = Math.max(1, Number(interaction.options.getNumber('amount') || 1));
         
-        if (!target || !pathway || !stage) {
-          await safeReply(interaction, { content: 'User, pathway, and stage are required for xenomorphs.', ephemeral: true }, { loggerName: 'command:devgive' });
+        if (!target || !stage) {
+          await safeReply(interaction, { content: 'User and stage are required for xenomorphs.', ephemeral: true }, { loggerName: 'command:devgive' });
           return;
         }
-        
-        // Verify pathway and stage exist
-        const pathwayExists = evolutions.pathways && evolutions.pathways[pathway];
+
+        // Verify stage exists
         const stageExists = evolutions.roles && evolutions.roles[stage];
-        
-        if (!pathwayExists || !stageExists) {
-          await safeReply(interaction, { content: 'Invalid pathway or stage.', ephemeral: true }, { loggerName: 'command:devgive' });
+        if (!stageExists) {
+          await safeReply(interaction, { content: 'Invalid stage.', ephemeral: true }, { loggerName: 'command:devgive' });
           return;
+        }
+
+        // Determine whether the stage belongs to any pathway. If it does,
+        // a pathway must be provided. If not, pathway is optional.
+        let stageInAnyPathway = false;
+        if (evolutions.pathways) {
+          for (const p of Object.keys(evolutions.pathways)) {
+            const stages = evolutions.pathways[p] && evolutions.pathways[p].stages || [];
+            if (Array.isArray(stages) && stages.includes(stage)) { stageInAnyPathway = true; break; }
+          }
+        }
+
+        if (stageInAnyPathway) {
+          if (!pathway) {
+            await safeReply(interaction, { content: 'This stage requires a pathway. Please provide a pathway.', ephemeral: true }, { loggerName: 'command:devgive' });
+            return;
+          }
+          // If provided, verify pathway exists
+          const pathwayExists = evolutions.pathways && evolutions.pathways[pathway];
+          if (!pathwayExists) {
+            await safeReply(interaction, { content: 'Invalid pathway.', ephemeral: true }, { loggerName: 'command:devgive' });
+            return;
+          }
         }
         
         const xenoModel = require('../../models/xenomorph');
