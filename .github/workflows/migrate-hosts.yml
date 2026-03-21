@@ -1,0 +1,26 @@
+name: Hosts migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_migration:
+        description: 'Set to "true" to perform writes. Default is false (dry-run).'
+        required: false
+        default: 'false'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run migration (dry-run unless run_migration=true)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DRY_RUN: ${{ inputs.run_migration != 'true' }}
+        run: node scripts/migrate_attach_hosts_by_owner.js
