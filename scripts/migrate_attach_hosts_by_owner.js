@@ -130,43 +130,92 @@ async function main() {
       console.log(`  owner=${owner}  candidates=${JSON.stringify(candidates)}  selected=${selected}`);
 
       try {
+        const client = String(((knex && knex.client && knex.client.config && knex.client.config.client) || '')).toLowerCase();
+        const isMysql = client.includes('mysql');
+        const isPg = client.includes('pg') || client.includes('postgres');
+
         if (!DRY_RUN) {
           await knex.transaction(async (trx) => {
-            const rows = await trx('hosts')
+            // Count rows first
+            const cntRow = await trx('hosts')
               .where({ owner_id: String(owner) })
               .andWhere(function () { this.whereNull('guild_id').orWhere('guild_id', ''); })
-              .select('id', 'data');
+              .count('id as n');
+            const n = Number(cntRow[0]?.n ?? 0);
 
-            for (const row of rows) {
-              const data = parseJsonColumn(row.data);
-              data.guild_id = selected;
+            if (n > 0) {
+              if (isMysql) {
+                await trx('hosts')
+                  .where({ owner_id: String(owner) })
+                  .andWhere(function () { this.whereNull('guild_id').orWhere('guild_id', ''); })
+                  .update({ guild_id: selected, data: trx.raw("JSON_SET(COALESCE(data, '{}'), '$.guild_id', ?)", [selected]) });
+              } else if (isPg) {
+                await trx('hosts')
+                  .where({ owner_id: String(owner) })
+                  .andWhere(function () { this.whereNull('guild_id').orWhere('guild_id', ''); })
+                  .update({ guild_id: selected, data: trx.raw("jsonb_set(COALESCE(data::jsonb, '{}'::jsonb), '{guild_id}', to_jsonb(?::text))", [selected]) });
+              } else {
+                // Fallback: update per-row (slower)
+                const rows = await trx('hosts')
+                  .where({ owner_id: String(owner) })
+                  .andWhere(function () { this.whereNull('guild_id').orWhere('guild_id', ''); })
+                  .select('id', 'data');
+                for (const row of rows) {
+                  const data = parseJsonColumn(row.data);
+                  data.guild_id = selected;
+                  await trx('hosts').where({ id: row.id }).update({ guild_id: selected, data: JSON.stringify(data) });
+                }
+              }
 
-              await trx('hosts')
-                .where({ id: row.id })
-                .update({ guild_id: selected, data: JSON.stringify(data) });
-            }
-                  processedHosts++;
+              // Account for processed hosts and show progress in reasonable steps.
+              totalUpdated += n;
+              if (n <= 200) {
+                for (let i = 0; i < n; i++) { processedHosts++; renderProgress(processedHosts, totalHosts); }
+              } else {
+                const step = Math.max(1, Math.floor(n / 100));
+                let advanced = 0;
+                while (advanced < n) {
+                  const inc = Math.min(step, n - advanced);
+                  processedHosts += inc;
+                  advanced += inc;
                   renderProgress(processedHosts, totalHosts);
+                }
+              }
 
-            totalUpdated += rows.length;
-            console.log(`    → updated ${rows.length} host(s)  guild_id=${selected}`);
+              console.log(`    → updated ${n} host(s)  guild_id=${selected}`);
+            } else {
+              console.log(`    → no hosts to update for owner ${owner}`);
+            }
           });
         } else {
-          // Dry-run: count rows that would be affected.
-          const rows = await knex('hosts')
+          // Dry-run: count rows that would be affected and step progress similarly.
+          const cntRow = await knex('hosts')
             .where({ owner_id: String(owner) })
             .andWhere(function () { this.whereNull('guild_id').orWhere('guild_id', ''); })
             .count('id as n');
-          const n = Number(rows[0]?.n ?? 0);
+          const n = Number(cntRow[0]?.n ?? 0);
           totalUpdated += n;
           console.log(`    [DRY RUN] would update ${n} host(s)  guild_id=${selected}`);
+
+          if (n <= 200) {
+            for (let i = 0; i < n; i++) { processedHosts++; renderProgress(processedHosts, totalHosts); }
+          } else {
+            const step = Math.max(1, Math.floor(n / 100));
+            let advanced = 0;
+            while (advanced < n) {
+              const inc = Math.min(step, n - advanced);
+              processedHosts += inc;
+              advanced += inc;
+              renderProgress(processedHosts, totalHosts);
+            }
+          }
         }
       } catch (err) {
         totalSkipped++;
         console.error(`  [ERROR] owner=${owner}:`, err?.message ?? err);
       }
 
-      renderProgress(processedOwners, totalOwners);
+      renderProgress(processedHosts, totalHosts);
     }
 
     // Brief pause between batches to reduce DB pressure.
