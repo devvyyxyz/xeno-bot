@@ -143,7 +143,7 @@ async function getHivesByGuild(guildId) {
   }
 }
 
-async function updateHiveById(id, changes = {}) {
+async function updateHiveById(id, changes = {}, opts = {}) {
   try {
     await ensureHiveColumns();
     const payload = {};
@@ -163,7 +163,7 @@ async function updateHiveById(id, changes = {}) {
     if ('data' in changes) payload.data = JSON.stringify(changes.data);
     if (Object.keys(payload).length === 0) return getHiveById(id);
     await db.knex('hives').where({ id }).update({ ...payload, updated_at: db.knex.fn.now() });
-    logger.info('Updated hive', { id, changes });
+    if (!opts || !opts.quiet) logger.info('Updated hive', { id, changes });
     return getHiveById(id);
   } catch (err) {
     logger.error('Failed updating hive', { id, changes, error: err && (err.stack || err) });

@@ -26,6 +26,7 @@ async function processHives() {
     const rows = await db.knex('hives').where('jelly_production_per_hour', '>', 0).select('*');
     if (!rows || rows.length === 0) return 0;
     let processed = 0;
+    const awardedHives = [];
     for (const r of rows) {
       try {
         // per-row memory debug
@@ -54,7 +55,7 @@ async function processHives() {
           // award amount
           try {
             await userModel.modifyCurrencyForGuild(ownerId, guildId, 'royal_jelly', Number(amount));
-            logger.info('Awarded hive production', { hiveId: hive.id, ownerId, guildId, amount });
+            awardedHives.push({ hiveId: hive.id, ownerId, guildId, amount });
           } catch (e) {
             logger.warn('Failed awarding hive production', {
               hiveId: hive.id,
@@ -70,7 +71,7 @@ async function processHives() {
           const newLast = lastCollected + consumedMs;
           const newData = Object.assign({}, data, { last_collected_at: newLast });
           try {
-            await hiveModel.updateHiveById(hive.id, { data: newData });
+            await hiveModel.updateHiveById(hive.id, { data: newData }, { quiet: true });
             processed += 1;
           } catch (e) {
             logger.warn('Failed updating hive last_collected', {
@@ -87,6 +88,13 @@ async function processHives() {
       const mu = process.memoryUsage();
       logger.info('processHives memory end', { heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10 });
     } catch (e) { /* ignore */ }
+
+    if (awardedHives.length > 0) {
+      const totalHives = awardedHives.length;
+      const totalAmount = awardedHives.reduce((s, a) => s + (Number(a.amount) || 0), 0);
+      logger.info(`Awarded hive production x${totalHives} (+${totalAmount})`, { totalHives, totalAmount });
+    }
+
     return processed;
   } catch (e) {
     logger.error('Hive worker failed', { error: e && (e.stack || e) });
