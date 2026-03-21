@@ -172,5 +172,6 @@
     ,"carrier": { "display": "Carrier", "emoji": "carrier", "rarity": 8 }
     ,"newborn": { "display": "Newborn", "emoji": "newborn", "rarity": 2 }
     ,"burster": { "display": "Burster", "emoji": "burster", "rarity": 6 }
+    ,"queen_mother": { "display": "Queen Mother", "emoji": "queen_mother", "rarity": 12 }
   }
 }
