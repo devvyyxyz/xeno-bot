@@ -7,18 +7,22 @@
   Usage: `node scripts/detach-xenos-over-capacity.js`
 */
 
+
 const db = require('../src/db');
 
 (async function main() {
   try {
-    const hives = await db.knex('hives').select('id', 'capacity');
+    await db.migrate();
+    const knex = db.knex;
+    if (!knex) throw new Error('Database not initialized');
+    const hives = await knex('hives').select('id', 'capacity');
     let totalDetached = 0;
     for (const hive of hives) {
       const cap = Number(hive.capacity) || 0;
       if (cap <= 0) continue;
 
       // Order by id desc so we detach the most-recently-created xenos first
-      const attached = await db.knex('xenomorphs').where({ hive_id: hive.id }).select('id').orderBy('id', 'desc');
+      const attached = await knex('xenomorphs').where({ hive_id: hive.id }).select('id').orderBy('id', 'desc');
       const count = attached.length;
       if (count <= cap) continue;
 
@@ -27,7 +31,7 @@ const db = require('../src/db');
       if (toDetach.length === 0) continue;
 
       console.log(`Hive ${hive.id} over capacity: ${count}/${cap} — detaching ${toDetach.length} xenomorph(s)`);
-      await db.knex('xenomorphs').whereIn('id', toDetach).update({ hive_id: null, updated_at: db.knex.fn.now() });
+      await knex('xenomorphs').whereIn('id', toDetach).update({ hive_id: null, updated_at: knex.fn.now() });
       totalDetached += toDetach.length;
     }
 
