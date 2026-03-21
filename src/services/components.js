@@ -8,6 +8,24 @@ async function updateInteraction(interaction, payload = {}) {
   const p = Object.assign({}, payload);
   if (!Object.prototype.hasOwnProperty.call(p, 'flags')) p.flags = MessageFlags.IsComponentsV2;
   try {
+    const dumpInteractionState = (it) => {
+      try {
+        if (!it) return null;
+        return {
+          id: it.id || null,
+          type: it.type || null,
+          userId: (it.user && it.user.id) ? it.user.id : (it.userId || null),
+          channelId: it.channel && it.channel.id ? it.channel.id : (it.channelId || null),
+          replied: !!it.replied,
+          deferred: !!it.deferred,
+          hasUpdate: typeof it.update === 'function',
+          hasEdit: typeof it.edit === 'function',
+          messagePresent: !!(it.message && it.message.id),
+          messageEditable: !!(it.message && typeof it.message.edit === 'function')
+        };
+      } catch (_) { return null; }
+    };
+
     // If components are present, attempt to pre-validate each to surface
     // which component index is causing validation to fail. This logs details
     // to `components` logger so we can inspect problematic payloads.
@@ -56,7 +74,7 @@ async function updateInteraction(interaction, payload = {}) {
         delete editPayload.ephemeral;
         return await interaction.edit(editPayload);
       } catch (msgErr) {
-        try { logger && logger.warn && logger.warn('components: direct message.edit failed', { error: msgErr && (msgErr.stack || msgErr) }); } catch (_) { /* ignore */ }
+        try { logger && logger.warn && logger.warn('components: direct message.edit failed', { error: msgErr && (msgErr.stack || msgErr), interaction: dumpInteractionState(interaction) }); } catch (_) { /* ignore */ }
         // fallthrough to interaction.update or safeReply below
       }
     }
@@ -65,7 +83,7 @@ async function updateInteraction(interaction, payload = {}) {
       try {
         return await interaction.update(p);
       } catch (updateErr) {
-        try { logger && logger.warn && logger.warn('components: interaction.update failed, attempting message edit', { error: updateErr && (updateErr.stack || updateErr) }); } catch (_) { /* ignore */ }
+        try { logger && logger.warn && logger.warn('components: interaction.update failed, attempting message edit', { error: updateErr && (updateErr.stack || updateErr), payloadSummary: (p && p.components) ? `components:${p.components.length}` : (p && p.content) ? String(p.content).slice(0,200) : null, interaction: dumpInteractionState(interaction) }); } catch (_) { /* ignore */ }
         try {
           if (interaction && typeof interaction.message === 'object' && typeof interaction.message.edit === 'function') {
             const editPayload = Object.assign({}, p);
@@ -81,14 +99,14 @@ async function updateInteraction(interaction, payload = {}) {
             return await interaction.edit(editPayload2);
           }
         } catch (msgEditErr) {
-          try { logger && logger.warn && logger.warn('components: message.edit after update failure also failed', { error: msgEditErr && (msgEditErr.stack || msgEditErr) }); } catch (_) { /* ignore */ }
+          try { logger && logger.warn && logger.warn('components: message.edit after update failure also failed', { error: msgEditErr && (msgEditErr.stack || msgEditErr), payloadSummary: (p && p.components) ? `components:${p.components.length}` : (p && p.content) ? String(p.content).slice(0,200) : null, interaction: dumpInteractionState(interaction) }); } catch (_) { /* ignore */ }
         }
         // If editing the underlying message isn't possible, fall through to safeReply
       }
     }
     // Do not fall back to sending new messages. If we cannot update or edit
     // the original message, log and return null so callers know nothing changed.
-    try { logger && logger.warn && logger.warn('components: unable to update or edit interaction; skipping send/followup'); } catch (_) { /* ignore */ }
+    try { logger && logger.warn && logger.warn('components: unable to update or edit interaction; skipping send/followup', { interaction: dumpInteractionState(interaction), payloadSummary: (p && p.components) ? `components:${p.components.length}` : (p && p.content) ? String(p.content).slice(0,200) : null }); } catch (_) { /* ignore */ }
     return null;
   } catch (err) {
     // Final fallback: log and return null (do not send new messages)

@@ -22,7 +22,7 @@ const itemsService = require('../../services/items');
 const componentsService = require('../../services/components');
 const cmd = { name: 'evolve', description: 'Evolve your xenomorphs' };
 const EVOLVE_LIST_PAGE_SIZE = 5;
-const EVOLVE_CANCEL_PAGE_SIZE = 10;
+const EVOLVE_CANCEL_PAGE_SIZE = 5;
 
 function normalizeKey(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -598,7 +598,16 @@ module.exports = {
       collector.on('collect', async i => {
         try {
           if (i.user.id !== interaction.user.id) {
-            try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:evolve' }); } catch (_) { /* ignore */ }
+            // Avoid heavy safeReply fallback paths for quick ephemeral notices
+            const notice = { content: 'These controls are reserved for the user who opened this view.', ephemeral: true };
+            try {
+              await i.reply(notice);
+            } catch (err) {
+              try {
+                if (!i.deferred && !i.replied) await i.deferReply({ ephemeral: true });
+                await i.editReply(notice);
+              } catch (_) { /* ignore */ }
+            }
             return;
           }
 
