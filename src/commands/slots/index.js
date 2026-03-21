@@ -211,6 +211,10 @@ module.exports = {
         const payout = multiplier > 0 ? amount * multiplier : 0;
         if (payout > 0) await userModel.modifyCurrencyForGuild(userId, guildId, 'royal_jelly', +payout);
         const newBal = await userModel.getCurrencyForGuild(userId, guildId, 'royal_jelly');
+        // Build a concise result summary so the user immediately sees win/loss and amounts
+        const resultSummary = payout > 0
+          ? `You won ${payout} RJ (x${multiplier}). Balance: ${newBal} RJ`
+          : `You lost ${amount} RJ. Balance: ${newBal} RJ`;
         void newBal;
 
         // persist play record if DB available
@@ -222,7 +226,7 @@ module.exports = {
 
         // Build final grid and result
         const gridReelsFinal = { top: [ ' ', ' ', ' ' ], mid: [ symbolEmoji(r1), symbolEmoji(r2), symbolEmoji(r3) ], bot: [ ' ', ' ', ' ' ] };
-        await interaction.editReply(makeGridComponents({ title: '🎰 Slots — Result', reels: gridReelsFinal, footer: `Bet: ${amount} RJ` }));
+        await interaction.editReply(makeGridComponents({ title: '🎰 Slots — Result', reels: gridReelsFinal, footer: `Bet: ${amount} RJ • ${resultSummary}` }));
         // Attach collector for Bet Again / Paytable on the new grid
         const { collector: gridCollector } = await createInteractionCollector(interaction, { time: 60_000, ephemeral: ephemeralFlag, edit: false, collectorOptions: { componentType: 2 } });
         if (!gridCollector) return;
@@ -288,6 +292,8 @@ module.exports = {
       const titleText = `## ${title}`;
       section.addTextDisplayComponents(new TextDisplayBuilder().setContent(titleText));
       container.addSectionComponents(section);
+      // If a footer/result summary was provided, show it beneath the title
+      if (footer) container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`\n${footer}`));
 
       // Helper to create a disabled emoji button (builders path)
       const btn = (emojiName, customId, disabled = true, style = ButtonStyle.Secondary, label) => {
