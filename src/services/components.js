@@ -48,14 +48,52 @@ async function updateInteraction(interaction, payload = {}) {
       try { logger.warn('Failed during pre-serialization pass', { error: serAllErr && (serAllErr.stack || serAllErr.message || serAllErr) }); } catch (_) { /* ignore */ }
     }
 
-    if (interaction && typeof interaction.update === 'function') {
-      return await interaction.update(p);
+    // If caller passed a Message-like object, prefer editing it directly.
+    if (interaction && typeof interaction.edit === 'function') {
+      try {
+        const editPayload = Object.assign({}, p);
+        delete editPayload.flags;
+        delete editPayload.ephemeral;
+        return await interaction.edit(editPayload);
+      } catch (msgErr) {
+        try { logger && logger.warn && logger.warn('components: direct message.edit failed', { error: msgErr && (msgErr.stack || msgErr) }); } catch (_) { /* ignore */ }
+        // fallthrough to interaction.update or safeReply below
+      }
     }
-    // Fallback to safeReply which handles replies/edits/followups
-    return await safeReply(interaction, p);
+
+    if (interaction && typeof interaction.update === 'function') {
+      try {
+        return await interaction.update(p);
+      } catch (updateErr) {
+        try { logger && logger.warn && logger.warn('components: interaction.update failed, attempting message edit', { error: updateErr && (updateErr.stack || updateErr) }); } catch (_) { /* ignore */ }
+        try {
+          if (interaction && typeof interaction.message === 'object' && typeof interaction.message.edit === 'function') {
+            const editPayload = Object.assign({}, p);
+            delete editPayload.flags;
+            delete editPayload.ephemeral;
+            return await interaction.message.edit(editPayload);
+          }
+          // Also try interaction.edit if available (some objects may expose both)
+          if (interaction && typeof interaction.edit === 'function') {
+            const editPayload2 = Object.assign({}, p);
+            delete editPayload2.flags;
+            delete editPayload2.ephemeral;
+            return await interaction.edit(editPayload2);
+          }
+        } catch (msgEditErr) {
+          try { logger && logger.warn && logger.warn('components: message.edit after update failure also failed', { error: msgEditErr && (msgEditErr.stack || msgEditErr) }); } catch (_) { /* ignore */ }
+        }
+        // If editing the underlying message isn't possible, fall through to safeReply
+      }
+    }
+    // Do not fall back to sending new messages. If we cannot update or edit
+    // the original message, log and return null so callers know nothing changed.
+    try { logger && logger.warn && logger.warn('components: unable to update or edit interaction; skipping send/followup'); } catch (_) { /* ignore */ }
+    return null;
   } catch (err) {
-    // Final fallback: try safeReply
-    try { return await safeReply(interaction, p); } catch (_) { throw err; }
+    // Final fallback: log and return null (do not send new messages)
+    try { logger && logger.error && logger.error('components: unexpected error while updating interaction', { error: err && (err.stack || err) }); } catch (_) { /* ignore */ }
+    return null;
   }
 }
 

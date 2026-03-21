@@ -66,6 +66,7 @@ async function safeReply(interaction, payload = {}, opts = {}) {
   const styledPayload = maybeBuildStyledNoticePayload(payload, opts);
   const usingStyledPayload = !!styledPayload;
   if (usingStyledPayload) payload = styledPayload;
+  const isComponentsOnly = (payload && typeof payload === 'object' && Array.isArray(payload.components) && (payload.embeds === undefined || payload.embeds === null) && !payload.files && !payload.attachments && (!payload.content || String(payload.content).trim() === ''));
   // Normalize ephemeral payloads both directions:
   // - `flags` -> `ephemeral`
   // - `ephemeral` -> `flags`
@@ -128,6 +129,11 @@ async function safeReply(interaction, payload = {}, opts = {}) {
               logger && logger.warn && logger.warn('safeReply: editReply(originalPayload) also failed', { error: errOrig && (errOrig.stack || errOrig), interaction: dumpInteractionState(interaction) });
             }
           }
+          // For components-only updates we must not create new messages — skip followUp
+          if (isComponentsOnly) {
+            try { logger && logger.warn && logger.warn('safeReply: editReply failed for components-only payload; not sending followUp'); } catch (_) { /* ignore */ }
+            return null;
+          }
           // fallthrough to followUp
             try {
               if (typeof interaction.followUp === 'function') {
@@ -174,9 +180,9 @@ async function safeReply(interaction, payload = {}, opts = {}) {
     applyEphemeralFlag(payload);
 
     // Not replied yet — try reply
-    try {
-      return await interaction.reply(payload);
-    } catch (e) {
+      try {
+        return await interaction.reply(payload);
+      } catch (e) {
       logger && logger.warn && logger.warn('safeReply: reply failed, attempting defer+edit', {
         error: e && (e.stack || e),
         payload: (typeof payload === 'object') ? payload : String(payload),
@@ -202,6 +208,11 @@ async function safeReply(interaction, payload = {}, opts = {}) {
             logger && logger.warn && logger.warn('safeReply: defer+edit(originalPayload) failed', { error: errDeferOrig && (errDeferOrig.stack || errDeferOrig), interaction: dumpInteractionState(interaction) });
           }
         }
+        // For components-only updates, do not create follow-up messages
+        if (isComponentsOnly) {
+          try { logger && logger.warn && logger.warn('safeReply: defer+edit failed for components-only payload; not sending followUp'); } catch (_) { /* ignore */ }
+          return null;
+        }
         try {
           if (typeof interaction.followUp === 'function') {
             if (interaction.replied || interaction.deferred) {
@@ -225,6 +236,10 @@ async function safeReply(interaction, payload = {}, opts = {}) {
             interaction: dumpInteractionState(interaction)
           });
           // Final fallback: try sending a plain channel message if possible (handles expired/odd interactions)
+          if (isComponentsOnly) {
+            try { logger && logger.warn && logger.warn('safeReply: all strategies failed for components-only payload; not sending channel fallback'); } catch (_) { /* ignore */ }
+            return null;
+          }
           try {
             if (interaction && interaction.channel && typeof interaction.channel.send === 'function') {
               const text = (originalPayload && originalPayload.content) ? originalPayload.content : (typeof originalPayload === 'string' ? originalPayload : 'Unable to deliver reply.');
