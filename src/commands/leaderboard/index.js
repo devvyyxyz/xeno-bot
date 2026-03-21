@@ -40,10 +40,11 @@ function buildLeaderboardV2Components({
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
     );
 
+    const activeSort = (selectedSort || 'eggs');
     const sortOptions = (sortChoices || []).slice(0, 25).map(opt => ({
       label: String(opt.label),
       value: String(opt.value),
-      default: String(opt.value) === String(selectedSort)
+      default: String(opt.value) === String(activeSort)
     }));
 
     if (sortOptions.length > 0) {
@@ -144,7 +145,11 @@ module.exports = {
     if (!sub && interaction.guildId) sub = 'server';
     const sort = (interaction.options && typeof interaction.options.getString === 'function') ? (interaction.options.getString('sort') || 'eggs') : 'eggs';
     if (!(interaction.isStringSelectMenu && interaction.isStringSelectMenu())) {
-      await interaction.deferReply({ ephemeral: cmd.ephemeral === true });
+      try {
+        if (!interaction.replied && !interaction.deferred) await interaction.deferReply({ ephemeral: cmd.ephemeral === true });
+      } catch (e) {
+        // If deferReply fails because interaction already replied/deferred, ignore
+      }
     }
     // Get all users in DB
     const baseLogger = require('../../utils/logger');
@@ -369,22 +374,35 @@ module.exports = {
         return;
       }
       collector.on('collect', async i => {
-        if (i.customId === 'leaderboard-sort') {
-          const newSort = i.values[0];
-          i.options = { getString: () => newSort, getSubcommand: () => 'global' };
-          // preserve the original guild context so re-invoked handler uses per-guild data
-          try { i.guildId = interaction.guildId; } catch (e) { /* ignore */ void 0; }
-          await module.exports.executeInteraction(i);
-        } else if (i.customId === 'leaderboard-eggtype') {
-          const newSort = i.values[0];
-          i.options = { getString: () => newSort, getSubcommand: () => 'global' };
-          try { i.guildId = interaction.guildId; } catch (e) { /* ignore */ void 0; }
-          await module.exports.executeInteraction(i);
-        } else if (i.customId === 'leaderboard-hosttype') {
-          const newSort = i.values[0];
-          i.options = { getString: () => newSort, getSubcommand: () => 'global' };
-          try { i.guildId = interaction.guildId; } catch (e) { /* ignore */ void 0; }
-          await module.exports.executeInteraction(i);
+        try {
+          // When a select is used, acknowledge the select interaction
+          // (so the user doesn't see "Interaction failed"), then re-run
+          // the command using the original interaction object which owns
+          // the message so updates target the valid interaction token.
+          if (i.customId === 'leaderboard-sort' || i.customId === 'leaderboard-eggtype' || i.customId === 'leaderboard-hosttype') {
+            try {
+              await i.deferUpdate();
+            } catch (deferErr) {
+              try {
+                if (!i.replied && !i.deferred) {
+                  await i.reply({ content: 'Updating leaderboard...', ephemeral: true });
+                }
+              } catch (replyErr) {
+                try { logger && logger.warn && logger.warn('Failed to acknowledge leaderboard select interaction', { error: (replyErr && (replyErr.stack || replyErr)), customId: i && i.customId, userId: i && i.user && i.user.id }); } catch (_) { /* ignore */ }
+              }
+            }
+            const newSort = i.values[0];
+            const prevOptions = interaction.options;
+            try {
+              interaction.options = { getString: () => newSort, getSubcommand: () => 'global' };
+              await module.exports.executeInteraction(interaction);
+            } finally {
+              interaction.options = prevOptions;
+            }
+          }
+        } catch (err) {
+          try { logger && logger.error && logger.error('Leaderboard collector handler failed', { error: err && (err.stack || err), customId: i && i.customId, value: i && i.values && i.values[0], userId: i && i.user && i.user.id, guildId: interaction && interaction.guildId }); } catch (_) { /* ignore */ }
+          try { await safeReply(i, { content: 'Failed to update leaderboard view.', ephemeral: true }); } catch (_) { /* ignore */ }
         }
       });
       collector.on('end', async () => {
@@ -412,9 +430,29 @@ module.exports = {
     }
 
     // Build per-user leaderboard data for the server
-    // Use host model to count hosts scoped to this guild per user (handles legacy schema)
+    // Prefetch hosts for this guild and group by owner to avoid per-user DB calls
     const hostModel = require('../../models/host');
     const hostsConfig = require('../../../config/hosts.json');
+    const utils = require('../../utils');
+    const { parseJSON } = utils.jsonParse;
+    let hostsByOwner = {};
+    try {
+      const allHostsRows = await db.knex('hosts').select('owner_id', 'host_type', 'guild_id', 'data');
+      for (const hr of allHostsRows) {
+        try {
+          const gid = hr.guild_id || (hr.data ? parseJSON(hr.data, {}) && (parseJSON(hr.data, {}).guild_id || parseJSON(hr.data, {}).guild || parseJSON(hr.data, {}).guildId) : null);
+          if (!gid || String(gid) !== String(guildId)) continue;
+          const ownerId = String(hr.owner_id);
+          if (!hostsByOwner[ownerId]) hostsByOwner[ownerId] = { hostsByType: {}, total: 0 };
+          const ht = String(hr.host_type || 'unknown');
+          hostsByOwner[ownerId].hostsByType[ht] = (hostsByOwner[ownerId].hostsByType[ht] || 0) + 1;
+          hostsByOwner[ownerId].total++;
+        } catch (e) { /* ignore parse errors for individual rows */ }
+      }
+    } catch (e) {
+      try { require('../../utils/logger').get('command:leaderboard').warn('Failed prefetching hosts for leaderboard', { error: e && (e.stack || e) }); } catch (_) { /* ignore */ }
+      hostsByOwner = {};
+    }
     
     let leaderboard = [];
     for (const user of rows) {
@@ -427,18 +465,9 @@ module.exports = {
       const eggs = guildData.eggs || {};
       const eggsTotal = Object.values(eggs).reduce((a, b) => a + b, 0);
       
-      // Get host data for this user scoped to this guild
+      // Get host data for this user scoped to this guild (from prefetched map)
       const userId = String(user.discord_id);
-      let userHosts = { hostsByType: {}, total: 0 };
-      try {
-        const hostRows = await hostModel.listHostsByOwner(userId, guildId);
-        for (const hr of hostRows) {
-          const ht = String(hr.host_type || hr.hostType || 'unknown');
-          userHosts.hostsByType[ht] = (userHosts.hostsByType[ht] || 0) + 1;
-          userHosts.total++;
-        }
-      } catch (e) { /* ignore host lookup failures */ }
-
+      const userHosts = hostsByOwner[userId] || { hostsByType: {}, total: 0 };
       // Skip users with 0 eggs AND 0 hosts in this guild
       if (eggsTotal === 0 && userHosts.total === 0) continue;
       
@@ -553,22 +582,31 @@ module.exports = {
         return;
       }
       collector.on('collect', async i => {
-        if (i.customId === 'leaderboard-sort') {
-          const newSort = i.values[0];
-          i.options = { getString: () => newSort, getSubcommand: () => 'server' };
-          // ensure the re-invoked interaction preserves the guild id
-          try { i.guildId = interaction.guildId; } catch (e) { /* ignore */ void 0; }
-          await module.exports.executeInteraction(i);
-        } else if (i.customId === 'leaderboard-eggtype') {
-          const newSort = i.values[0];
-          i.options = { getString: () => newSort, getSubcommand: () => 'server' };
-          try { i.guildId = interaction.guildId; } catch (e) { /* ignore */ void 0; }
-          await module.exports.executeInteraction(i);
-        } else if (i.customId === 'leaderboard-hosttype') {
-          const newSort = i.values[0];
-          i.options = { getString: () => newSort, getSubcommand: () => 'server' };
-          try { i.guildId = interaction.guildId; } catch (e) { /* ignore */ void 0; }
-          await module.exports.executeInteraction(i);
+        try {
+          // Re-run command on the original interaction so updates use a valid
+          // interaction token. Save/restore original options.
+          if (i.customId === 'leaderboard-sort' || i.customId === 'leaderboard-eggtype' || i.customId === 'leaderboard-hosttype') {
+            try {
+              await i.deferUpdate();
+            } catch (deferErr) {
+              try {
+                if (!i.replied && !i.deferred) await i.reply({ content: 'Updating leaderboard...', ephemeral: true });
+              } catch (replyErr) {
+                try { logger && logger.warn && logger.warn('Failed to acknowledge leaderboard select interaction (server)', { error: (replyErr && (replyErr.stack || replyErr)), customId: i && i.customId, userId: i && i.user && i.user.id }); } catch (_) { /* ignore */ }
+              }
+            }
+            const newSort = i.values[0];
+            const prevOptions = interaction.options;
+            try {
+              interaction.options = { getString: () => newSort, getSubcommand: () => 'server' };
+              await module.exports.executeInteraction(interaction);
+            } finally {
+              interaction.options = prevOptions;
+            }
+          }
+        } catch (err) {
+          try { logger && logger.error && logger.error('Leaderboard collector handler failed', { error: err && (err.stack || err), customId: i && i.customId, value: i && i.values && i.values[0], userId: i && i.user && i.user.id, guildId: interaction && interaction.guildId }); } catch (_) { /* ignore */ }
+          try { await safeReply(i, { content: 'Failed to update leaderboard view.', ephemeral: true }); } catch (_) { /* ignore */ }
         }
       });
       collector.on('end', async () => {
