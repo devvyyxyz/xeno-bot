@@ -32,10 +32,15 @@ function get(key, client) {
         const m = String(val.markup).match(/^<a?:([a-zA-Z0-9_]+):([0-9]+)>$/);
         if (m) {
           const id = m[2];
-          if (client && client.emojis && client.emojis.cache && client.emojis.cache.get && client.emojis.cache.get(id)) {
-            return val.markup;
+          // If a client is provided, prefer returning markup only when the emoji is cached.
+          if (client) {
+            if (client.emojis && client.emojis.cache && client.emojis.cache.get && client.emojis.cache.get(id)) {
+              return val.markup;
+            }
+            return val.fallback || EMOJI_FALLBACK;
           }
-          return val.fallback || EMOJI_FALLBACK;
+          // No client provided: return the raw markup so callers can decide how to use it.
+          return val.markup;
         }
         return val.fallback || EMOJI_FALLBACK;
       }
@@ -46,10 +51,15 @@ function get(key, client) {
       const m = String(val).match(/^<a?:([a-zA-Z0-9_]+):([0-9]+)>$/);
       if (m) {
         const id = m[2];
-        if (client && client.emojis && client.emojis.cache && client.emojis.cache.get && client.emojis.cache.get(id)) {
-          return val;
+        // If a client is provided, verify the emoji is available before returning markup.
+        if (client) {
+          if (client.emojis && client.emojis.cache && client.emojis.cache.get && client.emojis.cache.get(id)) {
+            return val;
+          }
+          return EMOJI_FALLBACK;
         }
-        return EMOJI_FALLBACK;
+        // No client: return the raw markup so callers (UI builders) can parse id/name.
+        return val;
       }
       // Plain unicode or other string
       return val;
