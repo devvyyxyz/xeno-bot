@@ -227,78 +227,100 @@ void buildStatsPage;
 
 const cmd = getCommandConfig('hunt') || { name: 'hunt', description: 'Hunt for hosts to use in evolutions' };
 
+
+// Simple in-memory per-user mutex for hunt command
+const huntLocks = new Map();
+
 async function performHunt(interaction, client) {
-  const isEphemeral = !!(cmd && Object.prototype.hasOwnProperty.call(cmd, 'ephemeral') ? !!cmd.ephemeral : false);
-  // Rate limit check - prevents spam and abuse
-  if (!await checkCommandRateLimit(interaction, 'expensive')) {
-    return; // Rate limit message already sent to user
-  }
-
-  const userId = interaction.user.id;
-  const guildId = interaction.guildId;
-  const cfgHosts = (hostsCfg && hostsCfg.hosts) || {};
-  const hostKeys = Object.keys(cfgHosts || {});
-
-  try {
-    const defaultCooldownSeconds = Math.max(0, Number(guildDefaultsCfg?.data?.hunt_cooldown_seconds || 0));
-    let cooldownSeconds = defaultCooldownSeconds;
-    try {
-      const guildCfg = await guildModel.getGuildConfig(guildId);
-      const configured = Number(guildCfg?.data?.hunt_cooldown_seconds);
-      if (Number.isFinite(configured)) cooldownSeconds = Math.max(0, configured);
-    } catch (e) {
-      logger.warn('Failed to read guild hunt cooldown config, using defaults', { guildId, error: e && e.message });
+    // Ignore commands from bots
+    if (interaction.user && interaction.user.bot) {
+      return;
     }
 
-    const nowMs = Date.now();
-    let user = await userModel.findOrCreate(userId);
-    if (!user) {
-      // As a fallback, try to create the user explicitly and refetch.
+    // Per-user mutex: prevent concurrent hunts for the same user
+    const userId = interaction.user.id;
+    if (huntLocks.get(userId)) {
+      // Optionally, send a message: 'Hunt already in progress.'
+      return safeReply(interaction, { content: 'A hunt is already in progress for you. Please wait a moment and try again.', flags: 64 }, { loggerName: 'command:hunt' });
+    }
+    huntLocks.set(userId, true);
+    let result;
+    let found = false;
+    try {
+      const isEphemeral = !!(cmd && Object.prototype.hasOwnProperty.call(cmd, 'ephemeral') ? !!cmd.ephemeral : false);
+      // Rate limit check - prevents spam and abuse
+      if (!await checkCommandRateLimit(interaction, 'expensive')) {
+        return; // Rate limit message already sent to user
+      }
+
+      const guildId = interaction.guildId;
+      const cfgHosts = (hostsCfg && hostsCfg.hosts) || {};
+      const hostKeys = Object.keys(cfgHosts || {});
+
       try {
-        await userModel.createUser(userId, {});
-        user = await userModel.getUserByDiscordId(userId);
-      } catch (err) {
-        logger.error('Failed to create or fetch user for hunt', { userId, error: err && (err.stack || err) });
+        const defaultCooldownSeconds = Math.max(0, Number(guildDefaultsCfg?.data?.hunt_cooldown_seconds || 0));
+        let cooldownSeconds = defaultCooldownSeconds;
+        try {
+          const guildCfg = await guildModel.getGuildConfig(guildId);
+          const configured = Number(guildCfg?.data?.hunt_cooldown_seconds);
+          if (Number.isFinite(configured)) cooldownSeconds = Math.max(0, configured);
+        } catch (e) {
+          logger.warn('Failed to read guild hunt cooldown config, using defaults', { guildId, error: e && e.message });
+        }
+
+        const nowMs = Date.now();
+        let user = await userModel.findOrCreate(userId);
+        if (!user) {
+          // As a fallback, try to create the user explicitly and refetch.
+          try {
+            await userModel.createUser(userId, {});
+            user = await userModel.getUserByDiscordId(userId);
+          } catch (err) {
+            logger.error('Failed to create or fetch user for hunt', { userId, error: err && (err.stack || err) });
+          }
+        }
+        if (!user) {
+          // Give a helpful ephemeral error rather than crashing due to null access.
+          return safeReply(interaction, { content: 'Unable to initialize your user profile right now; please try again shortly.', flags: MessageFlags.Ephemeral }, { loggerName: 'command:hunt' });
+        }
+        const userData = user.data || {};
+        userData.guilds = userData.guilds || {};
+        userData.guilds[guildId] = userData.guilds[guildId] || {};
+        userData.guilds[guildId].hunt = userData.guilds[guildId].hunt || {};
+
+        const lastHuntAt = Number(userData.guilds[guildId].hunt.last_hunt_at || 0);
+        const cooldownMs = Math.max(0, cooldownSeconds * 1000);
+
+        if (cooldownMs > 0 && lastHuntAt > 0) {
+          const elapsed = nowMs - lastHuntAt;
+          if (elapsed < cooldownMs) {
+            const remainingMs = cooldownMs - elapsed;
+            const remainingSeconds = Math.ceil(remainingMs / 1000);
+            const readyAtUnix = Math.floor((nowMs + remainingMs) / 1000);
+            const container = new ContainerBuilder();
+            addV2TitleWithBotThumbnail({ container, title: 'Hunt Cooldown', client });
+            container.addTextDisplayComponents(
+              new TextDisplayBuilder().setContent(`You need to wait **${remainingSeconds}s** before hunting again.`),
+              new TextDisplayBuilder().setContent(`Ready: <t:${readyAtUnix}:R>`) 
+            );
+            const payload = { components: [container], flags: isEphemeral ? (MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral) : MessageFlags.IsComponentsV2 };
+            return safeReply(interaction, payload, { loggerName: 'command:hunt' });
+          }
+        }
+
+        userData.guilds[guildId].hunt.last_hunt_at = nowMs;
+        try {
+          await userModel.updateUserDataRawById(user.id, userData);
+        } catch (e) {
+          logger.warn('Failed to persist hunt cooldown timestamp', { userId, guildId, error: e && e.message });
+        }
+
+        const findChance = Number((hostsCfg && hostsCfg.findChance) || 0.75);
+        found = Math.random() < findChance;
+      } catch (e) {
+        const formatErrorMessage = require('../../utils/formatErrorMessage');
+        return safeReply(interaction, { content: formatErrorMessage(e), flags: MessageFlags.Ephemeral }, { loggerName: 'command:hunt' });
       }
-    }
-    if (!user) {
-      // Give a helpful ephemeral error rather than crashing due to null access.
-      return safeReply(interaction, { content: 'Unable to initialize your user profile right now; please try again shortly.', flags: MessageFlags.Ephemeral }, { loggerName: 'command:hunt' });
-    }
-    const userData = user.data || {};
-    userData.guilds = userData.guilds || {};
-    userData.guilds[guildId] = userData.guilds[guildId] || {};
-    userData.guilds[guildId].hunt = userData.guilds[guildId].hunt || {};
-
-    const lastHuntAt = Number(userData.guilds[guildId].hunt.last_hunt_at || 0);
-    const cooldownMs = Math.max(0, cooldownSeconds * 1000);
-
-    if (cooldownMs > 0 && lastHuntAt > 0) {
-      const elapsed = nowMs - lastHuntAt;
-      if (elapsed < cooldownMs) {
-        const remainingMs = cooldownMs - elapsed;
-        const remainingSeconds = Math.ceil(remainingMs / 1000);
-        const readyAtUnix = Math.floor((nowMs + remainingMs) / 1000);
-        const container = new ContainerBuilder();
-        addV2TitleWithBotThumbnail({ container, title: 'Hunt Cooldown', client });
-        container.addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(`You need to wait **${remainingSeconds}s** before hunting again.`),
-          new TextDisplayBuilder().setContent(`Ready: <t:${readyAtUnix}:R>`) 
-        );
-        const payload = { components: [container], flags: isEphemeral ? (MessageFlags.IsComponentsV2 | MessageFlags.Ephemeral) : MessageFlags.IsComponentsV2 };
-        return safeReply(interaction, payload, { loggerName: 'command:hunt' });
-      }
-    }
-
-    userData.guilds[guildId].hunt.last_hunt_at = nowMs;
-    try {
-      await userModel.updateUserDataRawById(user.id, userData);
-    } catch (e) {
-      logger.warn('Failed to persist hunt cooldown timestamp', { userId, guildId, error: e && e.message });
-    }
-
-    const findChance = Number((hostsCfg && hostsCfg.findChance) || 0.75);
-    const found = Math.random() < findChance;
 
     if (!found) {
       // On failed hunts, there's a chance to still find items.
@@ -471,11 +493,11 @@ async function performHunt(interaction, client) {
           );
           await componentsService.updateInteraction(msg, { components: [container] });
         }
+
       } catch (_) { /* ignore */ void 0; }
     });
-    } catch (e) {
-    const formatErrorMessage = require('../../utils/formatErrorMessage');
-    return safeReply(interaction, { content: formatErrorMessage(e), flags: MessageFlags.Ephemeral }, { loggerName: 'command:hunt' });
+  } finally {
+    huntLocks.delete(userId);
   }
 }
 
