@@ -5,7 +5,20 @@ const { MessageFlags } = require('discord.js');
 const userModel = require('../../models/user');
 const eggTypes = require('../../../config/eggTypes.json');
 const db = require('../../db');
+const { Duration } = require('luxon');
 const fallbackLogger = require('../../utils/fallbackLogger');
+
+function formatMs(ms) {
+  if (ms === null || typeof ms !== 'number') return 'No data';
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 60_000) return `${Duration.fromMillis(ms).as('seconds').toFixed(2)}s`;
+  if (ms < 3_600_000) {
+    const mins = Math.floor(ms / 60_000);
+    const secs = Math.floor((ms % 60_000) / 1000);
+    return `${mins}m ${secs}s`;
+  }
+  return `${Duration.fromMillis(ms).as('hours').toFixed(2)}h`;
+}
 const createInteractionCollector = require('../../utils/collectorHelper');
 const safeReply = require('../../utils/safeReply');
 const { addV2TitleWithGuildThumbnail } = require('../../utils/componentsV2');
@@ -307,8 +320,8 @@ module.exports = {
           const hostEmojiKey = hostType && (hostType.emoji_key || hostType.emoji);
           const emoji = hostEmojiKey && emojiMap[hostEmojiKey] ? emojiMap[hostEmojiKey] : (hostType && hostType.emoji ? hostType.emoji : '');
           value = `${emoji} **${entry.info.hostsByType[t] || 0}**`;
-        } else if (sortOpt === 'fastest') value = (entry.info.best !== null && typeof entry.info.best === 'number') ? `**${(entry.info.best/1000).toFixed(2)}s**` : 'No data';
-        else if (sortOpt === 'slowest') value = (entry.info.worst !== null && typeof entry.info.worst === 'number') ? `**${(entry.info.worst/1000/3600).toFixed(2)}h**` : 'No data';
+        } else if (sortOpt === 'fastest') value = (entry.info.best !== null && typeof entry.info.best === 'number') ? `**${formatMs(entry.info.best)}**` : 'No data';
+        else if (sortOpt === 'slowest') value = (entry.info.worst !== null && typeof entry.info.worst === 'number') ? `**${formatMs(entry.info.worst)}**` : 'No data';
         desc += `#${i+1} ${displayName} — ${value}\n`;
       }
 
@@ -523,9 +536,9 @@ module.exports = {
       } else if (sort === 'hosts') {
         desc += `#${i + 1} ${userTag} — **${entry.hostsTotal} hosts**\n`;
       } else if (sort === 'fastest') {
-        desc += `#${i + 1} ${userTag} — **${(entry.fastest / 1000).toFixed(2)}s**\n`;
+        desc += `#${i + 1} ${userTag} — **${(entry.fastest !== null && typeof entry.fastest === 'number') ? formatMs(entry.fastest) : 'No data'}**\n`;
       } else if (sort === 'slowest') {
-        desc += `#${i + 1} ${userTag} — **${(entry.slowest / 1000 / 3600).toFixed(2)}h**\n`;
+        desc += `#${i + 1} ${userTag} — **${(entry.slowest !== null && typeof entry.slowest === 'number') ? formatMs(entry.slowest) : 'No data'}**\n`;
       } else if (sort === 'rarity') {
         desc += `#${i + 1} ${userTag} — **${entry.rarityScore} rarity**\n`;
       } else if (sort.startsWith('eggtype_')) {
