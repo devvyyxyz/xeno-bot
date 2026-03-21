@@ -239,7 +239,7 @@ module.exports = {
             }
             const parsed2 = parseCustomId(i2.customId);
             const base2 = parsed2 ? parsed2.baseId : i2.customId;
-            if (base2 === 'slots-betagain') {
+            if (base2 === 'slots-betagain' || base2 === 'slots-rerun') {
                 if (i2.user.id !== userId) {
                 try { await i2.reply({ content: 'Only the original bettor can press this.', ephemeral: true }); } catch (_) { /* ignore */ void 0; }
                 return;
@@ -284,7 +284,14 @@ module.exports = {
 
       // Fallback to the old stats payload when builders aren't available
       if (!supportBuilders) {
-        return buildStatsV2Payload({ title, rows: [ { label: 'Spin', value: `${reels.mid.join(' ')}` }, { label: 'Status', value: 'Result' } ], footer, client: interaction.client });
+        const payload = buildStatsV2Payload({ title, rows: [ { label: 'Spin', value: `${reels.mid.join(' ')}` }, { label: 'Status', value: 'Result' } ], footer, client: interaction.client });
+        payload.components = payload.components || [];
+        payload.components.push({ type: 1, components: [
+          { type: 2, style: 1, custom_id: 'slots-betagain', label: 'Bet Again' },
+          { type: 2, style: 1, custom_id: encodeCustomId('slots-rerun'), label: 'Play Again' },
+          { type: 2, style: 2, custom_id: encodeCustomId('slots-paytable'), label: 'Paytable' }
+        ] });
+        return payload;
       }
 
       const container = new ContainerBuilder();
@@ -334,6 +341,7 @@ module.exports = {
       container.addActionRowComponents(
           new ActionRowBuilder().addComponents(
           btn(null, encodeCustomId('slots-betagain'), false, ButtonStyle.Primary, 'Bet Again'),
+          btn(null, encodeCustomId('slots-rerun'), false, ButtonStyle.Primary, 'Play Again'),
           btn(null, encodeCustomId('slots-paytable'), false, ButtonStyle.Secondary, 'Paytable')
         )
       );
