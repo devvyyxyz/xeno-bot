@@ -747,6 +747,25 @@ async function gracefulShutdown(reason) {
     } catch (e) {
       logger.warn('hatchManager.shutdown not available', { error: e && (e.stack || e) });
     }
+    // Attempt to gracefully close the Redis client if present to free sockets
+    try {
+      try {
+        const redisClient = require('./lib/redis');
+        if (redisClient) {
+          if (typeof redisClient.quit === 'function') {
+            await redisClient.quit();
+            logger.info('Redis client quit completed during shutdown');
+          } else if (typeof redisClient.disconnect === 'function') {
+            try { redisClient.disconnect(); } catch (_) { /* ignore disconnect errors */ }
+            logger.info('Redis client disconnected during shutdown');
+          }
+        }
+      } catch (re) {
+        logger.warn('Failed to require redis client during shutdown', { error: re && (re.stack || re) });
+      }
+    } catch (e) {
+      logger.warn('Failed shutting down Redis client', { error: e && (e.stack || e) });
+    }
     try {
       await db.knex.destroy();
     } catch (e) {
