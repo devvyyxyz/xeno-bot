@@ -188,13 +188,104 @@ function startMemoryWatchdog() {
   const intervalMs = Number(process.env.MEMORY_WATCHDOG_INTERVAL_MS) || 60000;
   const warnHeapMb = Number(process.env.MEMORY_WATCHDOG_HEAP_MB) || 700;
   const warnRssMb = Number(process.env.MEMORY_WATCHDOG_RSS_MB) || 900;
+  const dumpOnThreshold = String(process.env.MEMORY_WATCHDOG_DUMP_ON_THRESHOLD || 'false').toLowerCase() === 'true';
+  const dumpDir = process.env.MEMORY_HEAP_DUMP_DIR || path.join(__dirname, '..', 'logs');
+  const dumpCooldownMs = Number(process.env.MEMORY_WATCHDOG_DUMP_COOLDOWN_MS) || 5 * 60 * 1000;
+  let lastDumpAt = 0;
 
-  const timer = setInterval(() => {
+  const takeHeapSnapshot = (reason) => {
+    try {
+      if (!fs.existsSync(dumpDir)) fs.mkdirSync(dumpDir, { recursive: true });
+    } catch (e) {
+      baseLogger.warn('Failed ensuring heap dump directory', { dir: dumpDir, error: e && (e.stack || e) });
+    }
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const fname = `heap-${process.pid}-${ts}.heapsnapshot`;
+    const filePath = path.join(dumpDir, fname);
+
+    try {
+      const v8 = require('v8');
+      if (typeof v8.writeHeapSnapshot === 'function') {
+        v8.writeHeapSnapshot(filePath);
+        baseLogger.info('Heap snapshot written (v8.writeHeapSnapshot)', { path: filePath, reason });
+        return Promise.resolve(filePath);
+      }
+    } catch (e) {
+      baseLogger.warn('v8.writeHeapSnapshot not available or failed; falling back to inspector', {
+        error: e && (e.stack || e),
+      });
+    }
+
+    return new Promise((resolve, reject) => {
+      const inspector = require('inspector');
+      const session = new inspector.Session();
+      let writeStream;
+      try {
+        session.connect();
+        writeStream = fs.createWriteStream(filePath);
+        session.on('HeapProfiler.addHeapSnapshotChunk', (m) => {
+          if (m && m.params && m.params.chunk) writeStream.write(m.params.chunk);
+        });
+        session.post('HeapProfiler.takeHeapSnapshot', null, (err) => {
+          writeStream.end();
+          try {
+            session.disconnect();
+          } catch (_) {}
+          if (err) {
+            baseLogger.warn('Heap snapshot (inspector) failed', { error: err && (err.stack || err) });
+            reject(err);
+          } else {
+            baseLogger.info('Heap snapshot written (inspector)', { path: filePath, reason });
+            resolve(filePath);
+          }
+        });
+      } catch (err) {
+        try {
+          if (writeStream) writeStream.end();
+        } catch (_) {}
+        try {
+          session.disconnect();
+        } catch (_) {}
+        baseLogger.warn('Heap snapshot (inspector) failed', { error: err && (err.stack || err) });
+        reject(err);
+      }
+    });
+  };
+
+  const timer = setInterval(async () => {
     try {
       const m = process.memoryUsage();
       const heapUsedMb = Math.round((m.heapUsed / 1024 / 1024) * 10) / 10;
       const heapTotalMb = Math.round((m.heapTotal / 1024 / 1024) * 10) / 10;
       const rssMb = Math.round((m.rss / 1024 / 1024) * 10) / 10;
+      const externalMb = Math.round((m.external / 1024 / 1024) * 10) / 10;
+      const arrayBuffersMb = Math.round(((m.arrayBuffers || 0) / 1024 / 1024) * 10) / 10;
+
+      let v8stats = null;
+      let heapSpaces = null;
+      try {
+        const v8 = require('v8');
+        if (v8 && typeof v8.getHeapStatistics === 'function') v8stats = v8.getHeapStatistics();
+        if (v8 && typeof v8.getHeapSpaceStatistics === 'function') heapSpaces = v8.getHeapSpaceStatistics();
+      } catch (_) {
+        // ignore v8 introspection failures
+      }
+
+      baseLogger.info('Memory stats', {
+        heapUsedMb,
+        heapTotalMb,
+        rssMb,
+        externalMb,
+        arrayBuffersMb,
+        v8stats,
+        heapSpacesSummary: heapSpaces
+          ? heapSpaces.map((s) => ({
+              space_name: s.space_name,
+              space_size_mb: Math.round((s.space_size / 1024 / 1024) * 10) / 10,
+              space_used_mb: Math.round((s.space_used_size / 1024 / 1024) * 10) / 10,
+            }))
+          : undefined,
+      });
 
       if (heapUsedMb >= warnHeapMb || rssMb >= warnRssMb) {
         baseLogger.warn('Memory watchdog threshold exceeded', {
@@ -204,12 +295,35 @@ function startMemoryWatchdog() {
           warnHeapMb,
           warnRssMb,
         });
+        const now = Date.now();
+        if (dumpOnThreshold && now - lastDumpAt > dumpCooldownMs) {
+          lastDumpAt = now;
+          try {
+            await takeHeapSnapshot('threshold');
+          } catch (err) {
+            baseLogger.warn('Heap snapshot on threshold failed', { error: err && (err.stack || err) });
+          }
+        }
       }
     } catch (err) {
       baseLogger.warn('Memory watchdog failed', { error: err && (err.stack || err) });
     }
   }, intervalMs);
   if (typeof timer.unref === 'function') timer.unref();
+
+  if (process && typeof process.on === 'function') {
+    process.on('SIGUSR2', () => {
+      const now = Date.now();
+      if (now - lastDumpAt < 1000) {
+        baseLogger.info('Ignoring rapid SIGUSR2', { sinceLastDumpMs: now - lastDumpAt });
+        return;
+      }
+      lastDumpAt = now;
+      takeHeapSnapshot('SIGUSR2').catch((err) => {
+        baseLogger.warn('Heap snapshot triggered by SIGUSR2 failed', { error: err && (err.stack || err) });
+      });
+    });
+  }
 }
 
 async function startup() {
