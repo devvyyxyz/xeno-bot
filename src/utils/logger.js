@@ -54,61 +54,57 @@ const forceColorFormat = format((info) => {
   return info;
 });
 
+// Sanitize helpers: extract so both file and console formats can reuse the same
+// redaction logic. Keep this conservative to avoid leaking secrets to stdout.
+const sanitizeValue = (v) => {
+  if (typeof v !== 'string') return v;
+  try {
+    if (new RegExp('^[a-zA-Z]+://').test(v)) {
+      try {
+        const u = new URL(v);
+        if (u.username || u.password) {
+          u.password = '****';
+          return u.toString();
+        }
+        return v;
+      } catch (e) {
+        return v.replace(/:\/\/([^:@/]+):([^@/]+)@/, '://$1:****@');
+      }
+    }
+  } catch (_) {}
+  if (/token|password|passwd|secret|dsn/i.test(v)) return 'REDACTED';
+  return v;
+};
+
+const sanitizeMeta = (m) => {
+  const out = {};
+  for (const [k, v] of Object.entries(m || {})) {
+    if (v === undefined) continue;
+    if (k.match(/password|pass|token|secret|dsn|url/i)) {
+      if (typeof v === 'string') out[k] = sanitizeValue(v);
+      else out[k] = 'REDACTED';
+    } else if (typeof v === 'object' && v !== null) {
+      try { out[k] = JSON.parse(JSON.stringify(v)); } catch (_) { out[k] = String(v); }
+    } else {
+      out[k] = sanitizeValue(v);
+    }
+  }
+  return out;
+};
+
 // NOTE: fileTransportFormat is defined after `shortTimestamp` below.
 
 const fileFormat = printf(({ timestamp, level, message, label, stack, ...meta }) => {
-  // Sanitize metadata to avoid leaking secrets (DB URLs, tokens, passwords)
-  const sanitizeValue = (v) => {
-    if (typeof v !== 'string') return v;
-    // Mask URL credentials: protocol://user:pass@host -> protocol://user:****@host
-    try {
-      if (new RegExp('^[a-zA-Z]+://').test(v)) {
-          try {
-            const u = new URL(v);
-          if (u.username || u.password) {
-            u.password = '****';
-            return u.toString();
-          }
-          return v;
-        } catch (e) {
-          // fallback to regex masking
-          return v.replace(/:\/\/([^:@/]+):([^@/]+)@/, '://$1:****@');
-        }
-      }
-    } catch (_) { /* ignore */ }
-    // Mask obvious tokens/keys
-    if (/token|password|passwd|secret|dsn/i.test(v)) return 'REDACTED';
-    return v;
-  };
-
-  const sanitizeMeta = (m) => {
-    const out = {};
-    for (const [k, v] of Object.entries(m || {})) {
-      if (v === undefined) continue;
-      if (k.match(/password|pass|token|secret|dsn|url/i)) {
-        // redact or sanitize known sensitive keys
-        if (typeof v === 'string') out[k] = sanitizeValue(v);
-        else out[k] = 'REDACTED';
-      } else if (typeof v === 'object' && v !== null) {
-        try { out[k] = JSON.parse(JSON.stringify(v)); } catch (_) { out[k] = String(v); }
-      } else {
-        out[k] = sanitizeValue(v);
-      }
-    }
-    return out;
-  };
-
   const cleanMeta = sanitizeMeta(meta);
   const metaStr = Object.keys(cleanMeta).length ? ` ${JSON.stringify(cleanMeta)}` : '';
   const msg = stack || message;
   return `${timestamp} [${level}]${label ? ` [${label}]` : ''} ${msg}${metaStr}`;
 });
 
-const consoleFormat = printf(({ timestamp, level, message, label, stack }) => {
+const consoleFormat = printf(({ timestamp, level, message, label, stack, ...meta }) => {
   const msg = stack || message;
   let labelPart = '';
   if (label) {
-    // If label already contains ANSI sequences (e.g. forceColorFormat applied), don't recolor
     const hasAnsi = String(label).indexOf('\u001b[') !== -1;
     if (!hasAnsi && shouldColorLabels()) {
       const code = pickLabelColor(label);
@@ -117,7 +113,14 @@ const consoleFormat = printf(({ timestamp, level, message, label, stack }) => {
       labelPart = ` [${label}]`;
     }
   }
-  return `${timestamp} [${level}]${labelPart} ${msg}`;
+  let metaStr = '';
+  try {
+    if (process.env.LOG_CONSOLE_META === '1') {
+      const cleanMeta = sanitizeMeta(meta);
+      metaStr = Object.keys(cleanMeta).length ? ` ${JSON.stringify(cleanMeta)}` : '';
+    }
+  } catch (_) { /* ignore meta rendering errors */ }
+  return `${timestamp} [${level}]${labelPart} ${msg}${metaStr}`;
 });
 
 // Short UTC timestamp helper: "MM-DD HH:mm" (year removed)
