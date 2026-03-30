@@ -186,177 +186,179 @@ async function init(botClient) {
         rssMb: Math.round((mu.rss / 1024 / 1024) * 10) / 10,
       });
     } catch (e) { /* ignore */ }
-    const knex = db.knex;
-    const shardGuildIds = Array.from(client.guilds.cache.keys());
-    const guildIdSet = new Set(shardGuildIds);
-    const inChunkSize = Number(process.env.SPAWN_MANAGER_GUILD_CHUNK) || 250;
-    const guildIdChunks = chunkArray(shardGuildIds, inChunkSize);
+      const knex = db.knex;
+      const shardGuildIds = Array.from(client.guilds.cache.keys());
+      const guildIdSet = new Set(shardGuildIds);
+      const inChunkSize = Number(process.env.SPAWN_MANAGER_GUILD_CHUNK) || 250;
+      const chunkDelayMs = Number(process.env.SPAWN_MANAGER_CHUNK_DELAY_MS) || 50;
+      const guildIdChunks = chunkArray(shardGuildIds, inChunkSize);
 
-    let rows = [];
-    for (const ids of guildIdChunks) {
-      if (!ids.length) continue;
-      const chunkRows = await knex('guild_settings').whereIn('guild_id', ids).select('*');
-      rows = rows.concat(chunkRows);
-    }
+      let totalLoadedGuildRows = 0;
+      let totalRestoredActiveRows = 0;
 
-    try {
-      const mu = process.memoryUsage();
-      logger.info('spawnManager.init after guild_settings load', {
-        heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
-        loadedGuildRows: rows.length,
-      });
-    } catch (e) { /* ignore */ }
-
-    // restore any active spawns from DB
-    try {
-      let activeRows = [];
       for (const ids of guildIdChunks) {
-        if (!ids.length) continue;
-        const chunkRows = await knex('active_spawns').whereIn('guild_id', ids).select('*');
-        activeRows = activeRows.concat(chunkRows);
-      }
-      for (const r of activeRows) {
+        if (!ids || ids.length === 0) continue;
+        // Load guild settings for this chunk and process immediately to avoid accumulating a large `rows` array
+        let chunkRows = [];
         try {
-          if (!guildIdSet.has(String(r.guild_id))) continue;
-          const ch = await client.channels.fetch(r.channel_id).catch(() => null);
-          if (!ch) {
-            // channel missing, cleanup
-            await knex('active_spawns').where({ id: r.id }).del();
-            continue;
-          }
-          // ensure message exists so users can still catch
-          const msg = await ch.messages.fetch(r.message_id).catch(() => null);
-          if (!msg) {
-            await knex('active_spawns').where({ id: r.id }).del();
-            continue;
-          }
-          // Basic validation: message should have been posted by the bot and the timestamp should
-          // roughly match the persisted spawned_at value. If not, cleanup the row to avoid
-          // incorrectly restoring stale or unrelated messages as active spawns.
-          try {
-            const spawnedAtNum = Number(r.spawned_at) || 0;
-            const ageMismatchMs = Math.abs((msg.createdTimestamp || 0) - spawnedAtNum);
-            const maxMismatch = 1000 * 60 * 60; // 1 hour tolerance
-            if (msg.author?.id !== client.user?.id || ageMismatchMs > maxMismatch) {
-              logger.info('Cleaned up stale active spawn (message validation failed)', {
+          chunkRows = await knex('guild_settings').whereIn('guild_id', ids).select('*');
+          totalLoadedGuildRows += chunkRows.length;
+        } catch (e) {
+          logger.warn('Failed loading guild_settings chunk', { error: e && (e.stack || e), chunkSize: ids.length });
+          continue;
+        }
+        try {
+          const mu = process.memoryUsage();
+          logger.info('spawnManager.init after guild_settings chunk', {
+            heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
+            loadedGuildRows: chunkRows.length,
+            totalLoadedGuildRows,
+          });
+        } catch (e) { /* ignore */ }
+
+        // Restore any active spawns for this chunk
+        try {
+          const activeChunkRows = await knex('active_spawns').whereIn('guild_id', ids).select('*');
+          totalRestoredActiveRows += activeChunkRows.length;
+          for (const r of activeChunkRows) {
+            try {
+              if (!guildIdSet.has(String(r.guild_id))) continue;
+              const ch = await client.channels.fetch(r.channel_id).catch(() => null);
+              if (!ch) {
+                // channel missing, cleanup
+                await knex('active_spawns').where({ id: r.id }).del();
+                continue;
+              }
+              // ensure message exists so users can still catch
+              const msg = await ch.messages.fetch(r.message_id).catch(() => null);
+              if (!msg) {
+                await knex('active_spawns').where({ id: r.id }).del();
+                continue;
+              }
+              try {
+                const spawnedAtNum = Number(r.spawned_at) || 0;
+                const ageMismatchMs = Math.abs((msg.createdTimestamp || 0) - spawnedAtNum);
+                const maxMismatch = 1000 * 60 * 60; // 1 hour tolerance
+                if (msg.author?.id !== client.user?.id || ageMismatchMs > maxMismatch) {
+                  logger.info('Cleaned up stale active spawn (message validation failed)', {
+                    messageId: r.message_id,
+                    channelId: r.channel_id,
+                    ageMismatchMs,
+                  });
+                  await knex('active_spawns').where({ id: r.id }).del();
+                  continue;
+                }
+              } catch (valErr) {
+                try {
+                  logger.warn('Error validating restored active spawn; removing row', {
+                    row: r,
+                    error: valErr && (valErr.stack || valErr),
+                  });
+                } catch (le) {
+                  try {
+                    logger && logger.warn && logger.warn('Failed logging validation error restoring active spawn', {
+                      error: le && (le.stack || le),
+                    });
+                  } catch (lle) {
+                    fallbackLogger && fallbackLogger.warn && fallbackLogger.warn(
+                      'Failed logging validation error restoring active spawn fallback',
+                      lle && (lle.stack || lle)
+                    );
+                  }
+                }
+                await knex('active_spawns').where({ id: r.id }).del();
+                continue;
+              }
+              const guildMap = activeEggs.get(r.guild_id) || new Map();
+              const restoredEggType = eggTypes.find((t) => t.id === r.egg_type) || { id: r.egg_type };
+              guildMap.set(r.message_id, {
                 messageId: r.message_id,
                 channelId: r.channel_id,
-                ageMismatchMs,
+                spawnedAt: Number(r.spawned_at),
+                numEggs: r.num_eggs,
+                eggType: restoredEggType,
               });
-              await knex('active_spawns').where({ id: r.id }).del();
-              continue;
-            }
-          } catch (valErr) {
-            try {
-              logger.warn('Error validating restored active spawn; removing row', {
-                row: r,
-                error: valErr && (valErr.stack || valErr),
-              });
-            } catch (le) {
+              activeEggs.set(r.guild_id, guildMap);
+            } catch (e) {
               try {
-                logger &&
-                  logger.warn &&
-                  logger.warn('Failed logging validation error restoring active spawn', {
+                logger.warn('Failed restoring active spawn row', {
+                  row: r,
+                  error: e && (e.stack || e),
+                });
+              } catch (le) {
+                try {
+                  logger && logger.warn && logger.warn('Failed logging restore active spawn error', {
                     error: le && (le.stack || le),
                   });
-              } catch (lle) {
-                fallbackLogger &&
-                  fallbackLogger.warn &&
-                  fallbackLogger.warn(
-                    'Failed logging validation error restoring active spawn fallback',
+                } catch (lle) {
+                  fallbackLogger && fallbackLogger.warn && fallbackLogger.warn(
+                    'Failed logging restore active spawn error fallback',
                     lle && (lle.stack || lle)
                   );
+                }
               }
             }
-            await knex('active_spawns').where({ id: r.id }).del();
-            continue;
           }
-          const guildMap = activeEggs.get(r.guild_id) || new Map();
-          // restore full eggType metadata when possible
-          const restoredEggType = eggTypes.find((t) => t.id === r.egg_type) || { id: r.egg_type };
-          guildMap.set(r.message_id, {
-            messageId: r.message_id,
-            channelId: r.channel_id,
-            spawnedAt: Number(r.spawned_at),
-            numEggs: r.num_eggs,
-            eggType: restoredEggType,
-          });
-          activeEggs.set(r.guild_id, guildMap);
+          try {
+            const mu = process.memoryUsage();
+            logger.info('spawnManager.init after active_spawns chunk restore', {
+              heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
+              restoredActiveRows: activeChunkRows.length,
+              totalRestoredActiveRows,
+            });
+          } catch (e) { /* ignore */ }
         } catch (e) {
           try {
-            logger.warn('Failed restoring active spawn row', {
-              row: r,
-              error: e && (e.stack || e),
-            });
+            logger.warn('Failed loading active_spawns chunk', { error: e && (e.stack || e) });
           } catch (le) {
             try {
-              logger &&
-                logger.warn &&
-                logger.warn('Failed logging restore active spawn error', {
-                  error: le && (le.stack || le),
-                });
+              logger && logger.warn && logger.warn('Failed logging active_spawns load error', { error: le && (le.stack || le) });
             } catch (lle) {
-              fallbackLogger &&
-                fallbackLogger.warn &&
-                fallbackLogger.warn(
-                  'Failed logging restore active spawn error fallback',
-                  lle && (lle.stack || lle)
-                );
+              fallbackLogger && fallbackLogger.warn && fallbackLogger.warn('Failed logging active_spawns load error fallback', lle && (lle.stack || lle));
             }
           }
         }
+
+        // Schedule spawns for guilds in this chunk
+        for (const row of chunkRows) {
+          if (!guildIdSet.has(String(row.guild_id))) continue;
+          if (row.next_spawn_at) {
+            const ts = Number(row.next_spawn_at);
+            const remaining = Math.max(0, ts - Date.now());
+            if (remaining > 0) {
+              const t = setTimeout(
+                () =>
+                  enqueueSpawn(row.guild_id).catch((err) =>
+                    logger.error('Spawn error', { guildId: row.guild_id, error: err.stack || err })
+                  ),
+                remaining
+              );
+              timers.set(row.guild_id, t);
+              nextSpawnAt.set(row.guild_id, ts);
+              logger.debug('Restored scheduled spawn from DB', {
+                guildId: row.guild_id,
+                scheduled_at: ts,
+                in_ms: remaining,
+              });
+              continue;
+            }
+          }
+          scheduleNext(row.guild_id);
+        }
+
+        // Small delay between chunks to let the event loop and GC breathe
+        try {
+          await new Promise((res) => setTimeout(res, chunkDelayMs));
+        } catch (_) { /* ignore */ }
       }
       try {
         const mu = process.memoryUsage();
-        logger.info('spawnManager.init after active_spawns restore', { heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10, restoredActiveRows: activeRows.length });
+        logger.info('spawnManager.init complete', {
+          heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
+          totalLoadedGuildRows,
+          totalRestoredActiveRows,
+        });
       } catch (e) { /* ignore */ }
-    } catch (e) {
-      try {
-        logger.warn('Failed loading active_spawns table', { error: e && (e.stack || e) });
-      } catch (le) {
-        try {
-          logger &&
-            logger.warn &&
-            logger.warn('Failed logging active_spawns load error', {
-              error: le && (le.stack || le),
-            });
-        } catch (lle) {
-          fallbackLogger &&
-            fallbackLogger.warn &&
-            fallbackLogger.warn(
-              'Failed logging active_spawns load error fallback',
-              lle && (lle.stack || lle)
-            );
-        }
-      }
-    }
-
-    for (const row of rows) {
-      if (!guildIdSet.has(String(row.guild_id))) continue;
-      // if there's a persisted next_spawn_at, respect it; otherwise schedule normally
-      if (row.next_spawn_at) {
-        const ts = Number(row.next_spawn_at);
-        const remaining = Math.max(0, ts - Date.now());
-        if (remaining > 0) {
-          const t = setTimeout(
-            () =>
-              enqueueSpawn(row.guild_id).catch((err) =>
-                logger.error('Spawn error', { guildId: row.guild_id, error: err.stack || err })
-              ),
-            remaining
-          );
-          timers.set(row.guild_id, t);
-          nextSpawnAt.set(row.guild_id, ts);
-          logger.debug('Restored scheduled spawn from DB', {
-            guildId: row.guild_id,
-            scheduled_at: ts,
-            in_ms: remaining,
-          });
-          continue;
-        }
-      }
-      scheduleNext(row.guild_id);
-    }
     // attempt to preload spawn image once to reduce transient allocations
     try {
       if (fs.existsSync(spawnImagePath)) {

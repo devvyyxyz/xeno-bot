@@ -22,12 +22,19 @@ async function processHives() {
     } catch (e) { /* ignore */ }
     const now = Date.now();
     const msPerHour = 3600000;
-    // load all hives with production > 0
-    const rows = await db.knex('hives').where('jelly_production_per_hour', '>', 0).select('*');
-    if (!rows || rows.length === 0) return 0;
+    // Process hives in chunks to avoid loading the entire table into memory
+    const chunkSize = Number(process.env.HIVE_WORKER_CHUNK_SIZE) || 200;
+    let offset = 0;
     let processed = 0;
     const awardedHives = [];
-    for (const r of rows) {
+    while (true) {
+      const rows = await db.knex('hives')
+        .where('jelly_production_per_hour', '>', 0)
+        .select('*')
+        .limit(chunkSize)
+        .offset(offset);
+      if (!rows || rows.length === 0) break;
+      for (const r of rows) {
       try {
         // per-row memory debug
         try {
@@ -83,6 +90,12 @@ async function processHives() {
       } catch (e) {
         logger.warn('Failed processing hive row', { row: r && r.id, error: e && (e.stack || e) });
       }
+      }
+      offset += rows.length;
+      // small pause to give GC/event loop a chance to run between chunks
+      try {
+        await new Promise((res) => setTimeout(res, Number(process.env.HIVE_WORKER_CHUNK_DELAY_MS) || 20));
+      } catch (_) { /* ignore */ }
     }
     try {
       const mu = process.memoryUsage();
