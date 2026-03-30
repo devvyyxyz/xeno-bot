@@ -8,6 +8,22 @@ const eggTypes = require('../../config/eggTypes.json');
 void eggTypes;
 const xenoModel = models.xenomorph;
 
+// Optional BullMQ queue support for delayed hatch jobs. We attempt to
+// require the local `lib/queue` helper but tolerate absence/failures
+// and fall back to the legacy per-hatch timers implementation.
+let hatchQueue = null;
+let hatchWorker = null;
+let useBull = false;
+let createQueue = null;
+let createWorker = null;
+try {
+  const qlib = require('../lib/queue');
+  createQueue = qlib && qlib.createQueue;
+  createWorker = qlib && qlib.createWorker;
+} catch (e) {
+  // ignore - fallback to timers
+}
+
 function getGuildName(guildId) {
   try {
     if (!client) {
@@ -41,6 +57,29 @@ async function init(botClient) {
     logger.info('hatchManager.init memory start', { heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10 });
   } catch (e) { /* ignore */ }
   try {
+    // Try to initialize a Redis-backed queue/worker for hatch timers. If
+    // queue creation fails for any reason, fall back to legacy timers.
+    if (typeof createQueue === 'function') {
+      try {
+        hatchQueue = createQueue('hatches');
+        if (typeof createWorker === 'function') {
+          hatchWorker = createWorker('hatches', async (job) => {
+            try {
+              const hatchId = job?.data?.hatchId || job?.data?.hatch_id || null;
+              logger.info('Hatch finished job processed', { hatchId });
+            } catch (we) {
+              logger.warn('Hatch worker processor error', { error: we && (we.stack || we) });
+            }
+          }, { concurrency: 1 });
+        }
+        useBull = true;
+      } catch (qe) {
+        logger.warn('Failed initializing hatch queue/worker; falling back to timers', { error: qe && (qe.stack || qe) });
+        useBull = false;
+        try { hatchQueue = null; if (hatchWorker && typeof hatchWorker.close === 'function') await hatchWorker.close(); } catch (_) { /* ignore */ }
+      }
+    }
+
     const rows = await db.knex('hatches').where({ collected: false }).select('*');
     for (const r of rows) {
       const now = Date.now();
@@ -49,9 +88,15 @@ async function init(botClient) {
         continue;
       }
       const delay = finishes - now;
-      scheduleTimer(r.id, delay);
-      const guildName = getGuildName(r.guild_id);
-      logger.debug(`Restored hatch timer (${guildName})`, { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, in_ms: delay });
+      // schedule using bull queue when available; falls back to timer
+      try {
+        await scheduleTimer(r.id, delay);
+        const guildName = getGuildName(r.guild_id);
+        logger.debug(`Restored hatch timer (${guildName})`, { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, in_ms: delay });
+      } catch (sErr) {
+        logger.warn('Failed scheduling hatch via queue; using timer fallback', { hatchId: r.id, error: sErr && (sErr.stack || sErr) });
+        scheduleTimer(r.id, delay).catch(() => {});
+      }
     }
   } catch (e) {
     logger.error('Failed initializing hatch manager', { error: e && (e.stack || e) });
@@ -65,18 +110,38 @@ async function init(botClient) {
   } catch (e) { logger.warn('Failed registering hatchManager with systemMonitor', { error: e && (e.stack || e) }); }
 }
 
-function scheduleTimer(hatchId, delay) {
+async function scheduleTimer(hatchId, delay) {
   if (shuttingDown) {
     try { logger && logger.info && logger.info('Skipping scheduleTimer: system is shutting down', { hatchId }); } catch (_) { /* ignore */ }
     return;
   }
+
+  // Prefer Redis-backed delayed jobs when possible
+  if (useBull && hatchQueue) {
+    const jobId = `hatch:${hatchId}`;
+    try {
+      const existing = await hatchQueue.getJob(jobId);
+      if (existing) {
+        // If job exists, attempt to remove and recreate to ensure delay is up-to-date
+        try { await existing.remove(); } catch (_) { /* ignore */ }
+      }
+      await hatchQueue.add('hatchFinish', { hatchId }, { jobId, delay: Number(delay) || 0, removeOnComplete: true, removeOnFail: true });
+      return;
+    } catch (e) {
+      logger.warn('Failed scheduling hatch job in queue; falling back to timer', { hatchId, error: e && (e.stack || e) });
+      // fall through to timer code
+    }
+  }
+
+  // Legacy per-hatch timer fallback
   if (timers.has(hatchId)) {
-    clearTimeout(timers.get(hatchId));
+    try { clearTimeout(timers.get(hatchId)); } catch (_) { /* ignore */ }
   }
   const t = setTimeout(() => {
     timers.delete(hatchId);
     logger.info('Hatch finished timer fired', { hatchId });
-  }, delay);
+  }, Number(delay) || 0);
+  if (typeof t.unref === 'function') t.unref();
   timers.set(hatchId, t);
 }
 
@@ -122,7 +187,8 @@ async function startHatch(discordId, guildId, eggTypeId, durationMs) {
   const id = Array.isArray(insert) ? insert[0] : insert;
   const guildName = getGuildName(guildId);
   logger.info(`Created hatch (${guildName})`, { id, discordId, guildId, eggTypeId, finishesAt });
-  scheduleTimer(id, finishesAt - Date.now());
+  // schedule via queue (async) but don't block return; ensure failures are logged
+  scheduleTimer(id, finishesAt - Date.now()).catch((err) => logger.warn('Failed scheduling hatch timer for new hatch', { hatchId: id, error: err && (err.stack || err) }));
   return { id, discord_id: discordId, guild_id: guildId, egg_type: eggTypeId, started_at: startedAt, finishes_at: finishesAt };
 }
 
@@ -137,8 +203,17 @@ async function skipHatch(discordId, guildId, hatchId, costRoyalJelly = 5) {
     throw new Error('Insufficient royal jelly');
   }
   await db.knex('hatches').where({ id: hatchId }).update({ skipped: true, finishes_at: now });
+  // Remove any scheduled job (queue or timer)
+  try {
+    if (useBull && hatchQueue) {
+      const job = await hatchQueue.getJob(`hatch:${hatchId}`);
+      if (job) await job.remove();
+    }
+  } catch (e) {
+    logger.warn('Failed removing hatch job from queue during skip', { hatchId, error: e && (e.stack || e) });
+  }
   if (timers.has(hatchId)) {
-    clearTimeout(timers.get(hatchId));
+    try { clearTimeout(timers.get(hatchId)); } catch (_) { /* ignore */ }
     timers.delete(hatchId);
   }
   const guildName = getGuildName(guildId);
@@ -210,11 +285,23 @@ module.exports = { init, startHatch, skipHatch, collectHatch, listHatches };
 async function shutdown() {
   shuttingDown = true;
   try {
+    // close bull worker/queue if used
+    try {
+      if (hatchWorker && typeof hatchWorker.close === 'function') await hatchWorker.close();
+    } catch (we) { logger.warn('Failed closing hatch worker', { error: we && (we.stack || we) }); }
+    try {
+      if (hatchQueue && typeof hatchQueue.close === 'function') await hatchQueue.close();
+    } catch (qe) { logger.warn('Failed closing hatch queue', { error: qe && (qe.stack || qe) }); }
+
     for (const [, t] of timers.entries()) {
-      try { clearTimeout(t); } catch (e) { try { logger && logger.warn && logger.warn('Failed clearing hatch timer during shutdown', { error: e && (e.stack || e) }); } catch (le) { try { fallbackLogger && fallbackLogger.warn && fallbackLogger.warn('Failed logging timer clear error during hatchManager shutdown', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; } } }
+      try { clearTimeout(t); } catch (e) {
+        try { logger && logger.warn && logger.warn('Failed clearing hatch timer during shutdown', { error: e && (e.stack || e) }); } catch (le) {
+          try { fallbackLogger && fallbackLogger.warn && fallbackLogger.warn('Failed logging timer clear error during hatchManager shutdown', le && (le.stack || le)); } catch (ignored) { /* ignore */ void 0; }
+        }
+      }
     }
     timers.clear();
-    logger.info('hatchManager shutdown: cleared timers');
+    logger.info('hatchManager shutdown: cleared timers and queue (if any)');
   } catch (e) {
     logger.warn('hatchManager shutdown error', { error: e && (e.stack || e) });
   }
