@@ -48,6 +48,9 @@ let client = null;
 let activeEggs = new Map();
 let timers = new Map();
 let shuttingDown = false;
+// preload spawn image into memory (optional) to avoid repeated large sync reads
+let spawnImageBuffer = null;
+const spawnImagePath = path.join(__dirname, '../assets/images/egg_spawn.png');
 const pendingReschedule = new Set();
 // nextSpawnAt: guildId -> timestamp (ms since epoch) when the next spawn is scheduled
 let nextSpawnAt = new Map();
@@ -354,6 +357,24 @@ async function init(botClient) {
       }
       scheduleNext(row.guild_id);
     }
+    // attempt to preload spawn image once to reduce transient allocations
+    try {
+      if (fs.existsSync(spawnImagePath)) {
+        try {
+          const stats = fs.statSync(spawnImagePath);
+          const maxSize = Number(process.env.SPAWN_IMAGE_CACHE_MAX_BYTES) || 8 * 1024 * 1024;
+          if (stats.size <= maxSize) {
+            spawnImageBuffer = fs.readFileSync(spawnImagePath);
+            logger.info('Preloaded spawn image into memory', { size: stats.size });
+          } else {
+            logger.info('Spawn image present but too large to preload', { size: stats.size, maxSize });
+          }
+        } catch (e) {
+          logger.warn('Failed preloading spawn image', { error: e && (e.stack || e) });
+        }
+      }
+    } catch (e) { /* ignore */ }
+
     logger.info('Spawn manager initialized', {
       shardGuilds: shardGuildIds.length,
       configuredGuilds: rows.length,
@@ -730,12 +751,12 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     if (hasImage && canAttachFiles) {
       try {
         const stats = fs.statSync(imgPath);
-        const maxSize = 8 * 1024 * 1024; // 8MB conservative limit for many guilds
+        const maxSize = Number(process.env.SPAWN_IMAGE_CACHE_MAX_BYTES) || 8 * 1024 * 1024; // 8MB conservative limit
         if (stats.size <= maxSize) {
-          // Read into buffer and attach from memory — send buffer form directly to avoid AttachmentBuilder/path issues
+          // Use preloaded buffer when available to avoid allocating a new large Buffer each spawn
           try {
-            const buf = fs.readFileSync(imgPath);
-            // Use raw buffer attachment format which is more consistent across environments
+            const buf = spawnImageBuffer || fs.readFileSync(imgPath);
+            logger.debug('Using spawn image buffer for attachment', { guildId, bufferSize: buf && buf.length });
             attachment = { attachment: buf, name: 'egg_spawn.png' };
           } catch (readErr) {
             logger.warn('Failed reading spawn image into buffer; skipping attach', {
@@ -797,8 +818,9 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
             { guildId, error: firstErr && (firstErr.stack || firstErr) },
             5 * 60 * 1000
           );
-          try {
-            const buf = fs.readFileSync(imgPath);
+            try {
+            const buf = spawnImageBuffer || fs.readFileSync(imgPath);
+            logger.debug('Retrying combined V2 send with buffer fallback', { guildId, bufferSize: buf && buf.length });
             sent = await channel.send(
               buildSpawnV2Payload([{ attachment: buf, name: 'egg_spawn.png' }])
             );
@@ -845,7 +867,7 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
             error: imgErr && (imgErr.stack || imgErr),
           });
           try {
-            const buf = fs.readFileSync(imgPath);
+            const buf = spawnImageBuffer || fs.readFileSync(imgPath);
             await channel.send({ files: [{ attachment: buf, name: 'egg_spawn.png' }] });
           } catch (imgBufErr) {
             logger.warn('Failed sending spawn image separately (buffer fallback)', {

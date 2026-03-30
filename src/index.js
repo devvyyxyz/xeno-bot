@@ -20,6 +20,41 @@ try {
 const utils = require('./utils');
 const baseLogger = utils.logger;
 const logger = baseLogger.get('index');
+// Safety: wrap Node's Worker class to attach a default error handler so
+// stray worker-thread errors are logged instead of causing an immediate
+// unhandled 'error' exception that crashes the whole process. This is a
+// defensive measure; libraries should still attach their own handlers.
+try {
+  const wt = require('worker_threads');
+  if (wt && wt.Worker) {
+    const NativeWorker = wt.Worker;
+    // Only patch once
+    if (!NativeWorker.__safePatched) {
+      class SafeWorker extends NativeWorker {
+        constructor(filename, options) {
+          super(filename, options);
+          try {
+            this.on('error', (err) => {
+              try {
+                baseLogger && baseLogger.error && baseLogger.error('Worker thread error (captured)', {
+                  error: err && (err.stack || err),
+                });
+              } catch (e) {
+                try { console.error('Worker thread error', err); } catch (_) { /* ignore */ }
+              }
+            });
+          } catch (e) {
+            /* ignore attach failures */
+          }
+        }
+      }
+      SafeWorker.__safePatched = true;
+      wt.Worker = SafeWorker;
+    }
+  }
+} catch (e) {
+  try { baseLogger && baseLogger.warn && baseLogger.warn('Failed to apply SafeWorker wrapper', { error: e && (e.stack || e) }); } catch (_) { /* ignore */ }
+}
 // Route any remaining `console.warn` / `console.error` fallbacks to a
 // file-backed fallback logger. This prevents raw stdout writes from
 // appearing in production logs if the main logger fails.
