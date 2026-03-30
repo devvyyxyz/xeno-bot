@@ -246,8 +246,18 @@ async function init(botClient) {
                     ageMismatchMs,
                   });
                   await knex('active_spawns').where({ id: r.id }).del();
+                  // remove cached message/channel references to avoid growing cache
+                  try {
+                    if (ch && ch.messages && ch.messages.cache) ch.messages.cache.delete(String(r.message_id));
+                  } catch (_) {}
+                  try { client.channels.cache.delete(String(r.channel_id)); } catch (_) {}
                   continue;
                 }
+                // After successful validation, immediately remove the fetched message and channel from caches
+                try {
+                  if (ch && ch.messages && ch.messages.cache) ch.messages.cache.delete(String(r.message_id));
+                } catch (_) {}
+                try { client.channels.cache.delete(String(r.channel_id)); } catch (_) {}
               } catch (valErr) {
                 try {
                   logger.warn('Error validating restored active spawn; removing row', {
