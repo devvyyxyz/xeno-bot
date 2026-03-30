@@ -766,6 +766,20 @@ async function gracefulShutdown(reason) {
     } catch (e) {
       logger.warn('Failed shutting down Redis client', { error: e && (e.stack || e) });
     }
+    // Close shared Redis used by queue helpers (if present)
+    try {
+      try {
+        const queueLib = require('./lib/queue');
+        if (queueLib && typeof queueLib.closeSharedRedis === 'function') {
+          await queueLib.closeSharedRedis();
+          logger.info('Queue shared Redis closed during shutdown');
+        }
+      } catch (qe) {
+        logger.warn('Failed requiring queue lib during shutdown', { error: qe && (qe.stack || qe) });
+      }
+    } catch (e) {
+      logger.warn('Failed closing shared queue Redis during shutdown', { error: e && (e.stack || e) });
+    }
     try {
       await db.knex.destroy();
     } catch (e) {
