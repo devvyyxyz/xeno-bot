@@ -101,20 +101,27 @@ async function processDueJobs(client) {
         await db.knex('xenomorphs').where({ id: job.xeno_id }).update(updates);
         await db.knex('evolution_queue').where({ id: job.id }).update({ status: 'completed', result: 'success', updated_at: db.knex.fn.now() });
         try {
-          const user = await client.users.fetch(String(job.user_id));
+          // Prefer cached user object to avoid hitting Discord API when possible
+          const uid = String(job.user_id);
+          let user = client.users.cache.get(uid) || null;
+          if (!user && typeof client.users.fetch === 'function') {
+            try {
+              user = await client.users.fetch(uid).catch(() => null);
+            } catch (_) { user = null; }
+          }
           if (user) {
             try {
               await user.send(buildEvolutionCompleteV2Dm(job, fromRole, targetRole));
             } catch (v2Err) {
-              await user.send(`Your evolution job [${job.id}] completed\n${getRoleDisplay(fromRole)} [${job.xeno_id}] -> ${getRoleDisplay(targetRole)} [${job.xeno_id}]`);
+              try { await user.send(`Your evolution job [${job.id}] completed\n${getRoleDisplay(fromRole)} [${job.xeno_id}] -> ${getRoleDisplay(targetRole)} [${job.xeno_id}]`); } catch (_) { /* ignore */ }
             }
           }
         } catch (dmErr) {
           logger.warn('Failed to DM user about evolution completion', { jobId: job.id, error: dmErr && (dmErr.stack || dmErr) });
-    if (shuttingDown) {
-      logger.info('Evolution worker start called while shutting down; ignoring');
-      return;
-    }
+          if (shuttingDown) {
+            logger.info('Evolution worker start called while shutting down; ignoring');
+            return;
+          }
         }
       } else {
         await db.knex('evolution_queue').where({ id: job.id }).update({ status: 'failed', result: 'failure', updated_at: db.knex.fn.now() });
