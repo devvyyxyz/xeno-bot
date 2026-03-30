@@ -24,7 +24,7 @@ module.exports = {
     },
     pool: {
       min: 0,
-      max: 7
+      max: process.env.DB_POOL_MAX ? Number(process.env.DB_POOL_MAX) : 4
     },
     migrations: {
       directory: path.join(__dirname, 'migrations')
@@ -41,7 +41,7 @@ module.exports = {
       database: process.env.MYSQL_DATABASE || process.env.DB_DATABASE || 'xeno_bot',
       charset: process.env.MYSQL_CHARSET || 'utf8mb4'
     },
-    pool: { min: 2, max: 10 },
+    pool: { min: 0, max: process.env.DB_POOL_MAX ? Number(process.env.DB_POOL_MAX) : 4 },
     migrations: { directory: path.join(__dirname, 'migrations') }
   }
 };

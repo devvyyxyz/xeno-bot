@@ -80,13 +80,14 @@ async function createKnex() {
     }
 
     try {
-      // Optimized pool settings for high concurrency
+      // Conservative pool settings to limit total DB connections per process.
+      // Can be overridden with the `DB_POOL_MAX` env var.
       const pool = {
-        min: 2,  // Maintain minimum connections to reduce latency
-        max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 20,  // Handle more concurrent requests
-        acquireTimeoutMillis: 60000,  // 60s timeout for acquiring connection
-        idleTimeoutMillis: 30000,  // Close idle connections after 30s
-        propagateCreateError: false  // Don't crash on connection pool errors
+        min: 0,
+        max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX) : 4,
+        acquireTimeoutMillis: 60000,
+        idleTimeoutMillis: 30000,
+        propagateCreateError: false,
       };
       return knexLib({ client, connection, pool });
     } catch (err) {
