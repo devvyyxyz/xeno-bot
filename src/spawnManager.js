@@ -80,6 +80,25 @@ const SPAWN_POLL_DB_LIMIT = Number(process.env.SPAWN_SCHED_DB_LIMIT) || 200;
 const SPAWN_CLEANUP_MS = Number(process.env.SPAWN_CLEANUP_MS) || 10 * 60 * 1000;
 const FAILURE_TRACKER_TTL = Number(process.env.SPAWN_FAILURE_TRACKER_TTL_MS) || 10 * 60 * 1000;
 const WARN_COOLDOWN_TTL = Number(process.env.SPAWN_WARN_COOLDOWN_TTL_MS) || 24 * 60 * 60 * 1000;
+const WORKER_ID = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+const SPAWN_JOB_CLAIM_LIMIT = Number(process.env.SPAWN_JOB_CLAIM_LIMIT) || 50;
+const SPAWN_JOB_STALE_MS = Number(process.env.SPAWN_JOB_STALE_MS) || 5 * 60 * 1000;
+
+async function upsertSpawnJob(guildId, scheduledAt) {
+  try {
+    const knex = db.knex;
+    // Use ON CONFLICT / ON DUPLICATE KEY UPDATE via knex onConflict().merge()
+    await knex('spawn_jobs')
+      .insert({ guild_id: String(guildId), scheduled_at: Number(scheduledAt) })
+      .onConflict('guild_id')
+      .merge({ scheduled_at: Number(scheduledAt), updated_at: knex.fn.now() });
+  } catch (e) {
+    // If table missing or DB error, log and continue gracefully
+    try {
+      logger && logger.warn && logger.warn('Failed upserting spawn_jobs row', { guildId, scheduledAt, error: e && (e.stack || e) });
+    } catch (_) {}
+  }
+}
 
 function chunkArray(values, size) {
   const out = [];
@@ -168,49 +187,60 @@ async function spawnPollerTick() {
     if (!guildIds || guildIds.length === 0) return;
     const chunks = chunkArray(guildIds, SPAWN_POLL_DB_LIMIT || 200);
     for (const chunk of chunks) {
-      let rows = [];
       try {
-        rows = await knex('guild_settings')
-          .whereIn('guild_id', chunk)
-          .where('next_spawn_at', '<=', windowEnd)
-          .select('guild_id', 'next_spawn_at');
+        // Claim due spawn_jobs using a transaction and SKIP LOCKED to avoid races
+        await knex.transaction(async (trx) => {
+          const staleThreshold = Date.now() - SPAWN_JOB_STALE_MS;
+          const rows = await trx
+            .select('id', 'guild_id', 'scheduled_at')
+            .from('spawn_jobs')
+            .whereIn('guild_id', chunk)
+            .andWhere('scheduled_at', '<=', windowEnd)
+            .andWhere(function () {
+              this.whereNull('claimed_by').orWhere('claimed_at', '<', staleThreshold);
+            })
+            .orderBy('scheduled_at', 'asc')
+            .forUpdate()
+            .skipLocked()
+            .limit(SPAWN_JOB_CLAIM_LIMIT || 50);
+
+          if (!rows || rows.length === 0) return;
+
+          const ids = rows.map((r) => r.id);
+          // Mark claimed under the same transaction
+          await trx('spawn_jobs').whereIn('id', ids).update({ claimed_by: WORKER_ID, claimed_at: Date.now() });
+
+          // Enqueue claimed jobs outside the transaction context
+          for (const r of rows) {
+            try {
+              const gid = String(r.guild_id);
+              nextSpawnAt.set(gid, Number(r.scheduled_at));
+              if (inProgress.has(gid) || enqueuedSet.has(gid)) continue;
+              const active = activeEggs.get(gid);
+              if (active && active.size > 0) continue;
+              const backoff = getSpawnBackoffDelay(gid);
+              if (backoff > 0) {
+                const tracker = failureTracker.get(gid);
+                const nextAllowed = tracker && tracker.lastFailTime ? tracker.lastFailTime + backoff : 0;
+                if (Date.now() < nextAllowed) continue;
+              }
+              if (spawnQueue.length >= maxSpawnQueueDepth) {
+                logger.warn('Spawn poller: spawn queue full; skipping enqueue', { guildId: gid, queueDepth: spawnQueue.length });
+                continue;
+              }
+              enqueuedSet.add(gid);
+              enqueueSpawn(gid).catch((err) => {
+                enqueuedSet.delete(gid);
+                logger.error('Failed enqueue spawn from job claim', { guildId: gid, error: err && (err.stack || err) });
+              });
+            } catch (inner) {
+              logger.warn('spawnPoller: error enqueueing claimed job', { row: r, error: inner && (inner.stack || inner) });
+            }
+          }
+        });
       } catch (e) {
-        logger.warn('spawnPoller DB query failed', { error: e && (e.stack || e) });
+        logger.warn('spawnPoller DB claim failed', { error: e && (e.stack || e) });
         continue;
-      }
-      for (const r of rows) {
-        try {
-          const gid = String(r.guild_id);
-          const ts = Number(r.next_spawn_at);
-          // keep in-memory view of persisted schedule
-          nextSpawnAt.set(gid, ts);
-          if (shuttingDown) return;
-          // Skip if already running or enqueued or active
-          if (inProgress.has(gid) || enqueuedSet.has(gid)) continue;
-          const active = activeEggs.get(gid);
-          if (active && active.size > 0) continue;
-
-          const backoff = getSpawnBackoffDelay(gid);
-          if (backoff > 0) {
-            const tracker = failureTracker.get(gid);
-            const nextAllowed = tracker && tracker.lastFailTime ? tracker.lastFailTime + backoff : 0;
-            if (Date.now() < nextAllowed) continue;
-          }
-
-          if (spawnQueue.length >= maxSpawnQueueDepth) {
-            logger.warn('Spawn poller: spawn queue full; skipping enqueue', { guildId: gid, queueDepth: spawnQueue.length });
-            continue;
-          }
-
-          // mark enqueued to avoid duplicates and push
-          enqueuedSet.add(gid);
-          enqueueSpawn(gid).catch((err) => {
-            enqueuedSet.delete(gid);
-            logger.error('Failed enqueue spawn from poller', { guildId: gid, error: err && (err.stack || err) });
-          });
-        } catch (inner) {
-          logger.warn('spawnPoller: error processing due row', { row: r, error: inner && (inner.stack || inner) });
-        }
       }
     }
   } catch (e) {
@@ -477,27 +507,32 @@ async function init(botClient) {
           if (row.next_spawn_at) {
             const ts = Number(row.next_spawn_at);
             const remaining = Math.max(0, ts - Date.now());
-            // Record persisted schedule in-memory; poller will fire it.
-            nextSpawnAt.set(row.guild_id, ts);
-            logger.debug('Restored scheduled spawn from DB (no local timer)', {
-              guildId: row.guild_id,
-              scheduled_at: ts,
-              in_ms: remaining,
-            });
-            // If already due, attempt to enqueue now (avoid duplicates)
-            if (remaining <= 0) {
-              try {
-                const gidStr = String(row.guild_id);
-                if (!inProgress.has(gidStr) && !enqueuedSet.has(gidStr) && !(activeEggs.get(gidStr) && activeEggs.get(gidStr).size > 0)) {
-                  enqueuedSet.add(gidStr);
-                  enqueueSpawn(gidStr).catch((err) => {
-                    enqueuedSet.delete(gidStr);
-                    logger.error('Spawn error from init enqueue', { guildId: gidStr, error: err && (err.stack || err) });
-                  });
+            // Record persisted schedule in spawn_jobs (migrate from guild_settings to job table)
+            try {
+              await upsertSpawnJob(row.guild_id, ts);
+              nextSpawnAt.set(row.guild_id, ts);
+              logger.debug('Restored scheduled spawn into job table (no local timer)', {
+                guildId: row.guild_id,
+                scheduled_at: ts,
+                in_ms: remaining,
+              });
+              // If already due, attempt to enqueue now (avoid duplicates)
+              if (remaining <= 0) {
+                try {
+                  const gidStr = String(row.guild_id);
+                  if (!inProgress.has(gidStr) && !enqueuedSet.has(gidStr) && !(activeEggs.get(gidStr) && activeEggs.get(gidStr).size > 0)) {
+                    enqueuedSet.add(gidStr);
+                    enqueueSpawn(gidStr).catch((err) => {
+                      enqueuedSet.delete(gidStr);
+                      logger.error('Spawn error from init enqueue', { guildId: gidStr, error: err && (err.stack || err) });
+                    });
+                  }
+                } catch (e) {
+                  logger.warn('Failed enqueueing due spawn during init', { guildId: row.guild_id, error: e && (e.stack || e) });
                 }
-              } catch (e) {
-                logger.warn('Failed enqueueing due spawn during init', { guildId: row.guild_id, error: e && (e.stack || e) });
               }
+            } catch (migrateErr) {
+              logger.warn('Failed migrating guild_settings.next_spawn_at into spawn_jobs', { guildId: row.guild_id, error: migrateErr && (migrateErr.stack || migrateErr) });
             }
             continue;
           }
@@ -641,17 +676,22 @@ function scheduleNext(guildId) {
       });
     }
 
-    // Persist to DB and record in-memory; central poller will enqueue when due.
+    // Persist to spawn_jobs table (DB-backed job) and record in-memory; central poller will enqueue when due.
     nextSpawnAt.set(guildId, scheduledAt);
+    try {
+      await upsertSpawnJob(guildId, scheduledAt);
+    } catch (e) {
+      logger.warn('Failed upserting spawn_jobs row during scheduleNext', { guildId, scheduledAt, error: e && (e.stack || e) });
+    }
+    // Also update legacy guild_settings.next_spawn_at for backwards compatibility
     try {
       const knex = db.knex;
       await knex('guild_settings').where({ guild_id: guildId }).update({ next_spawn_at: scheduledAt });
     } catch (dbErr) {
-      logger.warn('Failed persisting next_spawn_at to DB', {
+      logger.warn('Failed persisting next_spawn_at to guild_settings', {
         guildId,
         error: dbErr && (dbErr.stack || dbErr),
       });
-      // Don't re-throw - persistence is non-critical
     }
 
     // Checkpoint 7: Log completion
@@ -790,16 +830,22 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       try {
         const knex = db.knex;
         await knex('guild_settings').where({ guild_id: guildId }).update({ next_spawn_at: null });
+        // Remove any queued job for this guild (we are executing now)
+        try {
+          await knex('spawn_jobs').where({ guild_id: guildId }).del();
+        } catch (jm) {
+          // ignore migration/table missing errors
+        }
       } catch (e) {
         try {
-          logger.warn('Failed clearing next_spawn_at at doSpawn start', {
+          logger.warn('Failed clearing next_spawn_at or spawn_jobs at doSpawn start', {
             guildId,
             error: e && (e.stack || e),
           });
         } catch (le) {
           try {
             fallbackLogger.warn(
-              'Failed logging next_spawn_at clear error at doSpawn start',
+              'Failed logging next_spawn_at/spawn_jobs clear error at doSpawn start',
               le && (le.stack || le)
             );
           } catch (ignored) {
@@ -1345,16 +1391,21 @@ async function forceSpawn(guildId, forcedEggTypeId) {
     try {
       const knex = db.knex;
       await knex('guild_settings').where({ guild_id: guildId }).update({ next_spawn_at: null });
+      try {
+        await knex('spawn_jobs').where({ guild_id: guildId }).del();
+      } catch (_) {
+        // ignore missing table or delete errors
+      }
     } catch (e) {
       try {
-        logger.warn('Failed clearing next_spawn_at at forceSpawn start', {
+        logger.warn('Failed clearing next_spawn_at or spawn_jobs at forceSpawn start', {
           guildId,
           error: e && (e.stack || e),
         });
       } catch (le) {
         try {
           fallbackLogger.warn(
-            'Failed logging next_spawn_at clear error at forceSpawn start',
+            'Failed logging next_spawn_at/spawn_jobs clear error at forceSpawn start',
             le && (le.stack || le)
           );
         } catch (ignored) {
