@@ -128,10 +128,25 @@ const requiredEnvs = ['TOKEN'];
 const missing = requiredEnvs.filter((k) => !process.env[k]);
 if (missing.length > 0) {
   // Fail fast — bot cannot run without a token
-  // Log via console because logger not yet configured
-  // Use process.exit to avoid starting a bot with missing credentials
-  // Provide helpful hint
-  baseLogger.error('Missing required environment variables', { missing: missing.join(', ') });
+  // Emit an immediately visible message to console so `npm run dev`
+  // prints the reason for early exit in typical terminal sessions.
+  try {
+    // Helpful hint: development profile uses `TOKEN_DEV` (see config/bot.dev.json)
+    console.error(
+      `Missing required environment variables: ${missing.join(', ')}. ` +
+        'Set them in your environment or create a .env file (e.g. TOKEN_DEV for dev profile)'
+    );
+  } catch (e) {
+    /* ignore console failures */
+  }
+
+  // Also record via the structured logger for file-backed logs
+  try {
+    baseLogger.error('Missing required environment variables', { missing: missing.join(', ') });
+  } catch (e) {
+    /* ignore logger failures */
+  }
+
   process.exit(1);
 }
 
