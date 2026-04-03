@@ -87,6 +87,7 @@ const catchInProgress = new Set();
 const SPAWN_POLL_MS = Number(process.env.SPAWN_SCHED_POLL_MS) || 5000;
 const SPAWN_POLL_DB_LIMIT = Number(process.env.SPAWN_SCHED_DB_LIMIT) || 200;
 const SPAWN_CLEANUP_MS = Number(process.env.SPAWN_CLEANUP_MS) || 10 * 60 * 1000;
+const ENABLE_STUCK_GUILD_RECOVERY = String(process.env.SPAWN_ENABLE_STUCK_GUILD_RECOVERY || '').toLowerCase() === 'true';
 const FAILURE_TRACKER_TTL = Number(process.env.SPAWN_FAILURE_TRACKER_TTL_MS) || 10 * 60 * 1000;
 const WARN_COOLDOWN_TTL = Number(process.env.SPAWN_WARN_COOLDOWN_TTL_MS) || 24 * 60 * 60 * 1000;
 const WORKER_ID = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
@@ -287,8 +288,9 @@ function spawnCleanupTick() {
       if (shardGuildSet && shardGuildSet.size > 0 && !shardGuildSet.has(String(gid))) enqueuedSet.delete(gid);
     }
     
-    // Recovery: detect and fix stuck guilds (no scheduled spawn, no active eggs, not in progress)
-    if (shardGuildSet && shardGuildSet.size > 0) {
+    // Optional recovery path. Keep disabled by default because aggressive recovery
+    // can interfere with expected catch timing on some guilds.
+    if (ENABLE_STUCK_GUILD_RECOVERY && shardGuildSet && shardGuildSet.size > 0) {
       const stuckGuilds = [];
       for (const guildId of shardGuildSet) {
         const hasScheduledSpawn = nextSpawnAt.has(String(guildId)) || nextSpawnAt.has(guildId);
