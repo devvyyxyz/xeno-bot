@@ -434,11 +434,14 @@ function processSpawnQueue() {
         // Clean up state on error to prevent stuck spawns
         try {
           inProgress.delete(task.guildId);
-          enqueuedSet.delete(task.guildId);
         } catch (_) { /* ignore */ }
       })
       .finally(() => {
         activeSpawnWorkers -= 1;
+        // Always clean up enqueuedSet when processing completes (success or error)
+        try {
+          enqueuedSet.delete(task.guildId);
+        } catch (_) { /* ignore */ }
         if (spawnQueue.length > 0) processSpawnQueue();
       });
   }
