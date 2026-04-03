@@ -52,21 +52,55 @@ class InMemoryRedis {
     return deleted;
   }
 
-  // Simplified SCAN implementation: returns [cursor, [keys]]; pattern supports basic '*' wildcard
+  // SCAN implementation with proper cursor-based pagination
+  // Supports MATCH pattern and COUNT hints, behaves like real Redis SCAN
   async scan(cursor = '0', ...args) {
-    // ignore cursor/pagination; return all matching keys and cursor 0
+    // Parse arguments: MATCH pattern COUNT count
     let pattern = '*';
+    let count = 10; // default page size
     for (let i = 0; i < args.length; i++) {
-      if (String(args[i]).toUpperCase() === 'MATCH' && args[i + 1]) { pattern = String(args[i + 1]); }
+      const arg = String(args[i]).toUpperCase();
+      if (arg === 'MATCH' && args[i + 1]) pattern = String(args[i + 1]);
+      if (arg === 'COUNT' && args[i + 1]) {
+        const n = Number(args[i + 1]);
+        if (!Number.isNaN(n) && n > 0) count = n;
+      }
     }
+
+    // Compile pattern regex (basic glob: * → .*)
     const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
-    const keys = [];
+
+    // Get all matching keys, skipping expired entries
+    const matchingKeys = [];
     for (const k of this.store.keys()) {
       const entry = this.store.get(k);
-      if (entry && entry.expires && Date.now() > entry.expires) { this.store.delete(k); continue; }
-      if (regex.test(k)) keys.push(k);
+      // Clean up expired entries
+      if (entry && entry.expires && Date.now() > entry.expires) {
+        this.store.delete(k);
+        continue;
+      }
+      // Check pattern match
+      if (regex.test(k)) {
+        matchingKeys.push(k);
+      }
     }
-    return ['0', keys];
+
+    // Parse cursor as starting index
+    let cursorIndex = 0;
+    if (cursor !== '0') {
+      const n = Number(cursor);
+      if (!Number.isNaN(n) && n > 0) cursorIndex = n;
+    }
+
+    // Extract page of results starting from cursor index
+    const pageEnd = Math.min(cursorIndex + count, matchingKeys.length);
+    const resultsPage = matchingKeys.slice(cursorIndex, pageEnd);
+
+    // Calculate next cursor
+    // '0' means we've reached the end, otherwise it's the next starting index
+    const nextCursor = pageEnd >= matchingKeys.length ? '0' : String(pageEnd);
+
+    return [nextCursor, resultsPage];
   }
 
   // No-op event methods for compatibility
