@@ -370,167 +370,44 @@ async function init(botClient) {
           });
         } catch (e) { /* ignore */ }
 
-        // Restore any active spawns for this chunk - but only keep the
-        // most recent active spawn per guild to avoid memory growth from
-        // multiple stale rows. Validate messages/channels and clean up
-        // DB rows that are invalid.
+        // CRITICAL FIX: DELETE all active spawns instead of restoring them
+        // Restored eggs block new spawns for 30 minutes (UNCAUGHT_EGG_TIMEOUT_MS)
+        // This causes the reschedule queue to accumulate in memory and crash
+        // Better to start fresh: delete all stale eggs and schedule new spawns immediately
         try {
           const activeChunkRows = await knex('active_spawns').whereIn('guild_id', ids).select('*');
           totalRestoredActiveRows += activeChunkRows.length;
-          // Pick latest spawn per guild
-          const latestByGuild = new Map();
-          for (const r of activeChunkRows) {
-            const gid = String(r.guild_id);
-            const cur = latestByGuild.get(gid);
-            if (!cur || Number(r.spawned_at) > Number(cur.spawned_at)) latestByGuild.set(gid, r);
-          }
-          for (const [gid, r] of latestByGuild.entries()) {
+          
+          // Delete ALL active spawns (don't restore them)
+          const rowIds = activeChunkRows.map(r => r.id);
+          if (rowIds.length > 0) {
             try {
-              if (!guildIdSet.has(String(r.guild_id))) continue;
-              const ch = await client.channels.fetch(r.channel_id).catch(() => null);
-              if (!ch) {
-                // channel missing, cleanup
-                await knex('active_spawns').where({ id: r.id }).del();
-                continue;
-              }
-              // ensure message exists so users can still catch
-              const msg = await ch.messages.fetch(r.message_id).catch(() => null);
-              if (!msg) {
-                await knex('active_spawns').where({ id: r.id }).del();
-                continue;
-              }
-              try {
-                const spawnedAtNum = Number(r.spawned_at) || 0;
-                const ageMismatchMs = Math.abs((msg.createdTimestamp || 0) - spawnedAtNum);
-                const maxMismatch = 1000 * 60 * 60; // 1 hour tolerance
-                if (msg.author?.id !== client.user?.id || ageMismatchMs > maxMismatch) {
-                  logger.info('Cleaned up stale active spawn (message validation failed)', {
-                    messageId: r.message_id,
-                    channelId: r.channel_id,
-                    ageMismatchMs,
-                  });
-                  await knex('active_spawns').where({ id: r.id }).del();
-                  // remove cached message/channel references to avoid growing cache
-                  try {
-                    if (ch && ch.messages && ch.messages.cache) ch.messages.cache.delete(String(r.message_id));
-                  } catch (_) {}
-                  try { client.channels.cache.delete(String(r.channel_id)); } catch (_) {}
-                  continue;
-                }
-                // After successful validation, immediately remove the fetched message and channel from caches
-                try {
-                  if (ch && ch.messages && ch.messages.cache) ch.messages.cache.delete(String(r.message_id));
-                } catch (_) {}
-                try { client.channels.cache.delete(String(r.channel_id)); } catch (_) {}
-              } catch (valErr) {
-                try {
-                  logger.warn('Error validating restored active spawn; removing row', {
-                    row: r,
-                    error: valErr && (valErr.stack || valErr),
-                  });
-                } catch (le) {
-                  try {
-                    logger && logger.warn && logger.warn('Failed logging validation error restoring active spawn', {
-                      error: le && (le.stack || le),
-                    });
-                  } catch (lle) {
-                    fallbackLogger && fallbackLogger.warn && fallbackLogger.warn(
-                      'Failed logging validation error restoring active spawn fallback',
-                      lle && (lle.stack || lle)
-                    );
-                  }
-                }
-                await knex('active_spawns').where({ id: r.id }).del();
-                continue;
-              }
-              // Check if egg is too old (more than 2 hours) - delete it immediately instead of restoring
-              const eggAge = Date.now() - Number(r.spawned_at);
-              const MAX_EGG_RESTORE_AGE = 2 * 60 * 60 * 1000; // 2 hours
-              if (eggAge > MAX_EGG_RESTORE_AGE) {
-                try {
-                  await knex('active_spawns').where({ id: r.id }).del();
-                  logger.info('Deleted stale restored active spawn (too old to restore)', {
-                    messageId: r.message_id,
-                    ageHours: Math.round(eggAge / 1000 / 60 / 60),
-                  });
-                } catch (delErr) {
-                  logger.warn('Failed cleaning old active_spawn on restore', { id: r.id, error: delErr && (delErr.stack || delErr) });
-                }
-                continue;
-              }
-              const guildMap = activeEggs.get(r.guild_id) || new Map();
-              const restoredEggType = eggTypes.find((t) => t.id === r.egg_type) || { id: r.egg_type };
-              // store a minimal eggType blob to avoid retaining large config objects
-              guildMap.set(r.message_id, {
-                messageId: r.message_id,
-                channelId: r.channel_id,
-                spawnedAt: Number(r.spawned_at),
-                numEggs: r.num_eggs,
-                eggType: { id: restoredEggType.id, name: restoredEggType.name, emoji: restoredEggType.emoji },
+              await knex('active_spawns').whereIn('id', rowIds).del();
+              logger.info('Deleted all stale active spawns on init (no restore)', {
+                deletedCount: rowIds.length,
+                reason: 'Restored eggs block reschedules for 30 mins; fresh spawns better',
               });
-              activeEggs.set(r.guild_id, guildMap);
-              // Set cleanup timeout for restored eggs immediately (they need cleanup just like newly spawned eggs)
-              const gid = String(r.guild_id);
-              if (uncaughtEggTimeout.has(gid)) {
-                clearTimeout(uncaughtEggTimeout.get(gid));
-              }
-              const timeoutId = setTimeout(() => {
-                const guildEggs = activeEggs.get(gid);
-                if (guildEggs && guildEggs.size > 0) {
-                  logger.warn('Cleaning up uncaught eggs from restored spawn after timeout', {
-                    guildId: gid,
-                    messageIds: Array.from(guildEggs.keys()),
-                    timeoutMs: UNCAUGHT_EGG_TIMEOUT_MS,
-                  });
-                  activeEggs.delete(gid);
-                  // Try to delete the message if still accessible
-                  try {
-                    for (const eggEvent of guildEggs.values()) {
-                      client.channels.fetch(eggEvent.channelId).then((ch) => {
-                        ch.messages.fetch(eggEvent.messageId).then((msg) => msg.delete()).catch(() => {});
-                      }).catch(() => {});
-                    }
-                  } catch (_) { /* ignore */ }
-                }
-                uncaughtEggTimeout.delete(gid);
-              }, UNCAUGHT_EGG_TIMEOUT_MS);
-              uncaughtEggTimeout.set(gid, timeoutId);
-            } catch (e) {
-              try {
-                logger.warn('Failed restoring active spawn row', {
-                  row: r,
-                  error: e && (e.stack || e),
-                });
-              } catch (le) {
-                try {
-                  logger && logger.warn && logger.warn('Failed logging restore active spawn error', {
-                    error: le && (le.stack || le),
-                  });
-                } catch (lle) {
-                  fallbackLogger && fallbackLogger.warn && fallbackLogger.warn(
-                    'Failed logging restore active spawn error fallback',
-                    lle && (lle.stack || lle)
-                  );
-                }
-              }
+            } catch (delErr) {
+              logger.warn('Failed deleting stale active_spawns on init', { count: rowIds.length, error: delErr && (delErr.stack || delErr) });
             }
           }
+          
           try {
             const mu = process.memoryUsage();
-            logger.info('spawnManager.init after active_spawns chunk restore', {
+            logger.info('spawnManager.init after active_spawns cleanup', {
               heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
-              restoredActiveRows: activeChunkRows.length,
-              totalRestoredActiveRows,
+              deletedActiveRows: activeChunkRows.length,
+              totalDeletedActiveRows: totalRestoredActiveRows,
             });
           } catch (e) { /* ignore */ }
         } catch (e) {
           try {
-            logger.warn('Failed loading active_spawns chunk', { error: e && (e.stack || e) });
+            logger.warn('Failed cleaning active_spawns chunk', { error: e && (e.stack || e) });
           } catch (le) {
             try {
-              logger && logger.warn && logger.warn('Failed logging active_spawns load error', { error: le && (le.stack || le) });
+              logger && logger.warn && logger.warn('Failed logging active_spawns cleanup error', { error: le && (le.stack || le) });
             } catch (lle) {
-              fallbackLogger && fallbackLogger.warn && fallbackLogger.warn('Failed logging active_spawns load error fallback', lle && (lle.stack || lle));
+              fallbackLogger && fallbackLogger.warn && fallbackLogger.warn('Failed logging active_spawns cleanup error fallback', lle && (lle.stack || lle));
             }
           }
         }
