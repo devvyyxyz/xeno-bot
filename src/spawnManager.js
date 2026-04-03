@@ -58,6 +58,9 @@ let nextSpawnAt = new Map();
 let inProgress = new Set();
 // lastSpawnAt: guildId -> timestamp of last completed spawn, used to suppress near-duplicate spawns
 let lastSpawnAt = new Map();
+// uncaughtEggTimeout: guildId -> timeout ID for cleaning up uncaught eggs after 30 minutes
+const uncaughtEggTimeout = new Map();
+const UNCAUGHT_EGG_TIMEOUT_MS = Number(process.env.UNCAUGHT_EGG_TIMEOUT_MS) || 30 * 60 * 1000;
 // failureTracker: guildId -> { count, lastFailTime } to implement exponential backoff
 const failureTracker = new Map();
 // guildSendMode: guildId -> 'v2' | 'legacy' to avoid repeated V2 failures on unsupported channels
@@ -83,6 +86,7 @@ const WARN_COOLDOWN_TTL = Number(process.env.SPAWN_WARN_COOLDOWN_TTL_MS) || 24 *
 const WORKER_ID = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
 const SPAWN_JOB_CLAIM_LIMIT = Number(process.env.SPAWN_JOB_CLAIM_LIMIT) || 50;
 const SPAWN_JOB_STALE_MS = Number(process.env.SPAWN_JOB_STALE_MS) || 5 * 60 * 1000;
+const LAST_SPAWN_AT_TTL = Number(process.env.LAST_SPAWN_AT_TTL_MS) || 60 * 60 * 1000; // 1 hour
 
 async function upsertSpawnJob(guildId, scheduledAt) {
   try {
@@ -251,19 +255,29 @@ async function spawnPollerTick() {
 function spawnCleanupTick() {
   try {
     const now = Date.now();
+    // Clean expired failure tracker entries
     for (const [gid, tracker] of failureTracker.entries()) {
       if (!tracker || !tracker.lastFailTime) continue;
       if (now - tracker.lastFailTime > FAILURE_TRACKER_TTL) failureTracker.delete(gid);
     }
+    // Clean expired warn cooldown entries
     for (const [k, ts] of warnCooldowns.entries()) {
       if (now - ts > WARN_COOLDOWN_TTL) warnCooldowns.delete(k);
     }
+    // Clean lastSpawnAt entries older than 1 hour to prevent unbounded growth
+    for (const [gid, ts] of lastSpawnAt.entries()) {
+      if (now - ts > LAST_SPAWN_AT_TTL) lastSpawnAt.delete(gid);
+    }
+    // Clean guild-specific maps when guild leaves shard
     if (shardGuildSet && shardGuildSet.size > 0) {
       for (const gid of Array.from(guildSendMode.keys())) {
         if (!shardGuildSet.has(String(gid))) guildSendMode.delete(gid);
       }
       for (const gid of Array.from(nextSpawnAt.keys())) {
         if (!shardGuildSet.has(String(gid))) nextSpawnAt.delete(gid);
+      }
+      for (const gid of Array.from(lastSpawnAt.keys())) {
+        if (!shardGuildSet.has(String(gid))) lastSpawnAt.delete(gid);
       }
     }
     for (const gid of Array.from(enqueuedSet)) {
@@ -300,6 +314,11 @@ function stopPoller() {
     clearInterval(spawnCleanupInterval);
     spawnCleanupInterval = null;
   }
+  // Clear all pending uncaught egg timeouts
+  for (const timeoutId of uncaughtEggTimeout.values()) {
+    clearTimeout(timeoutId);
+  }
+  uncaughtEggTimeout.clear();
 }
 
 function enqueueSpawn(guildId, forcedEggTypeId, isForced = false) {
@@ -325,7 +344,14 @@ function processSpawnQueue() {
     activeSpawnWorkers += 1;
     doSpawn(task.guildId, task.forcedEggTypeId, task.isForced)
       .then((result) => task.resolve(result))
-      .catch((err) => task.reject(err))
+      .catch((err) => {
+        task.reject(err);
+        // Clean up state on error to prevent stuck spawns
+        try {
+          inProgress.delete(task.guildId);
+          enqueuedSet.delete(task.guildId);
+        } catch (_) { /* ignore */ }
+      })
       .finally(() => {
         activeSpawnWorkers -= 1;
         if (spawnQueue.length > 0) processSpawnQueue();
@@ -934,15 +960,18 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
         if (stats.size <= maxSize) {
           // Use preloaded buffer when available to avoid allocating a new large Buffer each spawn
           try {
-            const buf = spawnImageBuffer || fs.readFileSync(imgPath);
-            logger.debug('Using spawn image buffer for attachment', { guildId, bufferSize: buf && buf.length });
-            attachment = { attachment: buf, name: 'egg_spawn.png' };
+            if (!spawnImageBuffer) {
+              spawnImageBuffer = fs.readFileSync(imgPath);
+            }
+            logger.debug('Using spawn image buffer for attachment', { guildId, bufferSize: spawnImageBuffer && spawnImageBuffer.length });
+            attachment = { attachment: spawnImageBuffer, name: 'egg_spawn.png' };
           } catch (readErr) {
             logger.warn('Failed reading spawn image into buffer; skipping attach', {
               guildId,
               error: readErr && (readErr.stack || readErr),
             });
             attachment = null;
+            spawnImageBuffer = null; // clear cache on read failure
           }
         } else {
           logger.warn('Spawn image too large to attach', { guildId, size: stats.size, maxSize });
@@ -990,18 +1019,20 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
         try {
           sent = await channel.send(buildSpawnV2Payload([attachment]));
         } catch (firstErr) {
-          // Attempt fallback: read file into buffer and resend in one message
+          // Attempt fallback: use preloaded buffer and resend in one message
           warnWithCooldown(
             `v2-combined:${guildId}`,
             'Combined V2 text+image initial send failed; retrying with buffer',
             { guildId, error: firstErr && (firstErr.stack || firstErr) },
             5 * 60 * 1000
           );
-            try {
-            const buf = spawnImageBuffer || fs.readFileSync(imgPath);
-            logger.debug('Retrying combined V2 send with buffer fallback', { guildId, bufferSize: buf && buf.length });
+          try {
+            if (!spawnImageBuffer) {
+              spawnImageBuffer = fs.readFileSync(imgPath);
+            }
+            logger.debug('Retrying combined V2 send with buffer fallback', { guildId, bufferSize: spawnImageBuffer && spawnImageBuffer.length });
             sent = await channel.send(
-              buildSpawnV2Payload([{ attachment: buf, name: 'egg_spawn.png' }])
+              buildSpawnV2Payload([{ attachment: spawnImageBuffer, name: 'egg_spawn.png' }])
             );
           } catch (bufErr) {
             // If buffer fallback also fails, rethrow to outer catch to handle V2-only-then-legacy strategy
@@ -1046,8 +1077,10 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
             error: imgErr && (imgErr.stack || imgErr),
           });
           try {
-            const buf = spawnImageBuffer || fs.readFileSync(imgPath);
-            await channel.send({ files: [{ attachment: buf, name: 'egg_spawn.png' }] });
+            if (!spawnImageBuffer) {
+              spawnImageBuffer = fs.readFileSync(imgPath);
+            }
+            await channel.send({ files: [{ attachment: spawnImageBuffer, name: 'egg_spawn.png' }] });
           } catch (imgBufErr) {
             logger.warn('Failed sending spawn image separately (buffer fallback)', {
               guildId,
@@ -1065,6 +1098,31 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
         [sent.id, { messageId: sent.id, channelId: channel.id, spawnedAt, numEggs, eggType }],
       ])
     );
+    // Set a cleanup timeout for uncaught eggs (prevent unbounded growth if users never catch them)
+    if (uncaughtEggTimeout.has(guildId)) {
+      clearTimeout(uncaughtEggTimeout.get(guildId));
+    }
+    const timeoutId = setTimeout(() => {
+      const guildMap = activeEggs.get(guildId);
+      if (guildMap && guildMap.size > 0) {
+        logger.warn('Cleaning up uncaught eggs after timeout', {
+          guildId,
+          messageIds: Array.from(guildMap.keys()),
+          timeoutMs: UNCAUGHT_EGG_TIMEOUT_MS,
+        });
+        activeEggs.delete(guildId);
+        // Try to delete the message if still accessible
+        try {
+          for (const eggEvent of guildMap.values()) {
+            client.channels.fetch(eggEvent.channelId).then((ch) => {
+              ch.messages.fetch(eggEvent.messageId).then((msg) => msg.delete()).catch(() => {});
+            }).catch(() => {});
+          }
+        } catch (_) { /* ignore */ }
+      }
+      uncaughtEggTimeout.delete(guildId);
+    }, UNCAUGHT_EGG_TIMEOUT_MS);
+    uncaughtEggTimeout.set(guildId, timeoutId);
     // persist active spawn so it survives restarts
     try {
       const knex = db.knex;
@@ -1348,6 +1406,11 @@ async function handleMessage(message) {
   if (!activeEggs.has(gid)) {
     if (pendingReschedule.has(gid)) {
       pendingReschedule.delete(gid);
+    }
+    // Clear the uncaught egg timeout since eggs were caught
+    if (uncaughtEggTimeout.has(gid)) {
+      clearTimeout(uncaughtEggTimeout.get(gid));
+      uncaughtEggTimeout.delete(gid);
     }
     // Always schedule the next spawn after an event completes
     try {
