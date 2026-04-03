@@ -13,9 +13,16 @@
     ".vscode/**",
     ".idea/**",
     "coverage/**",
-    ".DS_Store"
+    ".DS_Store",
+    "**/.DS_Store",
+    "src/.DS_Store",
+    "config/.DS_Store",
+    "*.swp",
+    "*.swo",
+    "*~"
   ],
   "ext": "js,json",
   "exec": "node src/index.js",
-  "delay": 1000
+  "delay": 2500,
+  "legacyWatch": true
 }

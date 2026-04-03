@@ -289,6 +289,20 @@ function spawnCleanupTick() {
       const mu = process.memoryUsage();
       const totalActiveEggs = Array.from(activeEggs.values()).reduce((sum, map) => sum + map.size, 0);
       const heapPercent = Math.round((mu.heapUsed / mu.heapTotal) * 100);
+      const channelCacheSize = client && client.channels && client.channels.cache ? client.channels.cache.size : 0;
+      
+      // Aggressive cache cleanup if channel cache grows too large
+      if (channelCacheSize > 100) {
+        try {
+          if (client && client.channels && client.channels.cache) {
+            client.channels.cache.clear();
+            logger.warn('[SPAWN CLEANUP] Cleared oversized channel cache', { 
+              cacheSize: channelCacheSize,
+              heapPercent: `${heapPercent}%`
+            });
+          }
+        } catch (_) { /* ignore */ }
+      }
       
       if (heapPercent > 70) { // Only log when memory is elevated to avoid spam
         logger.warn('[SPAWN CLEANUP] Memory state', {
@@ -300,7 +314,7 @@ function spawnCleanupTick() {
           failureTrackerSize: failureTracker.size,
           warnCooldownsSize: warnCooldowns.size,
           uncaughtEggTimeoutsSize: uncaughtEggTimeout.size,
-          failureTrackerTTLSize: failureTracker.size,
+          channelCacheSize,
           heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 100) / 100,
           heapPercent: `${heapPercent}%`,
         });
@@ -892,6 +906,17 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     forcedEggTypeId,
     nextSpawnPersisted: nextSpawnAt.get(guildId),
   });
+  
+  // Aggressive cache cleanup BEFORE spawn to free memory
+  try {
+    if (client && client.channels && client.channels.cache) {
+      const initialSize = client.channels.cache.size;
+      client.channels.cache.clear();
+      if (initialSize > 0) {
+        logger.debug('Cleared Discord.js channel cache before spawn', { initialSize });
+      }
+    }
+  } catch (_) { /* ignore */ }
   // suppress near-duplicate spawns (e.g., timer firing while a force spawn also triggered)
   try {
     const last = lastSpawnAt.get(guildId) || 0;
@@ -1273,6 +1298,18 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       numEggs,
       eggType: eggType.id,
     });
+    
+    // Aggressive cache cleanup AFTER spawn message is sent to free memory
+    try {
+      if (client && client.channels && client.channels.cache) {
+        const initialSize = client.channels.cache.size;
+        client.channels.cache.clear();
+        if (initialSize > 0) {
+          logger.debug('Cleared Discord.js channel cache after spawn', { initialSize });
+        }
+      }
+    } catch (_) { /* ignore */ }
+    
     logger.info(`doSpawn leaving (${guildName})`, { guildId, messageId: sent.id, spawnedAt });
     try {
       lastSpawnAt.set(guildId, Date.now());
@@ -1348,6 +1385,17 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     scheduleNext(guildId);
     return false;
   } finally {
+    // Aggressive cache cleanup in finally block to ensure it always happens
+    try {
+      if (client && client.channels && client.channels.cache) {
+        const initialSize = client.channels.cache.size;
+        if (initialSize > 0) {
+          client.channels.cache.clear();
+          logger.debug('Cleared Discord.js channel cache in finally block', { initialSize, guildId });
+        }
+      }
+    } catch (_) { /* ignore */ }
+    
     inProgress.delete(guildId);
   }
 }
