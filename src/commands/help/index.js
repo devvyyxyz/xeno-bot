@@ -344,7 +344,7 @@ module.exports = {
     collector.on('collect', async i => {
       try {
         if (i.user.id !== interaction.user.id) {
-          try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', flags: MessageFlags.Ephemeral }, { loggerName: 'command:help' }); } catch (e) { /* ignore */ }
+          try { await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:help' }); } catch (e) { /* ignore */ }
           return;
         }
 
@@ -364,7 +364,7 @@ module.exports = {
           return;
         }
       } catch (err) {
-        try { const formatErrorMessage = require('../../utils/formatErrorMessage'); await safeReply(i, { content: formatErrorMessage('Failed to update help view.', { includeDetails: false }), flags: MessageFlags.Ephemeral }, { loggerName: 'command:help' }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to send failure safeReply in help command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging safeReply failure in help', le && (le.stack || le)); } }
+        try { const formatErrorMessage = require('../../utils/formatErrorMessage'); await safeReply(i, { content: formatErrorMessage('Failed to update help view.', { includeDetails: false }), ephemeral: true }, { loggerName: 'command:help' }); } catch (e) { try { logger && logger.warn && logger.warn('Failed to send failure safeReply in help command', { error: e && (e.stack || e) }); } catch (le) { fallbackLogger.warn('Failed logging safeReply failure in help', le && (le.stack || le)); } }
       }
     });
 
