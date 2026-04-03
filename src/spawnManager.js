@@ -473,6 +473,21 @@ async function init(botClient) {
                 await knex('active_spawns').where({ id: r.id }).del();
                 continue;
               }
+              // Check if egg is too old (more than 2 hours) - delete it immediately instead of restoring
+              const eggAge = Date.now() - Number(r.spawned_at);
+              const MAX_EGG_RESTORE_AGE = 2 * 60 * 60 * 1000; // 2 hours
+              if (eggAge > MAX_EGG_RESTORE_AGE) {
+                try {
+                  await knex('active_spawns').where({ id: r.id }).del();
+                  logger.info('Deleted stale restored active spawn (too old to restore)', {
+                    messageId: r.message_id,
+                    ageHours: Math.round(eggAge / 1000 / 60 / 60),
+                  });
+                } catch (delErr) {
+                  logger.warn('Failed cleaning old active_spawn on restore', { id: r.id, error: delErr && (delErr.stack || delErr) });
+                }
+                continue;
+              }
               const guildMap = activeEggs.get(r.guild_id) || new Map();
               const restoredEggType = eggTypes.find((t) => t.id === r.egg_type) || { id: r.egg_type };
               // store a minimal eggType blob to avoid retaining large config objects
@@ -484,6 +499,32 @@ async function init(botClient) {
                 eggType: { id: restoredEggType.id, name: restoredEggType.name, emoji: restoredEggType.emoji },
               });
               activeEggs.set(r.guild_id, guildMap);
+              // Set cleanup timeout for restored eggs immediately (they need cleanup just like newly spawned eggs)
+              const gid = String(r.guild_id);
+              if (uncaughtEggTimeout.has(gid)) {
+                clearTimeout(uncaughtEggTimeout.get(gid));
+              }
+              const timeoutId = setTimeout(() => {
+                const guildEggs = activeEggs.get(gid);
+                if (guildEggs && guildEggs.size > 0) {
+                  logger.warn('Cleaning up uncaught eggs from restored spawn after timeout', {
+                    guildId: gid,
+                    messageIds: Array.from(guildEggs.keys()),
+                    timeoutMs: UNCAUGHT_EGG_TIMEOUT_MS,
+                  });
+                  activeEggs.delete(gid);
+                  // Try to delete the message if still accessible
+                  try {
+                    for (const eggEvent of guildEggs.values()) {
+                      client.channels.fetch(eggEvent.channelId).then((ch) => {
+                        ch.messages.fetch(eggEvent.messageId).then((msg) => msg.delete()).catch(() => {});
+                      }).catch(() => {});
+                    }
+                  } catch (_) { /* ignore */ }
+                }
+                uncaughtEggTimeout.delete(gid);
+              }, UNCAUGHT_EGG_TIMEOUT_MS);
+              uncaughtEggTimeout.set(gid, timeoutId);
             } catch (e) {
               try {
                 logger.warn('Failed restoring active spawn row', {
@@ -542,11 +583,23 @@ async function init(botClient) {
                 scheduled_at: ts,
                 in_ms: remaining,
               });
-              // If already due, attempt to enqueue now (avoid duplicates)
+              // If already due, attempt to enqueue now (avoid duplicates and don't queue if eggs active)
               if (remaining <= 0) {
                 try {
                   const gidStr = String(row.guild_id);
-                  if (!inProgress.has(gidStr) && !enqueuedSet.has(gidStr) && !(activeEggs.get(gidStr) && activeEggs.get(gidStr).size > 0)) {
+                  const guildEggs = activeEggs.get(gidStr);
+                  const hasActiveEggs = guildEggs && guildEggs.size > 0;
+                  // Prevent queueing if eggs are active or already processing
+                  if (!hasActiveEggs && !inProgress.has(gidStr) && !enqueuedSet.has(gidStr)) {
+                    // Safety check: don't queue if spawn queue is nearly full (prevent memory explosion during init)
+                    if (spawnQueue.length >= maxSpawnQueueDepth * 0.8) {
+                      logger.warn('Spawn queue near capacity during init; skipping enqueue', {
+                        guildId: gidStr,
+                        queueDepth: spawnQueue.length,
+                        maxDepth: maxSpawnQueueDepth,
+                      });
+                      continue;
+                    }
                     enqueuedSet.add(gidStr);
                     enqueueSpawn(gidStr).catch((err) => {
                       enqueuedSet.delete(gidStr);
@@ -598,7 +651,7 @@ async function init(botClient) {
 
     logger.info('Spawn manager initialized', {
       shardGuilds: shardGuildIds.length,
-      configuredGuilds: rows.length,
+      configuredGuilds: totalLoadedGuildRows,
       chunkSize: inChunkSize,
       maxConcurrentSpawns,
     });
