@@ -34,16 +34,8 @@ function buildEvolutionCompleteV2Dm(job, fromRole, toRole) {
 
 async function processDueJobs(client) {
   if (shuttingDown) return 0;
-  // Snapshot memory at start for debugging memory growth during processing
-  try {
-    const mu = process.memoryUsage();
-    logger.info('processDueJobs memory start', {
-      heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
-      rssMb: Math.round((mu.rss / 1024 / 1024) * 10) / 10,
-    });
-  } catch (e) {
-    /* ignore logging errors */
-  }
+  // Log memory at start if diagnostics enabled
+  safeLogMemory(logger, 'processDueJobs memory start');
 
   const now = Date.now();
   const jobs = await db.knex('evolution_queue').where({ status: 'queued' }).andWhere('finishes_at', '<=', now).limit(20);

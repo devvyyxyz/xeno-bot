@@ -29,14 +29,17 @@ function safeJsonParse(value, defaultValue = {}, logger = null) {
 
 /**
  * Safely log process memory usage with consistent formatting.
- * Prevents memory logging from crashing the process or being spammed.
+ * Only logs if ENABLE_MEMORY_DIAGNOSTICS env var is set.
+ * Prevents memory logging from crashing the process or impacting production performance.
  *
  * @param {object} logger - Logger instance
  * @param {string} label - Label for the log entry
  * @param {object} extras - Additional fields to include in the log
- * @returns {object|null} Memory object {heapUsedMb, rssMb} or null if failed
+ * @returns {object|null} Memory object {heapUsedMb, rssMb} or null if disabled/failed
  */
 function safeLogMemory(logger, label, extras = {}) {
+  // Skip logging if diagnostics not enabled
+  if (!process.env.ENABLE_MEMORY_DIAGNOSTICS) return null;
   try {
     if (!logger || typeof logger.info !== 'function') return null;
     const mu = process.memoryUsage();
