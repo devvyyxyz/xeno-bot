@@ -27,6 +27,25 @@ function buildEvolutionCompleteV2Dm(job, fromRole, toRole) {
     new TextDisplayBuilder().setContent(`${getRoleDisplay(fromRole)} [${job.xeno_id}] -> ${getRoleDisplay(toRole)} [${job.xeno_id}]`)
   );
 
+  const originGuildId = String(job.origin_guild_id || '').trim();
+  const originChannelId = String(job.origin_channel_id || '').trim();
+  const originMessageId = String(job.origin_message_id || '').trim();
+  const originGuildName = String(job.origin_guild_name || '').trim();
+  if (originGuildId && originChannelId && originMessageId) {
+    const sourceUrl = `https://discord.com/channels/${originGuildId}/${originChannelId}/${originMessageId}`;
+    container.addActionRowComponents({
+      type: 1,
+      components: [
+        {
+          type: 2,
+          style: 5,
+          label: originGuildName || 'Open source message',
+          url: sourceUrl
+        }
+      ]
+    });
+  }
+
   return {
     components: [container],
     flags: MessageFlags.IsComponentsV2

@@ -538,6 +538,10 @@ async function migrate() {
         table.integer('xeno_id').notNullable();
         table.string('user_id').notNullable();
         table.integer('hive_id').nullable();
+        table.string('origin_guild_id').nullable();
+        table.string('origin_guild_name').nullable();
+        table.string('origin_channel_id').nullable();
+        table.string('origin_message_id').nullable();
         table.string('target_role').notNullable();
         table.bigInteger('started_at').nullable();
         table.bigInteger('finishes_at').notNullable();
@@ -549,6 +553,24 @@ async function migrate() {
       });
       logger.info('Created `evolution_queue` table');
     } else {
+      try {
+        const missingColumns = [];
+        const requiredColumns = ['origin_guild_id', 'origin_guild_name', 'origin_channel_id', 'origin_message_id'];
+        for (const columnName of requiredColumns) {
+          if (!(await knex.schema.hasColumn('evolution_queue', columnName))) missingColumns.push(columnName);
+        }
+        if (missingColumns.length > 0) {
+          await knex.schema.alterTable('evolution_queue', (table) => {
+            if (missingColumns.includes('origin_guild_id')) table.string('origin_guild_id').nullable();
+            if (missingColumns.includes('origin_guild_name')) table.string('origin_guild_name').nullable();
+            if (missingColumns.includes('origin_channel_id')) table.string('origin_channel_id').nullable();
+            if (missingColumns.includes('origin_message_id')) table.string('origin_message_id').nullable();
+          });
+          logger.info('Added origin link columns to `evolution_queue`', { columns: missingColumns });
+        }
+      } catch (err) {
+        logger.warn('Failed ensuring evolution_queue origin link columns', { error: err && (err.stack || err) });
+      }
       logger.info('`evolution_queue` table already exists');
     }
   } catch (err) {

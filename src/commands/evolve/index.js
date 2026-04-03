@@ -553,7 +553,17 @@ module.exports = {
                   lines.push(`Cost: ${jellyEmoji} ${defaults.cost_jelly} royal jelly.${hostPart ? ' ' + hostPart : ''}${itemPart}`);
                   lines.push(`Finishes: <t:${finishTs}:R> (<t:${finishTs}:F>)`);
 
-                  await respond({ components: buildEvolveView({ screen: 'result', message: lines.join('\n\n'), client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                  const startReply = await respond({ components: buildEvolveView({ screen: 'result', message: lines.join('\n\n'), client: interaction.client }), flags: MessageFlags.IsComponentsV2, ephemeral: true });
+                  try {
+                    const originGuildName = interaction.guild?.name || interaction.client?.guilds?.cache?.get(guildId)?.name || null;
+                    await db.knex('evolution_queue').where({ id }).update({
+                      origin_guild_id: String(guildId || ''),
+                      origin_guild_name: originGuildName ? String(originGuildName) : null,
+                      origin_channel_id: interaction.channelId ? String(interaction.channelId) : null,
+                      origin_message_id: startReply && startReply.id ? String(startReply.id) : String(interaction.id || ''),
+                      updated_at: db.knex.fn.now()
+                    });
+                  } catch (_) { /* ignore origin metadata update failures */ }
                 }
               }
             }

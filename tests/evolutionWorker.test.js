@@ -78,6 +78,56 @@ describe('evolutionWorker', () => {
       expect(job.result).toBe('success');
     });
 
+    test('includes a source message link in the completion DM when origin metadata is present', async () => {
+      const knex = dbModule.knex;
+
+      await knex('users').insert({
+        discord_id: 'user-link',
+        data: '{}'
+      });
+
+      const xenoId = await knex('xenomorphs').insert({
+        owner_id: 'user-link',
+        role: 'facehugger',
+        stage: 'facehugger',
+        pathway: 'standard',
+        data: '{}'
+      });
+      const xenoIdVal = Array.isArray(xenoId) ? xenoId[0] : xenoId;
+
+      const now = Date.now();
+      await knex('evolution_queue').insert({
+        user_id: 'user-link',
+        xeno_id: xenoIdVal,
+        target_role: 'runner',
+        finishes_at: now - 1000,
+        status: 'queued',
+        origin_guild_id: 'guild-123',
+        origin_guild_name: 'Aurora Station',
+        origin_channel_id: 'channel-456',
+        origin_message_id: 'message-789'
+      });
+
+      const mockUser = {
+        send: jest.fn().mockResolvedValue(null)
+      };
+      const mockClient = {
+        users: {
+          cache: new Map([['user-link', mockUser]]),
+          fetch: jest.fn().mockResolvedValue(mockUser)
+        }
+      };
+
+      const processed = await evolutionWorker.processDueJobs(mockClient);
+      expect(processed).toBe(1);
+      expect(mockUser.send).toHaveBeenCalledTimes(1);
+
+      const payload = mockUser.send.mock.calls[0][0];
+      const serialized = JSON.stringify(payload);
+      expect(serialized).toContain('Aurora Station');
+      expect(serialized).toContain('https://discord.com/channels/guild-123/channel-456/message-789');
+    });
+
     test('skips jobs not yet due', async () => {
       const knex = dbModule.knex;
 
