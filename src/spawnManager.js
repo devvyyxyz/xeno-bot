@@ -1277,7 +1277,6 @@ async function handleMessage(message) {
 
   // Only the first user to type 'egg' claims all eggs
   const eggEvent = eggsInChannel[0];
-  activeEggs.delete(gid);
   
   // Log egg catch and memory state
   try {
@@ -1306,6 +1305,10 @@ async function handleMessage(message) {
       eggEvent.eggType.id,
       catchTimeMs
     );
+
+    // Consume the active egg only after the reward update succeeds.
+    // This prevents a failed DB write from silently deleting the spawn.
+    activeEggs.delete(gid);
 
     const catchTime = Duration.fromMillis(catchTimeMs)
       .shiftTo('years', 'months', 'days', 'hours', 'minutes', 'seconds')
