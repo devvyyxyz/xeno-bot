@@ -189,6 +189,15 @@ async function spawnPollerTick() {
       }
     }
     
+    if (due.length > 0) {
+      logger.debug('spawnPollerTick checking due spawns', {
+        dueCount: due.length,
+        nextSpawnAtSize: nextSpawnAt.size,
+        inProgressSize: inProgress.size,
+        enqueuedSetSize: enqueuedSet.size,
+      });
+    }
+    
     // Enqueue due spawns (max limit to prevent queue overflow)
     for (const guildId of due) {
       // Clear the scheduled timestamp
@@ -196,7 +205,13 @@ async function spawnPollerTick() {
       
       // Skip if already in progress or queued
       if (inProgress.has(guildId) || enqueuedSet.has(guildId)) {
-        logger.debug('Skipping enqueue: spawn already in progress or queued', { guildId });
+        logger.debug('Skipping enqueue: spawn already in progress or queued', {
+          guildId,
+          inProgress: inProgress.has(guildId),
+          enqueued: enqueuedSet.has(guildId),
+        });
+        // Re-add to nextSpawnAt to retry next tick
+        nextSpawnAt.set(guildId, now + 5000);
         continue;
       }
       
@@ -224,7 +239,6 @@ async function spawnPollerTick() {
       });
       
       enqueuedSet.add(guildId);
-      inProgress.add(guildId);
       
       logger.debug('Enqueued due spawn', {
         guildId,
@@ -1199,6 +1213,16 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
             }).catch(() => {});
           }
         } catch (_) { /* ignore */ }
+        
+        // Schedule next spawn since this one expired without being caught
+        try {
+          scheduleNext(guildId);
+        } catch (e) {
+          logger.warn('Failed scheduling next spawn after uncaught egg timeout', {
+            guildId,
+            error: e && (e.stack || e),
+          });
+        }
       }
       uncaughtEggTimeout.delete(guildId);
     }, UNCAUGHT_EGG_TIMEOUT_MS);
