@@ -1,5 +1,6 @@
 const safeReply = require('../utils/safeReply');
 const { MessageFlags } = require('discord.js');
+const { extractErrorInfo } = require('../lib/safeUtils');
 
 const logger = require('../utils/logger').get('components');
 

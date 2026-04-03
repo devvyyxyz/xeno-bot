@@ -3,6 +3,7 @@ const utils = require('../utils');
 const logger = utils.logger.get('models:hive');
 const { parseJSON } = utils.jsonParse;
 const { insertWithReusedId } = utils.idReuse;
+const { safeJsonParse } = require('../lib/safeUtils');
 
 let _hiveColumnsChecked = false;
 let _hiveHasOwnerColumn = false;
@@ -59,8 +60,7 @@ async function getHiveById(id) {
   try {
     const row = await db.knex('hives').where({ id }).first();
     if (!row) return null;
-    let data = null;
-    try { data = row.data ? JSON.parse(row.data) : null; } catch (e) { logger.warn('Failed parsing hive data JSON', { id, error: e && (e.stack || e) }); }
+    const data = safeJsonParse(row.data, null, logger);
     return {
       id: row.id,
       owner_discord_id: row.owner_discord_id || row.user_id,

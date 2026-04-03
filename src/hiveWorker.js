@@ -5,6 +5,7 @@ const logger = baseLogger.get('hiveWorker');
 const models = require('./models');
 const userModel = models.user;
 const hiveModel = models.hive;
+const { safeJsonParse, safeLogMemory } = require('./lib/safeUtils');
 
 let _interval = null;
 let shuttingDown = false;
@@ -13,13 +14,7 @@ async function processHives() {
   if (shuttingDown) return 0;
   try {
     // Snapshot memory for diagnostics
-    try {
-      const mu = process.memoryUsage();
-      logger.info('processHives memory start', {
-        heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
-        rssMb: Math.round((mu.rss / 1024 / 1024) * 10) / 10,
-      });
-    } catch (e) { /* ignore */ }
+    safeLogMemory(logger, 'processHives memory start');
     const now = Date.now();
     const msPerHour = 3600000;
     // Process hives in chunks using keyset pagination (id > lastId) to avoid
@@ -39,23 +34,13 @@ async function processHives() {
       if (!rows || rows.length === 0) break;
       for (const r of rows) {
       try {
-        // per-row memory debug
-        try {
-          const mu = process.memoryUsage();
-          logger.debug('processHives per-row memory', { rowId: r && r.id, heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10 });
-        } catch (e) { /* ignore */ }
         const hive = r;
         const ownerId = String(hive.user_id || hive.owner_discord_id || '');
         const guildId = hive.guild_id || null;
         const rate = Number(hive.jelly_production_per_hour || 0);
         if (!rate || rate <= 0) continue;
         // determine last_collected timestamp from data JSON
-        let data = null;
-        try {
-          data = hive.data ? JSON.parse(hive.data) : {};
-        } catch (e) {
-          data = {};
-        }
+        const data = safeJsonParse(hive.data, {}, logger);
         const lastCollected =
           Number(data && data.last_collected_at) || Number(hive.created_at) || now;
         const elapsedMs = Math.max(0, now - lastCollected);
@@ -95,19 +80,12 @@ async function processHives() {
       }
       }
       // Advance keyset cursor to the last row processed
-      try {
-        const lastRow = rows[rows.length - 1];
-        lastId = Number(lastRow && lastRow.id) || lastId;
-      } catch (_) { /* ignore */ }
+      const lastRow = rows[rows.length - 1];
+      lastId = Number(lastRow && lastRow.id) || lastId;
       // small pause to give GC/event loop a chance to run between chunks
-      try {
-        await new Promise((res) => setTimeout(res, Number(process.env.HIVE_WORKER_CHUNK_DELAY_MS) || 20));
-      } catch (_) { /* ignore */ }
+      await new Promise((res) => setTimeout(res, Number(process.env.HIVE_WORKER_CHUNK_DELAY_MS) || 20));
     }
-    try {
-      const mu = process.memoryUsage();
-      logger.info('processHives memory end', { heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10 });
-    } catch (e) { /* ignore */ }
+    safeLogMemory(logger, 'processHives memory end');
 
     if (awardedHives.length > 0) {
       const totalHives = awardedHives.length;

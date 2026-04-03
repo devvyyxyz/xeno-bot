@@ -1,6 +1,7 @@
 const db = require('../db');
 const utils = require('../utils');
 const logger = utils.logger.get('evolutionWorker');
+const { safeLogMemory } = require('../lib/safeUtils');
 const { ContainerBuilder, TextDisplayBuilder } = require('@discordjs/builders');
 const { MessageFlags } = require('discord.js');
 const evolutionsCfg = require('../../config/evolutions.json');
@@ -49,14 +50,6 @@ async function processDueJobs(client) {
   if (!jobs || jobs.length === 0) return 0;
   for (const job of jobs) {
     try {
-        // log memory before each job to help locate leaks
-        try {
-          const mu = process.memoryUsage();
-          logger.debug('memory before job', {
-            jobId: job && job.id,
-            heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
-          });
-        } catch (e) { /* ignore */ }
       await db.knex('evolution_queue').where({ id: job.id }).update({ status: 'processing', updated_at: db.knex.fn.now() });
       const success = true;
       if (success) {
@@ -134,13 +127,7 @@ async function processDueJobs(client) {
       logger.error('Failed processing evolution job', { job, error: e && (e.stack || e) });
     }
   }
-    try {
-      const mu = process.memoryUsage();
-      logger.info('processDueJobs memory end', {
-        heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
-        rssMb: Math.round((mu.rss / 1024 / 1024) * 10) / 10,
-      });
-    } catch (e) { /* ignore */ }
+  safeLogMemory(logger, 'processDueJobs memory end');
   return jobs.length;
 }
 
