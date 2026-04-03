@@ -86,21 +86,62 @@ const WARN_COOLDOWN_TTL = Number(process.env.SPAWN_WARN_COOLDOWN_TTL_MS) || 24 *
 const WORKER_ID = `${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
 const SPAWN_JOB_CLAIM_LIMIT = Number(process.env.SPAWN_JOB_CLAIM_LIMIT) || 50;
 const SPAWN_JOB_STALE_MS = Number(process.env.SPAWN_JOB_STALE_MS) || 5 * 60 * 1000;
-const LAST_SPAWN_AT_TTL = Number(process.env.LAST_SPAWN_AT_TTL_MS) || 60 * 60 * 1000; // 1 hour
+const LAST_SPAWN_AT_TTL = Number(process.env.LAST_SPAWN_AT_TTL_MS) || 60 * 60 * 1000;
+const DB_OPERATION_TIMEOUT_MS = Number(process.env.DB_OP_TIMEOUT_MS) || 8000;
+const UPSERT_SPAWN_JOB_FAILURE_RETRIES = Number(process.env.UPSERT_JOB_RETRIES) || 3;
+
+const dbOpFailures = new Map();
+const dbOpDisabled = new Set();
+
+async function executeDbWithTimeout(operation, operationName = 'dbOp') {
+  return Promise.race([
+    operation(),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('DB operation timeout: ' + operationName)), DB_OPERATION_TIMEOUT_MS)
+    ),
+  ]);
+}
 
 async function upsertSpawnJob(guildId, scheduledAt) {
+  const opName = 'upsertSpawnJob';
+  if (dbOpDisabled.has(opName)) {
+    try {
+      logger && logger.debug && logger.debug('Skipping spawn_jobs upsert (disabled due to repeated failures)', { guildId });
+    } catch (_) {}
+    return;
+  }
+
   try {
     const knex = db.knex;
-    // Use ON CONFLICT / ON DUPLICATE KEY UPDATE via knex onConflict().merge()
-    await knex('spawn_jobs')
-      .insert({ guild_id: String(guildId), scheduled_at: Number(scheduledAt) })
-      .onConflict('guild_id')
-      .merge({ scheduled_at: Number(scheduledAt), updated_at: knex.fn.now() });
+    await executeDbWithTimeout(
+      () => knex('spawn_jobs')
+        .insert({ guild_id: String(guildId), scheduled_at: Number(scheduledAt) })
+        .onConflict('guild_id')
+        .merge({ scheduled_at: Number(scheduledAt), updated_at: knex.fn.now() }),
+      opName
+    );
+    dbOpFailures.delete(opName);
   } catch (e) {
-    // If table missing or DB error, log and continue gracefully
-    try {
-      logger && logger.warn && logger.warn('Failed upserting spawn_jobs row', { guildId, scheduledAt, error: e && (e.stack || e) });
-    } catch (_) {}
+    const failCount = (dbOpFailures.get(opName) || 0) + 1;
+    dbOpFailures.set(opName, failCount);
+    
+    if (failCount >= UPSERT_SPAWN_JOB_FAILURE_RETRIES) {
+      logger && logger.warn && logger.warn('Disabling spawn_jobs upserts after repeated failures', {
+        guildId,
+        failureCount: failCount,
+        threshold: UPSERT_SPAWN_JOB_FAILURE_RETRIES,
+      });
+      dbOpDisabled.add(opName);
+    } else {
+      try {
+        logger && logger.warn && logger.warn('Failed upserting spawn_jobs row', {
+          guildId,
+          scheduledAt,
+          failureCount: failCount,
+          error: e && (e.stack || e),
+        });
+      } catch (_) {}
+    }
   }
 }
 
@@ -183,17 +224,38 @@ function isPermissionError(error) {
 async function spawnPollerTick() {
   if (shuttingDown) return;
   try {
+    // Skip DB polling if memory is critically high to prevent further accumulation
+    try {
+      const mu = process.memoryUsage();
+      const heapPercent = Math.round((mu.heapUsed / mu.heapTotal) * 100);
+      if (heapPercent > 90) {
+        logger.warn('Skipping spawnPoller due to critically high memory', { heapPercent });
+        return;
+      }
+    } catch (_) { /* ignore */ }
+    
     const knex = db.knex;
     const now = Date.now();
-    const windowEnd = now + SPAWN_POLL_MS + 1000; // small buffer
+    const windowEnd = now + SPAWN_POLL_MS + 1000;
 
     const guildIds = Array.from(shardGuildSet);
     if (!guildIds || guildIds.length === 0) return;
     const chunks = chunkArray(guildIds, SPAWN_POLL_DB_LIMIT || 200);
+    
+    // Skip DB polling if spawn_jobs upserts are disabled (connection pool likely exhausted)
+    const opName = 'upsertSpawnJob';
+    if (dbOpDisabled.has(opName)) {
+      try {
+        logger && logger.debug && logger.debug('Skipping spawnPoller DB claim (spawn_jobs disabled)', {});
+      } catch (_) {}
+      return;
+    }
+    
     for (const chunk of chunks) {
       try {
         // Claim due spawn_jobs using a transaction and SKIP LOCKED to avoid races
-        await knex.transaction(async (trx) => {
+        await executeDbWithTimeout(
+          () => knex.transaction(async (trx) => {
           const staleThreshold = Date.now() - SPAWN_JOB_STALE_MS;
           const rows = await trx
             .select('id', 'guild_id', 'scheduled_at')
@@ -241,7 +303,9 @@ async function spawnPollerTick() {
               logger.warn('spawnPoller: error enqueueing claimed job', { row: r, error: inner && (inner.stack || inner) });
             }
           }
-        });
+          }),
+          'spawnPollerTick'
+        );
       } catch (e) {
         logger.warn('spawnPoller DB claim failed', { error: e && (e.stack || e) });
         continue;
@@ -383,7 +447,6 @@ function processSpawnQueue() {
       .then((result) => task.resolve(result))
       .catch((err) => {
         task.reject(err);
-        // Clean up state on error to prevent stuck spawns
         try {
           inProgress.delete(task.guildId);
           enqueuedSet.delete(task.guildId);
@@ -391,9 +454,13 @@ function processSpawnQueue() {
       })
       .finally(() => {
         activeSpawnWorkers -= 1;
-        if (spawnQueue.length > 0) processSpawnQueue();
+        // Small delay to prevent rapid queue processing during cascading failures
+        if (spawnQueue.length > 0) {
+          setImmediate(() => processSpawnQueue());
+        }
       });
   }
+}
 }
 
 async function init(botClient) {
@@ -1308,7 +1375,25 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
           logger.debug('Cleared Discord.js channel cache after spawn', { initialSize });
         }
       }
+      // Also clear message caches to prevent accumulation
+      if (client && client.channels && client.channels.cache) {
+        for (const ch of client.channels.cache.values()) {
+          try {
+            if (ch.messages && ch.messages.cache) {
+              const msgSize = ch.messages.cache.size;
+              if (msgSize > 0) ch.messages.cache.clear();
+            }
+          } catch (_) { /* ignore */ }
+        }
+      }
     } catch (_) { /* ignore */ }
+    
+    // Force garbage collection to reduce memory fragmentation
+    if (global.gc) {
+      try {
+        global.gc();
+      } catch (_) { /* ignore */ }
+    }
     
     logger.info(`doSpawn leaving (${guildName})`, { guildId, messageId: sent.id, spawnedAt });
     try {
