@@ -541,8 +541,7 @@ function processSpawnQueue() {
 
 async function init(botClient) {
   client = botClient;
-  const attachDirectListener = String(process.env.SPAWN_ATTACH_DIRECT_MESSAGE_LISTENER || 'true').toLowerCase() !== 'false';
-  if (attachDirectListener && !directMessageListenerAttached && client && typeof client.on === 'function') {
+  if (!directMessageListenerAttached && client && typeof client.on === 'function') {
     client.on('messageCreate', async (message) => {
       try {
         if (!message || !message.guild || !message.author || message.author.bot) return;
@@ -557,11 +556,6 @@ async function init(botClient) {
     });
     directMessageListenerAttached = true;
     logger.info('Attached direct spawn messageCreate listener');
-  } else if (!attachDirectListener) {
-    logger.info('Direct spawn messageCreate listener disabled by env override', {
-      env: 'SPAWN_ATTACH_DIRECT_MESSAGE_LISTENER',
-      enabled: false,
-    });
   }
   // start schedules for guilds that belong to this shard
   try {
