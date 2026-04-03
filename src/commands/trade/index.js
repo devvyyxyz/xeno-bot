@@ -57,6 +57,41 @@ function formatOffer(offer) {
   }
 }
 
+function countOfferUnits(offer) {
+  const o = offer || {};
+  let total = 0;
+  total += Object.values(o.eggs || {}).reduce((s, v) => s + Number(v || 0), 0);
+  total += Object.values(o.items || {}).reduce((s, v) => s + Number(v || 0), 0);
+  total += (o.hosts || []).length;
+  total += (o.xenos || []).length;
+  return total;
+}
+
+function summarizeOffer(offer) {
+  const o = offer || {};
+  const eggCount = Object.values(o.eggs || {}).reduce((s, v) => s + Number(v || 0), 0);
+  const itemCount = Object.values(o.items || {}).reduce((s, v) => s + Number(v || 0), 0);
+  const hostCount = (o.hosts || []).length;
+  const xenoCount = (o.xenos || []).length;
+  const total = eggCount + itemCount + hostCount + xenoCount;
+  if (!total) return 'None';
+  const parts = [];
+  if (eggCount) parts.push(`Eggs ${eggCount}`);
+  if (itemCount) parts.push(`Items ${itemCount}`);
+  if (hostCount) parts.push(`Hosts ${hostCount}`);
+  if (xenoCount) parts.push(`Xenos ${xenoCount}`);
+  return `${parts.join(' | ')} (Total ${total})`;
+}
+
+function buildTransferPreview(initiatorOffer, recipientOffer, initiatorId, recipientId) {
+  const initiatorTag = `<@${initiatorId}>`;
+  const recipientTag = `<@${recipientId}>`;
+  return [
+    `${recipientTag} receives: ${summarizeOffer(initiatorOffer)}`,
+    `${initiatorTag} receives: ${summarizeOffer(recipientOffer)}`
+  ].join('\n');
+}
+
 module.exports = {
   name: cmd.name,
   description: cmd.description,
@@ -164,7 +199,12 @@ module.exports = {
         const recipient = interaction.options.getUser('user');
         if (!recipient) { await safeReply(interaction, { content: 'Recipient required.', ephemeral: true }); return; }
         if (recipient.id === userId) { await safeReply(interaction, { content: 'You cannot offer to yourself.', ephemeral: true }); return; }
-        if (recipient.bot) { await safeReply(interaction, { content: 'You cannot offer to a bot.', ephemeral: true }); return; }
+        const botUserId = interaction?.client?.user?.id ? String(interaction.client.user.id) : null;
+        const isTradeWithXenoBot = !!botUserId && String(recipient.id) === botUserId;
+        if (recipient.bot && !isTradeWithXenoBot) {
+          await safeReply(interaction, { content: 'You can only trade with players or XenoBot itself.', ephemeral: true });
+          return;
+        }
         const amount = interaction.options.getInteger('amount') || 1;
         const eggType = interaction.options.getString('egg_type');
         const itemId = interaction.options.getString('item_id');
@@ -196,18 +236,47 @@ module.exports = {
         }
 
         const tradeRow = await tradesUtil.createTrade(userId, recipient.id, guildId, offer);
+
+        if (isTradeWithXenoBot) {
+          const botOffer = tradesUtil.emptyOffer();
+          await tradesUtil.updateTrade(tradeRow.id, { recipient_offer: JSON.stringify(botOffer) });
+          const applied = await tradesUtil.applyTrade(await tradesUtil.getTradeById(tradeRow.id));
+          if (!applied.success) {
+            await safeReply(interaction, { content: `Failed to auto-complete bot trade: ${applied.error || 'Unknown error'}`, ephemeral: true }, { loggerName: 'command:trade' });
+            return;
+          }
+
+          await safeReply(interaction, buildStatsV2Payload({
+            title: '🤖 Bot Trade Completed',
+            rows: [
+              { label: 'From', value: String(interaction.user) },
+              { label: 'To', value: String(recipient) },
+              { label: 'Your Offer', value: formatOffer(offer) },
+              { label: 'XenoBot Offer', value: 'None (always)' },
+              { label: 'Trade ID', value: String(tradeRow.id) }
+            ],
+            footer: 'XenoBot always accepts and offers nothing',
+            client: interaction.client
+          }), { loggerName: 'command:trade' });
+          logger.info('Bot trade auto-accepted', { id: tradeRow.id, from: userId, to: recipient.id, guildId });
+          return;
+        }
+
         const componentsService = require('../../services/components');
         // Try to build a V2 container with action row buttons if builders are available
         const supportBuilders = (() => {
           try { const { ButtonBuilder } = require('discord.js'); return typeof ButtonBuilder === 'function'; } catch (_) { return false; }
         })();
 
+        const recipientOffer = tradesUtil.emptyOffer();
         let payload = buildStatsV2Payload({
           title: '🔖 Trade Offered',
           rows: [
             { label: 'From', value: String(interaction.user) },
             { label: 'To', value: String(recipient) },
-            { label: 'Offer', value: formatOffer(offer) },
+            { label: 'Initiator Offer', value: formatOffer(offer) },
+            { label: 'Recipient Offer', value: 'None yet (recipient can use /trade edit)' },
+            { label: 'Quick Summary', value: buildTransferPreview(offer, recipientOffer, userId, recipient.id) },
             { label: 'Trade ID', value: String(tradeRow.id) }
           ],
           footer: 'Recipient must accept to complete trade',
@@ -329,19 +398,17 @@ module.exports = {
         let recipientOffer = tradeRow.recipient_offer ? JSON.parse(tradeRow.recipient_offer) : tradesUtil.emptyOffer();
 
         // Basic unbalanced check: compare count of objects
-        const countOffer = (o) => {
-          let c = 0;
-          c += Object.values(o.eggs || {}).reduce((s, v) => s + Number(v || 0), 0);
-          c += Object.values(o.items || {}).reduce((s, v) => s + Number(v || 0), 0);
-          c += (o.hosts || []).length;
-          c += (o.xenos || []).length;
-          return c;
-        };
         const initiatorOffer = tradeRow.initiator_offer ? JSON.parse(tradeRow.initiator_offer) : tradesUtil.emptyOffer();
-        const aCount = countOffer(initiatorOffer);
-        const bCount = countOffer(recipientOffer);
+        const aCount = countOfferUnits(initiatorOffer);
+        const bCount = countOfferUnits(recipientOffer);
         if (aCount !== bCount && !confirm) {
-          await safeReply(interaction, { content: `This trade appears unbalanced (initiator offers ${aCount} objects, you offer ${bCount}). Re-run with \`confirm=true\` to accept anyway.`, ephemeral: true }, { loggerName: 'command:trade' });
+          await safeReply(interaction, {
+            content: [
+              `This trade appears unbalanced (initiator offers ${aCount} units, you offer ${bCount}).`,
+              buildTransferPreview(initiatorOffer, recipientOffer, tradeRow.initiator_id, tradeRow.recipient_id),
+              'Re-run with `confirm=true` to accept anyway.'
+            ].join('\n')
+          }, { loggerName: 'command:trade' });
           return;
         }
 
@@ -414,6 +481,7 @@ module.exports = {
               { label: 'To', value: String(`<@${tradeRow.recipient_id}>`) },
               { label: 'Initiator Offer', value: formatOffer(newInitiatorOffer) },
               { label: 'Recipient Offer', value: formatOffer(newRecipientOffer) },
+              { label: 'Quick Summary', value: buildTransferPreview(newInitiatorOffer, newRecipientOffer, tradeRow.initiator_id, tradeRow.recipient_id) },
               { label: 'Trade ID', value: String(tradeRow.id) }
             ],
             footer: 'Recipient must accept to complete trade',
