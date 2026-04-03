@@ -54,9 +54,13 @@ let timerMonitorInterval = null;
 
 // Max age for legacy timers (longer than the longest hatch duration of 7 days, with buffer)
 const LEGACY_TIMER_MAX_AGE_MS = Number(process.env.HATCH_TIMER_MAX_AGE_MS) || 8 * 24 * 60 * 60 * 1000; // 8 days
+const HATCH_INIT_CHUNK_SIZE = Number(process.env.HATCH_INIT_CHUNK_SIZE) || 200;
+const HATCH_INIT_CHUNK_DELAY_MS = Number(process.env.HATCH_INIT_CHUNK_DELAY_MS) || 20;
 
 async function init(botClient) {
   client = botClient || null;
+  let restoredHatches = 0;
+  let skippedExpired = 0;
   try {
     const mu = process.memoryUsage();
     logger.info('hatchManager.init memory start', { heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10 });
@@ -85,30 +89,70 @@ async function init(botClient) {
       }
     }
 
-    const rows = await db.knex('hatches').where({ collected: false }).select('*');
-    for (const r of rows) {
+    let lastId = 0;
+    while (!shuttingDown) {
+      const rows = await db.knex('hatches')
+        .where({ collected: false })
+        .andWhere('id', '>', lastId)
+        .select('id', 'discord_id', 'guild_id', 'egg_type', 'started_at', 'finishes_at', 'skipped')
+        .orderBy('id', 'asc')
+        .limit(HATCH_INIT_CHUNK_SIZE);
+
+      if (!rows || rows.length === 0) break;
+
       const now = Date.now();
-      const finishes = Number(r.finishes_at) || now;
-      if (finishes <= now) {
-        continue;
+      for (const r of rows) {
+        lastId = Number(r.id) || lastId;
+        const finishes = Number(r.finishes_at) || now;
+        if (finishes <= now) {
+          skippedExpired += 1;
+          continue;
+        }
+
+        const delay = finishes - now;
+        try {
+          await scheduleTimer(r.id, delay);
+          restoredHatches += 1;
+          const guildName = getGuildName(r.guild_id);
+          logger.debug(`Restored hatch timer (${guildName})`, {
+            id: r.id,
+            discord_id: r.discord_id,
+            guild_id: r.guild_id,
+            in_ms: delay,
+          });
+        } catch (sErr) {
+          logger.warn('Failed scheduling hatch via queue; using timer fallback', {
+            hatchId: r.id,
+            error: sErr && (sErr.stack || sErr),
+          });
+          scheduleTimer(r.id, delay).catch(() => {});
+          restoredHatches += 1;
+        }
       }
-      const delay = finishes - now;
-      // schedule using bull queue when available; falls back to timer
+
       try {
-        await scheduleTimer(r.id, delay);
-        const guildName = getGuildName(r.guild_id);
-        logger.debug(`Restored hatch timer (${guildName})`, { id: r.id, discord_id: r.discord_id, guild_id: r.guild_id, in_ms: delay });
-      } catch (sErr) {
-        logger.warn('Failed scheduling hatch via queue; using timer fallback', { hatchId: r.id, error: sErr && (sErr.stack || sErr) });
-        scheduleTimer(r.id, delay).catch(() => {});
-      }
+        const muChunk = process.memoryUsage();
+        logger.info('hatchManager.init chunk complete', {
+          heapUsedMb: Math.round((muChunk.heapUsed / 1024 / 1024) * 10) / 10,
+          restoredHatches,
+          skippedExpired,
+          lastId,
+        });
+      } catch (e) { /* ignore */ }
+
+      if (rows.length < HATCH_INIT_CHUNK_SIZE) break;
+      await new Promise((res) => setTimeout(res, HATCH_INIT_CHUNK_DELAY_MS));
     }
   } catch (e) {
     logger.error('Failed initializing hatch manager', { error: e && (e.stack || e) });
   }
   try {
     const mu = process.memoryUsage();
-    logger.info('hatchManager.init memory end', { heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10, restoredHatches: (rows && rows.length) || 0 });
+    logger.info('hatchManager.init memory end', {
+      heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
+      restoredHatches,
+      skippedExpired,
+    });
   } catch (e) { /* ignore */ }
   try {
     utils.systemMonitor.registerSystem('hatchManager', { name: 'Hatch Manager', shutdown: shutdown });

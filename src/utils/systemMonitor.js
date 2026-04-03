@@ -11,6 +11,7 @@ const systems = {};
 const SHUTDOWN_HOOK_TIMEOUT_MS = Number(process.env.SHUTDOWN_HOOK_TIMEOUT_MS) || 5000;
 const PERSIST_PATH = path.join(__dirname, '..', '..', 'data', 'system-monitor.json');
 let statusUpdateTimer = null;
+let statusUpdateInFlight = null;
 
 // Load persisted state (statusMessageId) early so restarts reuse the same message
 loadPersist();
@@ -184,6 +185,8 @@ async function createStatusMessage(channel) {
 }
 
 async function updateStatusMessage() {
+  if (statusUpdateInFlight) return statusUpdateInFlight;
+  statusUpdateInFlight = (async () => {
   try {
     const ctx = await ensureChannelAndMessage();
     if (!ctx || !ctx.channel) return;
@@ -223,12 +226,17 @@ async function updateStatusMessage() {
   } catch (e) {
     logger.warn('updateStatusMessage failed', { error: e && (e.stack || e) });
   }
+  })().finally(() => {
+    statusUpdateInFlight = null;
+  });
+
+  return statusUpdateInFlight;
 }
 
 function registerSystem(key, opts = {}) {
   const { name = key, shutdown = null } = opts;
   systems[key] = { name, status: 'up', reason: null, shutdown };
-  updateStatusMessage();
+  setImmediate(() => updateStatusMessage().catch(() => {}));
 }
 
 async function markDown(key, reason) {
@@ -267,7 +275,7 @@ function markUp(key) {
   if (!systems[key]) systems[key] = { name: key, status: 'up', reason: null, shutdown: null };
   systems[key].status = 'up';
   systems[key].reason = null;
-  updateStatusMessage();
+  setImmediate(() => updateStatusMessage().catch(() => {}));
 }
 
 async function markAllDown(reason) {
