@@ -204,18 +204,6 @@ function spawnCleanupTick() {
       for (const gid of Array.from(lastSpawnAt.keys())) {
         if (!shardGuildSet.has(String(gid))) lastSpawnAt.delete(gid);
       }
-      // Clean activeEggs when guild leaves shard to prevent memory leak
-      for (const gid of Array.from(activeEggs.keys())) {
-        if (!shardGuildSet.has(String(gid))) activeEggs.delete(gid);
-      }
-      // Clean uncaughtEggTimeout when guild leaves shard
-      for (const gid of Array.from(uncaughtEggTimeout.keys())) {
-        if (!shardGuildSet.has(String(gid))) {
-          const timeoutId = uncaughtEggTimeout.get(gid);
-          if (timeoutId) clearTimeout(timeoutId);
-          uncaughtEggTimeout.delete(gid);
-        }
-      }
     }
     for (const gid of Array.from(enqueuedSet)) {
       if (shardGuildSet && shardGuildSet.size > 0 && !shardGuildSet.has(String(gid))) enqueuedSet.delete(gid);
@@ -1723,55 +1711,4 @@ async function shutdown() {
   }
 }
 
-// Clean up guild-specific state when a guild is deleted
-async function cleanupGuild(guildId) {
-  const gid = String(guildId);
-  try {
-    // Clear activeEggs for this guild
-    if (activeEggs.has(gid)) {
-      activeEggs.delete(gid);
-    }
-    
-    // Clear any pending spawn timing data
-    if (nextSpawnAt.has(gid)) {
-      nextSpawnAt.delete(gid);
-    }
-    
-    // Clear last spawn timing data
-    if (lastSpawnAt.has(gid)) {
-      lastSpawnAt.delete(gid);
-    }
-    
-    // Clear failure tracking for this guild
-    if (failureTracker.has(gid)) {
-      failureTracker.delete(gid);
-    }
-    
-    // Clear send mode cache for this guild
-    if (guildSendMode.has(gid)) {
-      guildSendMode.delete(gid);
-    }
-    
-    // Clear uncaught egg timeout and cancel the timeout
-    if (uncaughtEggTimeout.has(gid)) {
-      const timeoutId = uncaughtEggTimeout.get(gid);
-      if (timeoutId) {
-        try { clearTimeout(timeoutId); } catch (_) { /* ignore */ }
-      }
-      uncaughtEggTimeout.delete(gid);
-    }
-    
-    // Remove from enqueued set
-    enqueuedSet.delete(gid);
-    
-    // Remove from in-progress set
-    inProgress.delete(gid);
-    
-    logger.info('cleanupGuild: removed all state for guild', { guildId: gid });
-  } catch (e) {
-    logger.warn('cleanupGuild error', { guildId: gid, error: e && (e.stack || e) });
-  }
-}
-
 module.exports.shutdown = shutdown;
-module.exports.cleanupGuild = cleanupGuild;
