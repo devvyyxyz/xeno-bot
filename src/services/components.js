@@ -105,6 +105,25 @@ async function updateInteraction(interaction, payload = {}) {
         // If editing the underlying message isn't possible, fall through to safeReply
       }
     }
+
+    // Support command interactions that expose editReply but not update/edit.
+    if (interaction && typeof interaction.editReply === 'function') {
+      try {
+        const editReplyPayload = Object.assign({}, p);
+        delete editReplyPayload.flags;
+        delete editReplyPayload.ephemeral;
+        return await interaction.editReply(editReplyPayload);
+      } catch (editReplyErr) {
+        try {
+          logger && logger.warn && logger.warn('components: interaction.editReply failed', {
+            error: editReplyErr && (editReplyErr.stack || editReplyErr),
+            payloadSummary: (p && p.components) ? `components:${p.components.length}` : (p && p.content) ? String(p.content).slice(0,200) : null,
+            interaction: dumpInteractionState(interaction)
+          });
+        } catch (_) { /* ignore */ }
+      }
+    }
+
     // Do not fall back to sending new messages. If we cannot update or edit
     // the original message, log and return null so callers know nothing changed.
     try { logger && logger.warn && logger.warn('components: unable to update or edit interaction; skipping send/followup', { interaction: dumpInteractionState(interaction), payloadSummary: (p && p.components) ? `components:${p.components.length}` : (p && p.content) ? String(p.content).slice(0,200) : null }); } catch (_) { /* ignore */ }
