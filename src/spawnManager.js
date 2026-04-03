@@ -175,12 +175,70 @@ function isPermissionError(error) {
   return false;
 }
 
-// Central poller: query DB for due next_spawn_at rows and enqueue spawns.
+// Central poller: check in-memory nextSpawnAt for due spawns and enqueue them.
 async function spawnPollerTick() {
   if (shuttingDown) return;
-  // DISABLED: spawn_jobs polling to prevent connection pool exhaustion
-  // In-memory nextSpawnAt Map is used for all spawn scheduling instead
-  return;
+  try {
+    const now = Date.now();
+    const due = [];
+    
+    // Find all guilds with spawns due now
+    for (const [guildId, scheduledAt] of nextSpawnAt.entries()) {
+      if (scheduledAt && scheduledAt <= now) {
+        due.push(guildId);
+      }
+    }
+    
+    // Enqueue due spawns (max limit to prevent queue overflow)
+    for (const guildId of due) {
+      // Clear the scheduled timestamp
+      nextSpawnAt.delete(guildId);
+      
+      // Skip if already in progress or queued
+      if (inProgress.has(guildId) || enqueuedSet.has(guildId)) {
+        logger.debug('Skipping enqueue: spawn already in progress or queued', { guildId });
+        continue;
+      }
+      
+      // Check spawn queue depth to prevent unbounded growth
+      if (spawnQueue.length >= maxSpawnQueueDepth) {
+        logger.warn('Spawn queue at capacity; dropping enqueue attempt', {
+          guildId,
+          queueDepth: spawnQueue.length,
+          maxDepth: maxSpawnQueueDepth,
+        });
+        // Re-schedule this spawn (will be re-enqueued next poll tick)
+        nextSpawnAt.set(guildId, now + 5000);
+        continue;
+      }
+      
+      // Enqueue the spawn task
+      const promise = new Promise((resolve, reject) => {
+        spawnQueue.push({
+          guildId,
+          forcedEggTypeId: null,
+          isForced: false,
+          resolve,
+          reject,
+        });
+      });
+      
+      enqueuedSet.add(guildId);
+      inProgress.add(guildId);
+      
+      logger.debug('Enqueued due spawn', {
+        guildId,
+        queueDepth: spawnQueue.length,
+      });
+    }
+    
+    // Process the queue
+    if (spawnQueue.length > 0) {
+      processSpawnQueue();
+    }
+  } catch (e) {
+    logger.warn('spawnPollerTick error', { error: e && (e.stack || e) });
+  }
 }
 
 function spawnCleanupTick() {
