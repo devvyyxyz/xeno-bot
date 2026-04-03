@@ -1605,7 +1605,8 @@ async function handleMessage(message) {
     await message.channel.send(
       `${message.author} caught ${eggEvent.numEggs} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${eggEvent.numEggs > 1 ? 's' : ''}! (${catchTime})\n\-# You now have ${result} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${result > 1 ? 's' : ''}.`
     );
-    logger.info('Egg(s) caught', {
+    const guildName = getGuildName(gid);
+    logger.info(`Egg(s) caught (${guildName})`, {
       guildId: gid,
       user: message.author.id,
       numEggs: eggEvent.numEggs,
