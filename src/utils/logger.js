@@ -123,11 +123,19 @@ const consoleFormat = printf(({ timestamp, level, message, label, stack, ...meta
   return `${timestamp} [${level}]${labelPart} ${msg}${metaStr}`;
 });
 
-// Short UTC timestamp helper: "MM-DD HH:mm" (year removed)
+// Short UTC timestamp helper with memory info: "MM-DD HH:mm [heapUsedMb/heapTotalMb]"
 const shortTimestamp = () => {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');
-  return `${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+  let memInfo = '';
+  try {
+    const mu = process.memoryUsage();
+    const heapUsedMb = Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10;
+    const heapTotalMb = Math.round((mu.heapTotal / 1024 / 1024) * 10) / 10;
+    const percent = Math.round((mu.heapUsed / mu.heapTotal) * 100);
+    memInfo = ` [${heapUsedMb}/${heapTotalMb}MB:${percent}%]`;
+  } catch (_) { /* ignore */ }
+  return `${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}${memInfo}`;
 };
 
 // Determine the format used for file transports. When LOG_FORCE_COLOR is set,
