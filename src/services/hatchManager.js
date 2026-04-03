@@ -61,6 +61,7 @@ async function init(botClient) {
   client = botClient || null;
   let restoredHatches = 0;
   let skippedExpired = 0;
+  let chunkCount = 0;
   try {
     const mu = process.memoryUsage();
     logger.info('hatchManager.init memory start', { heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10 });
@@ -130,15 +131,30 @@ async function init(botClient) {
         }
       }
 
-      try {
-        const muChunk = process.memoryUsage();
-        logger.info('hatchManager.init chunk complete', {
-          heapUsedMb: Math.round((muChunk.heapUsed / 1024 / 1024) * 10) / 10,
-          restoredHatches,
-          skippedExpired,
-          lastId,
-        });
-      } catch (e) { /* ignore */ }
+      chunkCount += 1;
+      if (chunkCount === 1 || chunkCount % 10 === 0 || rows.length < HATCH_INIT_CHUNK_SIZE) {
+        try {
+          const muChunk = process.memoryUsage();
+          logger.info('hatchManager.init chunk complete', {
+            heapUsedMb: Math.round((muChunk.heapUsed / 1024 / 1024) * 10) / 10,
+            restoredHatches,
+            skippedExpired,
+            lastId,
+            chunkCount,
+          });
+        } catch (e) { /* ignore */ }
+      } else {
+        try {
+          const muChunk = process.memoryUsage();
+          logger.debug('hatchManager.init chunk progress', {
+            heapUsedMb: Math.round((muChunk.heapUsed / 1024 / 1024) * 10) / 10,
+            restoredHatches,
+            skippedExpired,
+            lastId,
+            chunkCount,
+          });
+        } catch (e) { /* ignore */ }
+      }
 
       if (rows.length < HATCH_INIT_CHUNK_SIZE) break;
       await new Promise((res) => setTimeout(res, HATCH_INIT_CHUNK_DELAY_MS));

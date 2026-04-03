@@ -675,11 +675,14 @@ function requestReschedule(guildId) {
   // If eggs are active, mark for reschedule after they're cleared; otherwise schedule immediately
   const activeMap = activeEggs.get(guildId);
   if (activeMap && activeMap.size > 0) {
+    const wasPending = pendingReschedule.has(guildId);
     pendingReschedule.add(guildId);
-    const guildName = getGuildName(guildId);
-    logger.info(`Reschedule requested; will apply after active eggs cleared (${guildName})`, {
-      guildId,
-    });
+    if (!wasPending) {
+      const guildName = getGuildName(guildId);
+      logger.info(`Reschedule requested; will apply after active eggs cleared (${guildName})`, {
+        guildId,
+      });
+    }
     return;
   }
   // schedule immediately
