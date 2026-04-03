@@ -1719,11 +1719,22 @@ async function handleMessage(message) {
     });
   } catch (_) { /* ignore */ }
   
-  let catchTimeMs = 0;
+  const catchTimeMs = Date.now() - eggEvent.spawnedAt;
+  const catchTime = Duration.fromMillis(catchTimeMs)
+    .shiftTo('years', 'months', 'days', 'hours', 'minutes', 'seconds')
+    .toHuman({ maximumFractionDigits: 2, showZeros: false });
+  const eggName = `${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${eggEvent.numEggs > 1 ? 's' : ''}`;
+  let quickCatchMsg = null;
+  try {
+    quickCatchMsg = await message.channel.send(
+      `${message.author} caught ${eggEvent.numEggs} ${eggName}! (${catchTime})\n\-# Finalizing reward...`
+    );
+  } catch (_) {
+    /* ignore immediate ack failures */
+  }
+
   let result = 0;
   try {
-    // Calculate catch time
-    catchTimeMs = Date.now() - eggEvent.spawnedAt;
     // Track per egg type and stats
     result = await userModel.addEggsForGuild(
       String(message.author.id),
@@ -1753,9 +1764,15 @@ async function handleMessage(message) {
       error: err.stack || err,
     });
     try {
-      await message.channel.send(
-        `${emojis.facehugger || ''} Error awarding egg to ${message.author}.`
-      );
+      if (quickCatchMsg && typeof quickCatchMsg.edit === 'function') {
+        await quickCatchMsg.edit(
+          `${emojis.facehugger || ''} Could not finalize reward for ${message.author}. Try typing egg again.`
+        );
+      } else {
+        await message.channel.send(
+          `${emojis.facehugger || ''} Error awarding egg to ${message.author}.`
+        );
+      }
     } catch (replyErr) {
       logger.warn('Failed sending award error response', {
         guildId: gid,
@@ -1768,13 +1785,12 @@ async function handleMessage(message) {
   }
 
   try {
-    const catchTime = Duration.fromMillis(catchTimeMs)
-      .shiftTo('years', 'months', 'days', 'hours', 'minutes', 'seconds')
-      .toHuman({ maximumFractionDigits: 2, showZeros: false });
-
-    await message.channel.send(
-      `${message.author} caught ${eggEvent.numEggs} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${eggEvent.numEggs > 1 ? 's' : ''}! (${catchTime})\n\-# You now have ${result} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${result > 1 ? 's' : ''}.`
-    );
+    const finalText = `${message.author} caught ${eggEvent.numEggs} ${eggName}! (${catchTime})\n\-# You now have ${result} ${eggEvent.eggType.emoji} ${eggEvent.eggType.name}${result > 1 ? 's' : ''}.`;
+    if (quickCatchMsg && typeof quickCatchMsg.edit === 'function') {
+      await quickCatchMsg.edit(finalText);
+    } else {
+      await message.channel.send(finalText);
+    }
     const guildName = getGuildName(gid);
     logger.info(`Egg(s) caught (${guildName})`, {
       guildId: gid,
