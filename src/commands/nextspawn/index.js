@@ -32,7 +32,8 @@ function buildNextSpawnPayload(info, customId, includeButton = true, expired = f
     );
   } else if (info.active) {
     const human = msToHuman(info.activeSinceMs);
-    const activeText = `An egg event is currently active (${info.numEggs} egg(s)), started ${human} ago.`;
+    const eggLabel = Number(info.numEggs) === 1 ? 'egg' : 'eggs';
+    const activeText = `An egg event is live with ${info.numEggs} ${eggLabel}. Started ${human} ago.`;
 
     if (includeButton && !expired) {
       container.addSectionComponents(
