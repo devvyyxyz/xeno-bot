@@ -298,12 +298,16 @@ module.exports = {
       let currentPage = 0;
 
       const collector = msg.createMessageComponentCollector({
-        filter: i => i.user.id === userId,
+        filter: () => true,
         time: 300_000
       });
 
       collector.on('collect', async i => {
         try {
+          if (i.user.id !== userId) {
+            await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:hunt-list' });
+            return;
+          }
           // Navigation
           if (i.customId === 'hunt-prev-page') {
             currentPage = Math.max(0, currentPage - 1);

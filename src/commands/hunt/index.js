@@ -444,11 +444,17 @@ async function performHunt(interaction, client) {
     let rows = [];
     let currentPage = 0;
     const collector = msg.createMessageComponentCollector({
-      filter: i => i.user.id === userId,
+      filter: () => true,
       time: 300_000
     });
 
     collector.on('collect', async i => {
+      if (i.user.id !== userId) {
+        try {
+          await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:hunt' });
+        } catch (_) { /* ignore */ void 0; }
+        return;
+      }
       // Show host list from the result view
         if (i.customId === 'hunt-view-list-from-result') {
         rows = await hostModel.listHostsByOwner(userId, guildId);

@@ -19,6 +19,7 @@ void PrimaryButtonBuilder;
 const {
   MessageFlags
 } = require('discord.js');
+const safeReply = require('../../utils/safeReply');
 
 const cmd = getCommandConfig('pathway') || { name: 'pathway', description: 'View xenomorph evolution pathways' };
 
@@ -203,7 +204,6 @@ module.exports = {
     const guildId = interaction.guildId;
     void guildId;
     const logger = require('../../utils/logger').get('command:pathway');
-    const safeReply = require('../../utils/safeReply');
 
     try {
       await interaction.deferReply({ ephemeral: true });
@@ -221,12 +221,16 @@ module.exports = {
       let currentPathway = null;
 
       const collector = msg.createMessageComponentCollector({
-        filter: i => i.user.id === discordId,
+        filter: () => true,
         time: 300_000
       });
 
       collector.on('collect', async i => {
         try {
+          if (i.user.id !== discordId) {
+            await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:pathway' });
+            return;
+          }
           if (i.customId === 'pathway-select') {
             currentPathway = i.values[0];
             await i.update({ components: buildPathwayDetailView({ pathwayId: currentPathway, client: interaction.client }), flags: MessageFlags.IsComponentsV2 });

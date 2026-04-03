@@ -300,6 +300,12 @@ module.exports = {
 
       collector.on('collect', async (btn) => {
         try {
+          if (btn.user.id !== interaction.user.id) {
+            try {
+              await safeReply(btn, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:news' });
+            } catch (_) { /* ignore */ void 0; }
+            return;
+          }
           await btn.deferUpdate();
           const parts = btn.customId.split(':');
           const action = parts[1];

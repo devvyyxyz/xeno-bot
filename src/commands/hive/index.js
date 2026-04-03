@@ -710,12 +710,16 @@ async function attachHiveDashboardCollector({ interaction, msg, userId, guildId,
   let currentModulesPage = 0;
 
   const collector = msg.createMessageComponentCollector({
-    filter: i => i.user.id === userId,
+    filter: () => true,
     time: 300_000
   });
 
   collector.on('collect', async i => {
     try {
+      if (i.user.id !== userId) {
+        await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:hive' });
+        return;
+      }
       if (i.customId === HIVE_ACTION_REFRESH_ID) {
         const refreshedHive = await hiveModel.getHiveByUser(userId, guildId);
         if (refreshedHive) viewHive = refreshedHive;
@@ -1062,12 +1066,16 @@ module.exports = {
         if (!msg || typeof msg.createMessageComponentCollector !== 'function') return;
 
         const collector = msg.createMessageComponentCollector({
-          filter: i => i.user.id === userId && (i.customId === 'hive-create-prompt' || i.customId === HIVE_CREATE_VIEW_ID),
+          filter: i => i && (i.customId === 'hive-create-prompt' || i.customId === HIVE_CREATE_VIEW_ID),
           time: 60_000
         });
 
         collector.on('collect', async i => {
           try {
+            if (i.user.id !== userId) {
+              await safeReply(i, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:hive' });
+              return;
+            }
             // Handle view hive button
             if (i.customId === HIVE_CREATE_VIEW_ID) {
               const viewHive = await hiveModel.getHiveByUser(userId, guildId);
@@ -1161,9 +1169,13 @@ module.exports = {
               try {
                 const selMsg = i.message;
                 if (selMsg && typeof selMsg.createMessageComponentCollector === 'function') {
-                const selCollector = selMsg.createMessageComponentCollector({ filter: s => s.user.id === userId && s.customId === 'hive-create-type', time: 60_000, max: 1 });
+                const selCollector = selMsg.createMessageComponentCollector({ filter: s => s && s.customId === 'hive-create-type', time: 60_000, max: 1 });
                 selCollector.on('collect', async s => {
                   try {
+                    if (s.user.id !== userId) {
+                      await safeReply(s, { content: 'These controls are reserved for the user who opened this view.', ephemeral: true }, { loggerName: 'command:hive' });
+                      return;
+                    }
                     const choice = Array.isArray(s.values) ? s.values[0] : null;
                     if (!choice) {
                       await s.reply({ content: 'No hive type selected.', ephemeral: true });
