@@ -132,18 +132,7 @@ async function init(botClient) {
       }
 
       chunkCount += 1;
-      if (chunkCount === 1 || chunkCount % 10 === 0 || rows.length < HATCH_INIT_CHUNK_SIZE) {
-        try {
-          const muChunk = process.memoryUsage();
-          logger.info('hatchManager.init chunk complete', {
-            heapUsedMb: Math.round((muChunk.heapUsed / 1024 / 1024) * 10) / 10,
-            restoredHatches,
-            skippedExpired,
-            lastId,
-            chunkCount,
-          });
-        } catch (e) { /* ignore */ }
-      } else {
+      if (chunkCount === 1 || chunkCount % 25 === 0 || rows.length < HATCH_INIT_CHUNK_SIZE) {
         try {
           const muChunk = process.memoryUsage();
           logger.debug('hatchManager.init chunk progress', {

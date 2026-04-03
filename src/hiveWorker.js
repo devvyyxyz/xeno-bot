@@ -47,9 +47,6 @@ async function processHives() {
         // compute amount to award
         const amount = Math.floor((elapsedMs * rate) / msPerHour);
         if (amount > 0) {
-          // award amount + update timestamp in atomic transaction
-          // ensures both succeed or both fail (prevents duplicate awards on crash)
-          const trx = await db.knex.transaction();
           try {
             await userModel.modifyCurrencyForGuild(ownerId, guildId, 'royal_jelly', Number(amount));
             // advance last_collected by the amount awarded
@@ -59,10 +56,8 @@ async function processHives() {
             await hiveModel.updateHiveById(hive.id, { data: newData }, { quiet: true });
             awardedHives.push({ hiveId: hive.id, ownerId, guildId, amount });
             processed += 1;
-            await trx.commit();
           } catch (e) {
-            await trx.rollback();
-            logger.warn('Failed awarding and updating hive (transaction rolled back)', {
+            logger.warn('Failed awarding and updating hive', {
               hiveId: hive.id,
               ownerId,
               guildId,
@@ -91,7 +86,7 @@ async function processHives() {
 
     return processed;
   } catch (e) {
-    logger.error('Hive worker failed', { error: e && (e.stack || e) });
+    logger.warn('Hive worker failed', { error: e && (e.stack || e) });
     return 0;
   }
 }

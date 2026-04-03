@@ -343,22 +343,6 @@ function startMemoryWatchdog() {
         // ignore v8 introspection failures
       }
 
-      baseLogger.info('Memory stats', {
-        heapUsedMb,
-        heapTotalMb,
-        rssMb,
-        externalMb,
-        arrayBuffersMb,
-        v8stats,
-        heapSpacesSummary: heapSpaces
-          ? heapSpaces.map((s) => ({
-              space_name: s.space_name,
-              space_size_mb: Math.round((s.space_size / 1024 / 1024) * 10) / 10,
-              space_used_mb: Math.round((s.space_used_size / 1024 / 1024) * 10) / 10,
-            }))
-          : undefined,
-      });
-
       if (heapUsedMb >= warnHeapMb || rssMb >= warnRssMb) {
         baseLogger.warn('Memory watchdog threshold exceeded', {
           heapUsedMb,
@@ -366,6 +350,14 @@ function startMemoryWatchdog() {
           rssMb,
           warnHeapMb,
           warnRssMb,
+          v8stats,
+          heapSpacesSummary: heapSpaces
+            ? heapSpaces.map((s) => ({
+                space_name: s.space_name,
+                space_size_mb: Math.round((s.space_size / 1024 / 1024) * 10) / 10,
+                space_used_mb: Math.round((s.space_used_size / 1024 / 1024) * 10) / 10,
+              }))
+            : undefined,
         });
         const now = Date.now();
         if (dumpOnThreshold && now - lastDumpAt > dumpCooldownMs) {
@@ -401,6 +393,7 @@ function startMemoryWatchdog() {
 async function startup() {
   baseLogger.section('Startup');
   const startupProgress = createStartupProgress(5);
+  let lastMemoryMonitorLog = 0;
 
   try {
     await startupProgress.runStep('Redis availability', async () => {
@@ -557,15 +550,38 @@ async function startup() {
         const arrayBuffersMb = mu.arrayBuffers ? Math.round((mu.arrayBuffers / 1024 / 1024) * 100) / 100 : 0;
         const heapPercent = Math.round((mu.heapUsed / mu.heapTotal) * 100);
         
-        logger.info('[MEMORY MONITOR] Heap usage', {
-          heapUsedMb,
-          heapTotalMb,
-          heapPercent: `${heapPercent}%`,
-          rssMb,
-          externalMb,
-          arrayBuffersMb,
-          heapWarning: heapPercent > 85 ? '⚠️ HIGH' : heapPercent > 70 ? '⚠️ ELEVATED' : '✓ OK',
-        });
+        if (heapPercent >= 85) {
+          logger.warn('[MEMORY MONITOR] Heap usage', {
+            heapUsedMb,
+            heapTotalMb,
+            heapPercent: `${heapPercent}%`,
+            rssMb,
+            externalMb,
+            arrayBuffersMb,
+            heapWarning: '⚠️ HIGH',
+          });
+        } else if (heapPercent >= 70) {
+          logger.info('[MEMORY MONITOR] Heap usage', {
+            heapUsedMb,
+            heapTotalMb,
+            heapPercent: `${heapPercent}%`,
+            rssMb,
+            externalMb,
+            arrayBuffersMb,
+            heapWarning: '⚠️ ELEVATED',
+          });
+        } else if (!lastMemoryMonitorLog || Date.now() - lastMemoryMonitorLog >= (Number(process.env.MEMORY_MONITOR_INFO_MS) || 10 * 60 * 1000)) {
+          logger.debug('[MEMORY MONITOR] Heap usage', {
+            heapUsedMb,
+            heapTotalMb,
+            heapPercent: `${heapPercent}%`,
+            rssMb,
+            externalMb,
+            arrayBuffersMb,
+            heapWarning: '✓ OK',
+          });
+          lastMemoryMonitorLog = Date.now();
+        }
       } catch (e) {
         try {
           logger.warn('[MEMORY MONITOR] Failed to capture metrics', { error: e && (e.stack || e) });
