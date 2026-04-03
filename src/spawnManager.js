@@ -460,17 +460,52 @@ function clearFallbackCatchScanner(guildId) {
   fallbackCatchScanners.delete(gid);
 }
 
+async function scanFallbackCatchOnce(gid, channelId, spawnedAt, seenMessageIds = null) {
+  const guildMap = activeEggs.get(gid);
+  if (!guildMap || guildMap.size === 0) return false;
+
+  const channel = await client.channels.fetch(String(channelId)).catch(() => null);
+  if (!channel || !channel.messages || typeof channel.messages.fetch !== 'function') return false;
+
+  const recent = await channel.messages.fetch({ limit: 20 }).catch(() => null);
+  if (!recent || recent.size === 0) return false;
+
+  const candidates = Array.from(recent.values())
+    .filter((m) => {
+      if (!m || !m.id) return false;
+      if (seenMessageIds && seenMessageIds.has(m.id)) return false;
+      if (!m.author || m.author.bot) return false;
+      if (typeof m.content !== 'string') return false;
+      const normalized = m.content.trim().toLowerCase().replace(/^["'`!/\.\s]+|["'`!?.\s]+$/g, '');
+      if (!/\begg\b/i.test(normalized)) return false;
+      return Number(m.createdTimestamp || 0) >= Number(spawnedAt || 0) - 5000;
+    })
+    .sort((a, b) => Number(a.createdTimestamp || 0) - Number(b.createdTimestamp || 0));
+
+  if (candidates.length === 0) return false;
+  const candidate = candidates[0];
+  if (seenMessageIds) seenMessageIds.add(candidate.id);
+  logger.info('[SPAWN] Fallback scanner found egg catch candidate', {
+    guildId: gid,
+    channelId: String(channelId),
+    messageId: candidate.id,
+    userId: candidate.author && candidate.author.id,
+  });
+  await handleMessage(candidate);
+  return true;
+}
+
 function startFallbackCatchScanner(guildId, channelId, spawnedAt) {
   const gid = String(guildId);
   if (fallbackCatchScanners.has(gid)) return;
   const scannerStartedAt = Date.now();
   const seenMessageIds = new Set();
-  const intervalMs = Number(process.env.SPAWN_FALLBACK_SCAN_MS) || 5000;
+  const intervalMs = Number(process.env.SPAWN_FALLBACK_SCAN_MS) || 1500;
   const maxDurationMs = Number(process.env.SPAWN_FALLBACK_SCAN_MAX_MS) || 120000;
 
   const intervalId = setInterval(async () => {
     try {
-      const guildMap = activeEggs.get(gid) || activeEggs.get(guildId);
+      const guildMap = activeEggs.get(gid) || activeEggs.get(String(guildId));
       if (!guildMap || guildMap.size === 0) {
         clearFallbackCatchScanner(gid);
         return;
@@ -479,34 +514,7 @@ function startFallbackCatchScanner(guildId, channelId, spawnedAt) {
         clearFallbackCatchScanner(gid);
         return;
       }
-
-      const channel = await client.channels.fetch(String(channelId)).catch(() => null);
-      if (!channel || !channel.messages || typeof channel.messages.fetch !== 'function') return;
-
-      const recent = await channel.messages.fetch({ limit: 20 }).catch(() => null);
-      if (!recent || recent.size === 0) return;
-
-      const candidates = Array.from(recent.values())
-        .filter((m) => {
-          if (!m || !m.id || seenMessageIds.has(m.id)) return false;
-          if (!m.author || m.author.bot) return false;
-          if (typeof m.content !== 'string') return false;
-          const normalized = m.content.trim().toLowerCase().replace(/^["'`!/\.\s]+|["'`!?.\s]+$/g, '');
-          if (!/\begg\b/i.test(normalized)) return false;
-          return Number(m.createdTimestamp || 0) >= Number(spawnedAt || 0) - 5000;
-        })
-        .sort((a, b) => Number(a.createdTimestamp || 0) - Number(b.createdTimestamp || 0));
-
-      if (candidates.length === 0) return;
-      const candidate = candidates[0];
-      seenMessageIds.add(candidate.id);
-      logger.info('[SPAWN] Fallback scanner found egg catch candidate', {
-        guildId: gid,
-        channelId: String(channelId),
-        messageId: candidate.id,
-        userId: candidate.author && candidate.author.id,
-      });
-      await handleMessage(candidate);
+      await scanFallbackCatchOnce(gid, channelId, spawnedAt, seenMessageIds);
     } catch (e) {
       logger.warn('[SPAWN] Fallback scanner iteration failed', {
         guildId: gid,
@@ -1396,6 +1404,23 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     
     // Set/refresh cleanup timeout for uncaught eggs.
     armUncaughtEggTimeout(guildId, UNCAUGHT_EGG_TIMEOUT_MS);
+
+    // Eager one-shot fallback check for channels where messageCreate is blocked.
+    // This catches early "egg" messages quickly instead of waiting for the delayed diagnostic timer.
+    try {
+      const eagerCheckMs = Math.max(250, Number(process.env.SPAWN_EAGER_FALLBACK_CHECK_MS) || 1200);
+      const eagerTimer = setTimeout(() => {
+        scanFallbackCatchOnce(String(guildId), String(channel.id), spawnedAt)
+          .catch((err) => {
+            logger.debug('Eager fallback catch scan failed', {
+              guildId,
+              channelId: channel.id,
+              error: err && (err.stack || err),
+            });
+          });
+      }, eagerCheckMs);
+      if (typeof eagerTimer.unref === 'function') eagerTimer.unref();
+    } catch (_) { /* ignore eager fallback setup errors */ }
 
     // Diagnostic: if egg remains active and no messageCreate events were seen, catching may be blocked.
     try {
