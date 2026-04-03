@@ -283,6 +283,29 @@ function spawnCleanupTick() {
     for (const gid of Array.from(enqueuedSet)) {
       if (shardGuildSet && shardGuildSet.size > 0 && !shardGuildSet.has(String(gid))) enqueuedSet.delete(gid);
     }
+    
+    // Log memory and state periodically
+    try {
+      const mu = process.memoryUsage();
+      const totalActiveEggs = Array.from(activeEggs.values()).reduce((sum, map) => sum + map.size, 0);
+      const heapPercent = Math.round((mu.heapUsed / mu.heapTotal) * 100);
+      
+      if (heapPercent > 70) { // Only log when memory is elevated to avoid spam
+        logger.warn('[SPAWN CLEANUP] Memory state', {
+          activeEggCount: totalActiveEggs,
+          activeEggGuilds: activeEggs.size,
+          inProgressCount: inProgress.size,
+          enqueuedCount: enqueuedSet.size,
+          spawnQueueDepth: spawnQueue.length,
+          failureTrackerSize: failureTracker.size,
+          warnCooldownsSize: warnCooldowns.size,
+          uncaughtEggTimeoutsSize: uncaughtEggTimeout.size,
+          failureTrackerTTLSize: failureTracker.size,
+          heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 100) / 100,
+          heapPercent: `${heapPercent}%`,
+        });
+      }
+    } catch (e) { /* ignore */ }
   } catch (e) {
     logger.warn('spawnCleanupTick error', { error: e && (e.stack || e) });
   }
@@ -1151,6 +1174,23 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
         [sent.id, { messageId: sent.id, channelId: channel.id, spawnedAt, numEggs, eggType }],
       ])
     );
+    
+    // Log active eggs count for memory tracking
+    try {
+      const totalActiveEggs = Array.from(activeEggs.values()).reduce((sum, map) => sum + map.size, 0);
+      const mu = process.memoryUsage();
+      const heapPercent = Math.round((mu.heapUsed / mu.heapTotal) * 100);
+      logger.info('[SPAWN] Egg spawned', {
+        guildId,
+        messageId: sent.id,
+        numEggs,
+        eggType: eggType.id,
+        totalActiveEggs,
+        activeGuilds: activeEggs.size,
+        heapPercent: `${heapPercent}%`,
+      });
+    } catch (_) { /* ignore */ }
+    
     // Set a cleanup timeout for uncaught eggs (prevent unbounded growth if users never catch them)
     if (uncaughtEggTimeout.has(guildId)) {
       clearTimeout(uncaughtEggTimeout.get(guildId));
@@ -1327,6 +1367,23 @@ async function handleMessage(message) {
   // Only the first user to type 'egg' claims all eggs
   const eggEvent = eggsInChannel[0];
   activeEggs.delete(gid);
+  
+  // Log egg catch and memory state
+  try {
+    const totalActiveEggs = Array.from(activeEggs.values()).reduce((sum, map) => sum + map.size, 0);
+    const mu = process.memoryUsage();
+    const heapPercent = Math.round((mu.heapUsed / mu.heapTotal) * 100);
+    logger.info('[SPAWN] Eggs caught', {
+      guildId: gid,
+      user: message.author.id,
+      numEggs: eggEvent.numEggs,
+      eggType: eggEvent.eggType.id,
+      totalActiveEggs,
+      activeGuilds: activeEggs.size,
+      heapPercent: `${heapPercent}%`,
+    });
+  } catch (_) { /* ignore */ }
+  
   try {
     // Calculate catch time
     const catchTimeMs = Date.now() - eggEvent.spawnedAt;

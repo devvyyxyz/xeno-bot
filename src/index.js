@@ -523,6 +523,38 @@ async function startup() {
     });
 
     startupProgress.finish();
+    
+    // Start memory monitoring every 30 seconds to track heap growth
+    const memoryMonitorInterval = setInterval(() => {
+      try {
+        const mu = process.memoryUsage();
+        const heapUsedMb = Math.round((mu.heapUsed / 1024 / 1024) * 100) / 100;
+        const heapTotalMb = Math.round((mu.heapTotal / 1024 / 1024) * 100) / 100;
+        const rssMb = Math.round((mu.rss / 1024 / 1024) * 100) / 100;
+        const externalMb = Math.round((mu.external / 1024 / 1024) * 100) / 100;
+        const arrayBuffersMb = mu.arrayBuffers ? Math.round((mu.arrayBuffers / 1024 / 1024) * 100) / 100 : 0;
+        const heapPercent = Math.round((mu.heapUsed / mu.heapTotal) * 100);
+        
+        logger.info('[MEMORY MONITOR] Heap usage', {
+          heapUsedMb,
+          heapTotalMb,
+          heapPercent: `${heapPercent}%`,
+          rssMb,
+          externalMb,
+          arrayBuffersMb,
+          heapWarning: heapPercent > 85 ? '⚠️ HIGH' : heapPercent > 70 ? '⚠️ ELEVATED' : '✓ OK',
+        });
+      } catch (e) {
+        try {
+          logger.warn('[MEMORY MONITOR] Failed to capture metrics', { error: e && (e.stack || e) });
+        } catch (_) { /* ignore */ }
+      }
+    }, 30000); // 30 seconds
+    
+    // Ensure interval is cleaned up on shutdown
+    process.on('SIGTERM', () => {
+      if (memoryMonitorInterval) clearInterval(memoryMonitorInterval);
+    });
   } catch (err) {
     logger.error('Startup failed', { error: err && (err.stack || err) });
     process.exit(1);
