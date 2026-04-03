@@ -73,12 +73,13 @@ function buildNextSpawnPayload(info, customId, includeButton = true, expired = f
   }
 
   if (expired) {
-    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('_Refresh expired_'));
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent('_Refresh expired. Run /nextspawn again._'));
   }
 
   return {
     components: [container],
-    flags: MessageFlags.IsComponentsV2
+    flags: MessageFlags.IsComponentsV2,
+    __suppressNewsReminder: true
   };
 }
 
