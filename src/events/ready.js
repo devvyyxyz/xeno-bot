@@ -95,86 +95,148 @@ module.exports = {
     // Start cycling presence if configured
     try {
       const config = require('../../config/config.json');
-      const statusCycling = config.statusCycling;
-      
-      // Enable status cycling by default unless explicitly disabled
-      if (statusCycling && statusCycling.enabled === false) {
-        logger.info('Status cycling disabled in config');
-      } else {
-        let idx = 0;
-        const { ActivityType } = require('discord.js');
+      const presenceConfig = config.presence || {};
+      const statusCycling = config.statusCycling || {};
+      const { ActivityType } = require('discord.js');
 
-        // Build a case-insensitive lookup for ActivityType keys
-        const activityTypeMap = {};
-        for (const [k, v] of Object.entries(ActivityType || {})) {
-          activityTypeMap[String(k).toLowerCase()] = v;
-        }
+      // Build a case-insensitive lookup for ActivityType keys
+      const activityTypeMap = {};
+      for (const [k, v] of Object.entries(ActivityType || {})) {
+        activityTypeMap[String(k).toLowerCase()] = v;
+      }
 
-        // Generate a single status showing server and user counts
-        const generateActivities = () => {
-          const serverCount = client.guilds.cache.size || 0;
-          const userCount = client.guilds.cache.reduce((total, g) => total + (g.memberCount || 0), 0);
-          let shardPrefix = '';
-          try {
-            if (statusCycling?.displayShard !== false) {
-              if (client.shard && Array.isArray(client.shard.ids) && client.shard.count) {
-                shardPrefix = `Shard ${client.shard.ids[0]}/${client.shard.count} | `;
-              } else if (process.env.SHARD_ID) {
-                shardPrefix = `Shard ${process.env.SHARD_ID} | `;
-              }
-            }
-          } catch (_) { shardPrefix = ''; }
-          const name = `${shardPrefix}${serverCount.toLocaleString()} servers | ${userCount.toLocaleString()} users`;
-          return [{ name, type: ActivityType.Watching }];
-        };
-        
-        const setPresence = async () => {
-          try {
-            const activities = generateActivities();
-            if (activities.length > 0) {
-              const activity = activities[idx % activities.length];
-              // Ensure activity has a valid name
-              if (!activity || !activity.name) return;
-              const rawStatus = String(statusCycling?.status || 'online').toLowerCase();
-              const status = ['online', 'idle', 'dnd', 'invisible'].includes(rawStatus) ? rawStatus : 'online';
-              // Coerce activity.type to a number if possible
-              const act = { name: String(activity.name) };
-              if (activity.type !== undefined && activity.type !== null) act.type = Number(activity.type);
-              await client.user.setPresence({ activities: [act], status });
-              idx++;
-              statusFailureStreak = 0;
-            }
-          } catch (e) {
-            statusFailureStreak += 1;
-            logger.warn('Failed to set presence', { error: e && (e.stack || e), streak: statusFailureStreak });
-            if (statusFailureStreak >= 3 && statusCyclingInterval) {
-              clearInterval(statusCyclingInterval);
-              statusCyclingInterval = null;
-              logger.warn('Status cycling disabled after repeated failures; bot will keep default presence until restart');
+      const normalizeActivity = (entry) => {
+        if (!entry) return null;
+
+        if (typeof entry === 'string') {
+          const raw = entry.trim();
+          if (!raw) return null;
+
+          const stringPatterns = [
+            { pattern: /^playing\s+/i, type: 'Playing' },
+            { pattern: /^watching\s+/i, type: 'Watching' },
+            { pattern: /^listening to\s+/i, type: 'Listening' },
+            { pattern: /^streaming\s+/i, type: 'Streaming' },
+            { pattern: /^competing in\s+/i, type: 'Competing' },
+          ];
+
+          for (const { pattern, type } of stringPatterns) {
+            if (pattern.test(raw)) {
+              return normalizeActivity({
+                name: raw.replace(pattern, '').trim(),
+                type,
+              });
             }
           }
-        };
-        
-        // set immediately then interval
-        setPresence();
-        const intervalMs = (statusCycling?.intervalSeconds || 30) * 1000;
-        // Clear any existing interval from previous ready events (e.g., reconnects)
-        if (statusCyclingInterval) {
-          clearInterval(statusCyclingInterval);
-          logger.debug('Cleared previous status cycling interval');
+
+          return { name: raw };
         }
-        statusFailureStreak = 0;
-        statusCyclingInterval = setInterval(setPresence, intervalMs);
-        logger.info('Status cycling started', { 
-          intervalSeconds: statusCycling?.intervalSeconds || 30,
-          displayMembers: statusCycling?.displayMembers !== false,
-          displayServers: statusCycling?.displayServers !== false,
-          displayShard: statusCycling?.displayShard !== false,
-          customActivities: statusCycling?.customActivities?.length || 0
-        });
+
+        if (typeof entry === 'object') {
+          const name = String(entry.name || '').trim();
+          if (!name) return null;
+
+          const rawType = entry.type;
+          let type = null;
+          if (rawType !== undefined && rawType !== null) {
+            if (typeof rawType === 'number' && Number.isFinite(rawType)) {
+              type = rawType;
+            } else {
+              const normalized = String(rawType).trim().toLowerCase();
+              if (normalized && activityTypeMap[normalized] !== undefined) {
+                type = activityTypeMap[normalized];
+              }
+            }
+          }
+
+          const normalized = { name };
+          if (type !== null) normalized.type = type;
+          return normalized;
+        }
+
+        return null;
+      };
+
+      const customActivities = [];
+      const activitySource = Array.isArray(presenceConfig.activities) && presenceConfig.activities.length > 0
+        ? presenceConfig.activities
+        : Array.isArray(statusCycling.customActivities) ? statusCycling.customActivities : [];
+      for (const entry of activitySource) {
+        const normalized = normalizeActivity(entry);
+        if (normalized) customActivities.push(normalized);
       }
+
+      const useGeneratedCounts = customActivities.length === 0 && statusCycling.enabled !== false;
+      if (!useGeneratedCounts && customActivities.length === 0) {
+        logger.info('Presence configuration not found; leaving default presence');
+        return;
+      }
+
+      let idx = 0;
+
+      const generateActivities = () => {
+        if (customActivities.length > 0) return customActivities;
+
+        const serverCount = client.guilds.cache.size || 0;
+        const userCount = client.guilds.cache.reduce((total, g) => total + (g.memberCount || 0), 0);
+        let shardPrefix = '';
+        try {
+          if (statusCycling?.displayShard !== false) {
+            if (client.shard && Array.isArray(client.shard.ids) && client.shard.count) {
+              shardPrefix = `Shard ${client.shard.ids[0]}/${client.shard.count} | `;
+            } else if (process.env.SHARD_ID) {
+              shardPrefix = `Shard ${process.env.SHARD_ID} | `;
+            }
+          }
+        } catch (_) { shardPrefix = ''; }
+        const name = `${shardPrefix}${serverCount.toLocaleString()} servers | ${userCount.toLocaleString()} users`;
+        return [{ name, type: ActivityType.Watching }];
+      };
+
+      const setPresence = async () => {
+        try {
+          const activities = generateActivities();
+          if (activities.length > 0) {
+            const activity = activities[idx % activities.length];
+            if (!activity || !activity.name) return;
+            const rawStatus = String(presenceConfig.status || statusCycling.status || 'online').toLowerCase();
+            const status = ['online', 'idle', 'dnd', 'invisible'].includes(rawStatus) ? rawStatus : 'online';
+            const act = { name: String(activity.name) };
+            if (activity.type !== undefined && activity.type !== null) act.type = Number(activity.type);
+            await client.user.setPresence({ activities: [act], status });
+            idx++;
+            statusFailureStreak = 0;
+          }
+        } catch (e) {
+          statusFailureStreak += 1;
+          logger.warn('Failed to set presence', { error: e && (e.stack || e), streak: statusFailureStreak });
+          if (statusFailureStreak >= 3 && statusCyclingInterval) {
+            clearInterval(statusCyclingInterval);
+            statusCyclingInterval = null;
+            logger.warn('Presence updates disabled after repeated failures; bot will keep default presence until restart');
+          }
+        }
+      };
+
+      // set immediately then interval
+      setPresence();
+      const intervalMs = (presenceConfig.intervalSeconds || statusCycling.intervalSeconds || 30) * 1000;
+      if (statusCyclingInterval) {
+        clearInterval(statusCyclingInterval);
+        logger.debug('Cleared previous status cycling interval');
+      }
+      statusFailureStreak = 0;
+      statusCyclingInterval = setInterval(setPresence, intervalMs);
+      logger.info('Presence updates started', {
+        source: customActivities.length > 0 ? (Array.isArray(presenceConfig.activities) && presenceConfig.activities.length > 0 ? 'config.presence' : 'statusCycling.customActivities') : 'generated-counts',
+        intervalSeconds: presenceConfig.intervalSeconds || statusCycling.intervalSeconds || 30,
+        displayMembers: statusCycling.displayMembers !== false,
+        displayServers: statusCycling.displayServers !== false,
+        displayShard: statusCycling.displayShard !== false,
+        customActivities: customActivities.length,
+      });
     } catch (err) {
-      logger.warn('Status cycling not configured or failed to start', { error: err && (err.stack || err) });
+      logger.warn('Presence updates not configured or failed to start', { error: err && (err.stack || err) });
     }
   }
 };
