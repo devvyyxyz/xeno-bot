@@ -84,6 +84,7 @@ let directMessageListenerAttached = false;
 let messageCreateEventsSeen = 0;
 let lastMessageCreateSeenAt = 0;
 const catchInProgress = new Set();
+const fallbackCatchScanners = new Map();
 const SPAWN_POLL_MS = Number(process.env.SPAWN_SCHED_POLL_MS) || 5000;
 const SPAWN_POLL_DB_LIMIT = Number(process.env.SPAWN_SCHED_DB_LIMIT) || 200;
 const SPAWN_CLEANUP_MS = Number(process.env.SPAWN_CLEANUP_MS) || 10 * 60 * 1000;
@@ -445,6 +446,78 @@ function stopPoller() {
     clearTimeout(timeoutId);
   }
   uncaughtEggTimeout.clear();
+  for (const intervalId of fallbackCatchScanners.values()) {
+    try { clearInterval(intervalId); } catch (_) { /* ignore */ }
+  }
+  fallbackCatchScanners.clear();
+}
+
+function clearFallbackCatchScanner(guildId) {
+  const gid = String(guildId);
+  const intervalId = fallbackCatchScanners.get(gid);
+  if (!intervalId) return;
+  try { clearInterval(intervalId); } catch (_) { /* ignore */ }
+  fallbackCatchScanners.delete(gid);
+}
+
+function startFallbackCatchScanner(guildId, channelId, spawnedAt) {
+  const gid = String(guildId);
+  if (fallbackCatchScanners.has(gid)) return;
+  const scannerStartedAt = Date.now();
+  const seenMessageIds = new Set();
+  const intervalMs = Number(process.env.SPAWN_FALLBACK_SCAN_MS) || 5000;
+  const maxDurationMs = Number(process.env.SPAWN_FALLBACK_SCAN_MAX_MS) || 120000;
+
+  const intervalId = setInterval(async () => {
+    try {
+      const guildMap = activeEggs.get(gid) || activeEggs.get(guildId);
+      if (!guildMap || guildMap.size === 0) {
+        clearFallbackCatchScanner(gid);
+        return;
+      }
+      if (Date.now() - scannerStartedAt > maxDurationMs) {
+        clearFallbackCatchScanner(gid);
+        return;
+      }
+
+      const channel = await client.channels.fetch(String(channelId)).catch(() => null);
+      if (!channel || !channel.messages || typeof channel.messages.fetch !== 'function') return;
+
+      const recent = await channel.messages.fetch({ limit: 20 }).catch(() => null);
+      if (!recent || recent.size === 0) return;
+
+      const candidates = Array.from(recent.values())
+        .filter((m) => {
+          if (!m || !m.id || seenMessageIds.has(m.id)) return false;
+          if (!m.author || m.author.bot) return false;
+          if (typeof m.content !== 'string') return false;
+          const normalized = m.content.trim().toLowerCase().replace(/^["'`!/\.\s]+|["'`!?.\s]+$/g, '');
+          if (!/\begg\b/i.test(normalized)) return false;
+          return Number(m.createdTimestamp || 0) >= Number(spawnedAt || 0) - 5000;
+        })
+        .sort((a, b) => Number(a.createdTimestamp || 0) - Number(b.createdTimestamp || 0));
+
+      if (candidates.length === 0) return;
+      const candidate = candidates[0];
+      seenMessageIds.add(candidate.id);
+      logger.info('[SPAWN] Fallback scanner found egg catch candidate', {
+        guildId: gid,
+        channelId: String(channelId),
+        messageId: candidate.id,
+        userId: candidate.author && candidate.author.id,
+      });
+      await handleMessage(candidate);
+    } catch (e) {
+      logger.warn('[SPAWN] Fallback scanner iteration failed', {
+        guildId: gid,
+        channelId: String(channelId),
+        error: e && (e.stack || e),
+      });
+    }
+  }, intervalMs);
+
+  if (typeof intervalId.unref === 'function') intervalId.unref();
+  fallbackCatchScanners.set(gid, intervalId);
 }
 
 function armUncaughtEggTimeout(guildId, timeoutMs = UNCAUGHT_EGG_TIMEOUT_MS) {
@@ -485,6 +558,7 @@ function armUncaughtEggTimeout(guildId, timeoutMs = UNCAUGHT_EGG_TIMEOUT_MS) {
         });
       }
     }
+    clearFallbackCatchScanner(gid);
     uncaughtEggTimeout.delete(gid);
   }, delayMs);
 
@@ -1343,6 +1417,7 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
               },
               2 * 60 * 1000
             );
+            startFallbackCatchScanner(guildId, channel.id, spawnedAt);
           }
         } catch (_) { /* ignore */ }
       }, checkMs);
@@ -1819,6 +1894,7 @@ async function handleMessage(message) {
       clearTimeout(uncaughtEggTimeout.get(timeoutKey));
       uncaughtEggTimeout.delete(timeoutKey);
     }
+    clearFallbackCatchScanner(gid);
     // Always schedule the next spawn after an event completes
     try {
       scheduleNext(gid);
@@ -1920,6 +1996,7 @@ async function forceSpawn(guildId, forcedEggTypeId) {
         }
       }
       activeEggs.delete(guildId);
+      clearFallbackCatchScanner(guildId);
       try {
         const knex = db.knex;
         await knex('active_spawns').where({ guild_id: guildId }).del();
