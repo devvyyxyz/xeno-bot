@@ -445,6 +445,51 @@ function stopPoller() {
   uncaughtEggTimeout.clear();
 }
 
+function armUncaughtEggTimeout(guildId, timeoutMs = UNCAUGHT_EGG_TIMEOUT_MS) {
+  const gid = String(guildId);
+  if (uncaughtEggTimeout.has(gid)) {
+    try {
+      clearTimeout(uncaughtEggTimeout.get(gid));
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  const delayMs = Math.max(1000, Number(timeoutMs) || UNCAUGHT_EGG_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => {
+    const guildMap = activeEggs.get(gid);
+    if (guildMap && guildMap.size > 0) {
+      logger.warn('Cleaning up uncaught eggs after timeout', {
+        guildId: gid,
+        messageIds: Array.from(guildMap.keys()),
+        timeoutMs: delayMs,
+      });
+      activeEggs.delete(gid);
+      try {
+        for (const eggEvent of guildMap.values()) {
+          client.channels.fetch(eggEvent.channelId).then((ch) => {
+            ch.messages.fetch(eggEvent.messageId).then((msg) => msg.delete()).catch(() => {});
+          }).catch(() => {});
+        }
+      } catch (_) { /* ignore */ }
+
+      // Schedule next spawn since this one expired without being caught
+      try {
+        scheduleNext(gid);
+      } catch (e) {
+        logger.warn('Failed scheduling next spawn after uncaught egg timeout', {
+          guildId: gid,
+          error: e && (e.stack || e),
+        });
+      }
+    }
+    uncaughtEggTimeout.delete(gid);
+  }, delayMs);
+
+  if (typeof timeoutId.unref === 'function') timeoutId.unref();
+  uncaughtEggTimeout.set(gid, timeoutId);
+}
+
 function enqueueSpawn(guildId, forcedEggTypeId, isForced = false) {
   if (shuttingDown) return Promise.reject(new Error('spawnManager is shutting down, cannot enqueue spawn'));
   // CRITICAL FIX: Prevent spawn initiation during initialization phase
@@ -555,44 +600,82 @@ async function init(botClient) {
           });
         } catch (e) { /* ignore */ }
 
-        // CRITICAL FIX: DELETE all active spawns instead of restoring them
-        // Restored eggs block new spawns for 30 minutes (UNCAUGHT_EGG_TIMEOUT_MS)
-        // This causes the reschedule queue to accumulate in memory and crash
-        // Better to start fresh: delete all stale eggs and schedule new spawns immediately
+        // Restore active spawns in-memory so eggs survive restarts, while pruning expired rows.
+        // We keep the payload minimal and re-arm uncaught cleanup timers with remaining TTL.
         try {
-          const activeChunkRows = await knex('active_spawns').whereIn('guild_id', ids).select('*');
-          totalRestoredActiveRows += activeChunkRows.length;
-          
-          // Delete ALL active spawns (don't restore them)
-          const rowIds = activeChunkRows.map(r => r.id);
-          if (rowIds.length > 0) {
+          const activeChunkRows = await knex('active_spawns')
+            .whereIn('guild_id', ids)
+            .select('id', 'guild_id', 'message_id', 'channel_id', 'spawned_at', 'num_eggs', 'egg_type');
+          const expiredRowIds = [];
+          const rearmDelayByGuild = new Map();
+          const nowTs = Date.now();
+
+          for (const row of activeChunkRows) {
+            const gid = String(row.guild_id);
+            const spawnedAt = Number(row.spawned_at) || nowTs;
+            const expiresAt = spawnedAt + UNCAUGHT_EGG_TIMEOUT_MS;
+
+            if (expiresAt <= nowTs) {
+              if (row.id) expiredRowIds.push(row.id);
+              continue;
+            }
+
+            const dbEggType = eggTypes.find((t) => t.id === row.egg_type) || {
+              id: row.egg_type,
+              name: row.egg_type,
+              emoji: '',
+            };
+            const guildMap = activeEggs.get(gid) || new Map();
+            guildMap.set(String(row.message_id), {
+              messageId: String(row.message_id),
+              channelId: String(row.channel_id),
+              spawnedAt,
+              numEggs: Number(row.num_eggs) || 1,
+              eggType: { id: dbEggType.id, name: dbEggType.name, emoji: dbEggType.emoji || '' },
+            });
+            activeEggs.set(gid, guildMap);
+            totalRestoredActiveRows += 1;
+
+            const remainingMs = Math.max(1000, expiresAt - nowTs);
+            const previousDelay = rearmDelayByGuild.get(gid);
+            if (!previousDelay || remainingMs < previousDelay) rearmDelayByGuild.set(gid, remainingMs);
+          }
+
+          for (const [gid, remainingMs] of rearmDelayByGuild.entries()) {
+            armUncaughtEggTimeout(gid, remainingMs);
+          }
+
+          if (expiredRowIds.length > 0) {
             try {
-              await knex('active_spawns').whereIn('id', rowIds).del();
-              logger.info('Deleted all stale active spawns on init (no restore)', {
-                deletedCount: rowIds.length,
-                reason: 'Restored eggs block reschedules for 30 mins; fresh spawns better',
+              await knex('active_spawns').whereIn('id', expiredRowIds).del();
+              logger.info('Pruned expired active spawns on init', {
+                prunedCount: expiredRowIds.length,
               });
             } catch (delErr) {
-              logger.warn('Failed deleting stale active_spawns on init', { count: rowIds.length, error: delErr && (delErr.stack || delErr) });
+              logger.warn('Failed pruning expired active_spawns on init', {
+                count: expiredRowIds.length,
+                error: delErr && (delErr.stack || delErr),
+              });
             }
           }
-          
+
           try {
             const mu = process.memoryUsage();
-            logger.info('spawnManager.init after active_spawns cleanup', {
+            logger.info('spawnManager.init after active_spawns restore', {
               heapUsedMb: Math.round((mu.heapUsed / 1024 / 1024) * 10) / 10,
-              deletedActiveRows: activeChunkRows.length,
-              totalDeletedActiveRows: totalRestoredActiveRows,
+              chunkRows: activeChunkRows.length,
+              restoredActiveRows: totalRestoredActiveRows,
+              rearmedGuilds: rearmDelayByGuild.size,
             });
           } catch (e) { /* ignore */ }
         } catch (e) {
           try {
-            logger.warn('Failed cleaning active_spawns chunk', { error: e && (e.stack || e) });
+            logger.warn('Failed restoring active_spawns chunk', { error: e && (e.stack || e) });
           } catch (le) {
             try {
-              logger && logger.warn && logger.warn('Failed logging active_spawns cleanup error', { error: le && (le.stack || le) });
+              logger && logger.warn && logger.warn('Failed logging active_spawns restore error', { error: le && (le.stack || le) });
             } catch (lle) {
-              fallbackLogger && fallbackLogger.warn && fallbackLogger.warn('Failed logging active_spawns cleanup error fallback', lle && (lle.stack || lle));
+              fallbackLogger && fallbackLogger.warn && fallbackLogger.warn('Failed logging active_spawns restore error fallback', lle && (lle.stack || lle));
             }
           }
         }
@@ -1241,41 +1324,8 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       });
     } catch (_) { /* ignore */ }
     
-    // Set a cleanup timeout for uncaught eggs (prevent unbounded growth if users never catch them)
-    if (uncaughtEggTimeout.has(guildId)) {
-      clearTimeout(uncaughtEggTimeout.get(guildId));
-    }
-    const timeoutId = setTimeout(() => {
-      const guildMap = activeEggs.get(guildId);
-      if (guildMap && guildMap.size > 0) {
-        logger.warn('Cleaning up uncaught eggs after timeout', {
-          guildId,
-          messageIds: Array.from(guildMap.keys()),
-          timeoutMs: UNCAUGHT_EGG_TIMEOUT_MS,
-        });
-        activeEggs.delete(guildId);
-        // Try to delete the message if still accessible
-        try {
-          for (const eggEvent of guildMap.values()) {
-            client.channels.fetch(eggEvent.channelId).then((ch) => {
-              ch.messages.fetch(eggEvent.messageId).then((msg) => msg.delete()).catch(() => {});
-            }).catch(() => {});
-          }
-        } catch (_) { /* ignore */ }
-        
-        // Schedule next spawn since this one expired without being caught
-        try {
-          scheduleNext(guildId);
-        } catch (e) {
-          logger.warn('Failed scheduling next spawn after uncaught egg timeout', {
-            guildId,
-            error: e && (e.stack || e),
-          });
-        }
-      }
-      uncaughtEggTimeout.delete(guildId);
-    }, UNCAUGHT_EGG_TIMEOUT_MS);
-    uncaughtEggTimeout.set(guildId, timeoutId);
+    // Set/refresh cleanup timeout for uncaught eggs.
+    armUncaughtEggTimeout(guildId, UNCAUGHT_EGG_TIMEOUT_MS);
 
     // Diagnostic: if egg remains active and no messageCreate events were seen, catching may be blocked.
     try {
