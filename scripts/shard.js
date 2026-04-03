@@ -1,4 +1,26 @@
-require('dotenv').config();
+function loadDotenv() {
+  try {
+    const dotenv = require('dotenv');
+    if (dotenv && typeof dotenv.config === 'function') {
+      return dotenv.config();
+    }
+  } catch (_) {
+    /* ignore and fall back */
+  }
+
+  try {
+    const dotenvMain = require('dotenv/lib/main.js');
+    if (dotenvMain && typeof dotenvMain.config === 'function') {
+      return dotenvMain.config();
+    }
+  } catch (_) {
+    /* ignore and continue without .env loading */
+  }
+
+  return null;
+}
+
+loadDotenv();
 const path = require('path');
 const { ShardingManager } = require('discord.js');
 const baseLogger = require('../src/utils/logger');

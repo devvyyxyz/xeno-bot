@@ -6,7 +6,29 @@ try {
 } catch (_) {
   /* ignore if module-alias not installed */ void 0;
 }
-require('dotenv').config();
+function loadDotenv() {
+  try {
+    const dotenv = require('dotenv');
+    if (dotenv && typeof dotenv.config === 'function') {
+      return dotenv.config();
+    }
+  } catch (_) {
+    /* ignore and fall back */
+  }
+
+  try {
+    const dotenvMain = require('dotenv/lib/main.js');
+    if (dotenvMain && typeof dotenvMain.config === 'function') {
+      return dotenvMain.config();
+    }
+  } catch (_) {
+    /* ignore and continue without .env loading */
+  }
+
+  return null;
+}
+
+loadDotenv();
 // Ensure compatibility with different @discordjs/builders versions by
 // providing a safe fallback for SeparatorSpacingSize if missing.
 try {
