@@ -83,6 +83,7 @@ let enqueuedSet = new Set();
 let directMessageListenerAttached = false;
 let messageCreateEventsSeen = 0;
 let lastMessageCreateSeenAt = 0;
+const catchInProgress = new Set();
 const SPAWN_POLL_MS = Number(process.env.SPAWN_SCHED_POLL_MS) || 5000;
 const SPAWN_POLL_DB_LIMIT = Number(process.env.SPAWN_SCHED_DB_LIMIT) || 200;
 const SPAWN_CLEANUP_MS = Number(process.env.SPAWN_CLEANUP_MS) || 10 * 60 * 1000;
@@ -255,6 +256,45 @@ function spawnCleanupTick() {
   }
 }
 
+function schedulePostSpawnMaintenance(guildId) {
+  try {
+    setImmediate(() => {
+      try {
+        const mu = process.memoryUsage();
+        const heapPercent = Math.round((mu.heapUsed / Math.max(mu.heapTotal, 1)) * 100);
+        // Only do expensive cleanup when memory pressure is actually elevated.
+        if (heapPercent >= 85 && client && client.channels && client.channels.cache) {
+          const initialSize = client.channels.cache.size;
+          if (initialSize > 0) {
+            client.channels.cache.clear();
+            logger.warn('[SPAWN] Deferred channel cache clear due to high memory pressure', {
+              guildId,
+              initialSize,
+              heapPercent: `${heapPercent}%`,
+            });
+          }
+        }
+
+        if (heapPercent >= 90 && global.gc) {
+          try {
+            global.gc();
+            logger.warn('[SPAWN] Deferred GC due to high memory pressure', {
+              guildId,
+              heapPercent: `${heapPercent}%`,
+            });
+          } catch (_) {
+            /* ignore */
+          }
+        }
+      } catch (_) {
+        /* ignore */
+      }
+    });
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 function startPoller() {
   if (spawnPollInterval) return;
   spawnPollInterval = setInterval(() => {
@@ -334,7 +374,8 @@ function processSpawnQueue() {
 
 async function init(botClient) {
   client = botClient;
-  if (!directMessageListenerAttached && client && typeof client.on === 'function') {
+  const attachDirectListener = String(process.env.SPAWN_ATTACH_DIRECT_MESSAGE_LISTENER || '').toLowerCase() === 'true';
+  if (attachDirectListener && !directMessageListenerAttached && client && typeof client.on === 'function') {
     client.on('messageCreate', async (message) => {
       try {
         messageCreateEventsSeen += 1;
@@ -348,6 +389,11 @@ async function init(botClient) {
     });
     directMessageListenerAttached = true;
     logger.info('Attached direct spawn messageCreate listener');
+  } else if (!attachDirectListener) {
+    logger.info('Direct spawn messageCreate listener disabled (using events/messageCreate.js)', {
+      env: 'SPAWN_ATTACH_DIRECT_MESSAGE_LISTENER',
+      enabled: false,
+    });
   }
   // start schedules for guilds that belong to this shard
   try {
@@ -1183,34 +1229,8 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       eggType: eggType.id,
     });
     
-    // CRITICAL FIX: Aggressive cache cleanup AFTER spawn message is sent to free memory
-    try {
-      if (client && client.channels && client.channels.cache) {
-        const initialSize = client.channels.cache.size;
-        if (initialSize > 0) {
-          client.channels.cache.clear();
-          logger.debug('Cleared Discord.js channel cache after spawn', { initialSize, guildId });
-        }
-      }
-      // Also clear message caches to prevent accumulation
-      if (client && client.channels && client.channels.cache) {
-        for (const ch of client.channels.cache.values()) {
-          try {
-            if (ch.messages && ch.messages.cache) {
-              const msgSize = ch.messages.cache.size;
-              if (msgSize > 0) ch.messages.cache.clear();
-            }
-          } catch (_) { /* ignore */ }
-        }
-      }
-    } catch (_) { /* ignore */ }
-    
-    // CRITICAL FIX: Force garbage collection to reduce memory fragmentation
-    if (global.gc) {
-      try {
-        global.gc();
-      } catch (_) { /* ignore */ }
-    }
+    // Avoid blocking immediate catch processing right after spawn.
+    schedulePostSpawnMaintenance(guildId);
     
     logger.info(`doSpawn leaving (${guildName})`, { guildId, messageId: sent.id, spawnedAt });
     try {
@@ -1287,28 +1307,16 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     scheduleNext(guildId);
     return false;
   } finally {
-    // CRITICAL FIX: Aggressive cache cleanup in finally block to ensure it always happens
-    try {
-      if (client && client.channels && client.channels.cache) {
-        const initialSize = client.channels.cache.size;
-        if (initialSize > 0) {
-          client.channels.cache.clear();
-          logger.debug('Cleared Discord.js channel cache in finally block', { initialSize, guildId });
-        }
-      }
-    } catch (_) { /* ignore */ }
-    
-    // Force GC one final time
-    try {
-      if (global.gc) global.gc();
-    } catch (_) { /* ignore */ }
-    
     inProgress.delete(guildId);
   }
 }
 
 async function handleMessage(message) {
   if (!message.guild) return false;
+  try {
+    messageCreateEventsSeen += 1;
+    lastMessageCreateSeenAt = Date.now();
+  } catch (_) { /* ignore */ }
   const gid = message.guild.id;
   const rawContent = String(message.content || '').trim().toLowerCase();
   // Accept common variants like "egg", egg!, !egg, /egg.
@@ -1431,6 +1439,17 @@ async function handleMessage(message) {
 
   // Only the first user to type 'egg' claims all eggs
   const eggEvent = eggsInChannel[0];
+  const catchKey = `${String(gid)}:${String(eggEvent && eggEvent.messageId || '')}`;
+  if (catchInProgress.has(catchKey)) {
+    logger.info('[SPAWN] Duplicate catch attempt ignored while processing', {
+      guildId: gid,
+      messageId: eggEvent && eggEvent.messageId,
+      userId: message.author && message.author.id,
+    });
+    return true;
+  }
+  catchInProgress.add(catchKey);
+  try {
   
   // Log egg catch and memory state
   try {
@@ -1644,6 +1663,9 @@ async function handleMessage(message) {
     }
   }
   return true;
+  } finally {
+    catchInProgress.delete(catchKey);
+  }
 }
 
 module.exports = {
