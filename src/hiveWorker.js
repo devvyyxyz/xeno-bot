@@ -6,6 +6,7 @@ const models = require('./models');
 const userModel = models.user;
 const hiveModel = models.hive;
 const { safeJsonParse, safeLogMemory } = require('./lib/safeUtils');
+const workerConfig = require('./config/workers');
 
 let _interval = null;
 let shuttingDown = false;
@@ -16,11 +17,11 @@ async function processHives() {
     // Snapshot memory for diagnostics
     safeLogMemory(logger, 'processHives memory start');
     const now = Date.now();
-    const msPerHour = 3600000;
+    const msPerHour = workerConfig.hive.msPerHour;
     // Process hives in chunks using keyset pagination (id > lastId) to avoid
     // expensive OFFSET scans on large tables. Select only required columns
     // to reduce memory pressure.
-    const chunkSize = Number(process.env.HIVE_WORKER_CHUNK_SIZE) || 200;
+    const chunkSize = workerConfig.hive.chunkSize;
     let lastId = 0;
     let processed = 0;
     const awardedHives = [];
@@ -74,7 +75,7 @@ async function processHives() {
       const lastRow = rows[rows.length - 1];
       lastId = Number(lastRow && lastRow.id) || lastId;
       // small pause to give GC/event loop a chance to run between chunks
-      await new Promise((res) => setTimeout(res, Number(process.env.HIVE_WORKER_CHUNK_DELAY_MS) || 20));
+      await new Promise((res) => setTimeout(res, workerConfig.hive.chunkDelayMs));
     }
     safeLogMemory(logger, 'processHives memory end');
 
@@ -96,7 +97,7 @@ async function start(opts = {}) {
     logger.info('Hive worker start called while shutting down; ignoring');
     return;
   }
-  const pollMs = opts.pollMs || 60 * 1000; // default once per minute
+  const pollMs = opts.pollMs || workerConfig.hive.pollMs;
   if (_interval) clearInterval(_interval);
   _interval = setInterval(() => {
     processHives().catch((e) =>

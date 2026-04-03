@@ -6,12 +6,13 @@ const { ContainerBuilder, TextDisplayBuilder } = require('@discordjs/builders');
 const { MessageFlags } = require('discord.js');
 const evolutionsCfg = require('../../config/evolutions.json');
 const emojisCfg = require('../../config/emojis.json');
+const workerConfig = require('../config/workers');
 let shuttingDown = false;
 
 function getRoleDisplay(roleId) {
   const key = String(roleId || '').toLowerCase();
   const roleInfo = evolutionsCfg?.roles?.[key] || {};
-  const display = roleInfo.display || key || 'Unknown';
+  const display = roleInfo.display || key || workerConfig.evolution.defaultRoleDisplay;
   const emojiKey = roleInfo.emoji;
   const emoji = emojiKey && emojisCfg[emojiKey] ? `${emojisCfg[emojiKey]} ` : '';
   return `${emoji}${display}`.trim();
@@ -38,7 +39,7 @@ async function processDueJobs(client) {
   safeLogMemory(logger, 'processDueJobs memory start');
 
   const now = Date.now();
-  const jobs = await db.knex('evolution_queue').where({ status: 'queued' }).andWhere('finishes_at', '<=', now).limit(20);
+  const jobs = await db.knex('evolution_queue').where({ status: 'queued' }).andWhere('finishes_at', '<=', now).limit(workerConfig.evolution.maxJobsPerRun);
   if (!jobs || jobs.length === 0) return 0;
   for (const job of jobs) {
     try {
@@ -125,7 +126,7 @@ async function processDueJobs(client) {
 
 let _interval = null;
 async function start(client, opts = {}) {
-  const pollMs = opts.pollMs || 30 * 1000;
+  const pollMs = opts.pollMs || workerConfig.evolution.pollMs;
   if (_interval) clearInterval(_interval);
   shuttingDown = false;
   _interval = setInterval(() => {
