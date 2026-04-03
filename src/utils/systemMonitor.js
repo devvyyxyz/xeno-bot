@@ -12,6 +12,7 @@ const SHUTDOWN_HOOK_TIMEOUT_MS = Number(process.env.SHUTDOWN_HOOK_TIMEOUT_MS) ||
 const PERSIST_PATH = path.join(__dirname, '..', '..', 'data', 'system-monitor.json');
 let statusUpdateTimer = null;
 let statusUpdateInFlight = null;
+const monitorStartedAt = Date.now();
 
 // Load persisted state (statusMessageId) early so restarts reuse the same message
 loadPersist();
@@ -52,26 +53,53 @@ function statusEmoji(s) {
   return '🔴';
 }
 
+function formatDuration(ms) {
+  const totalSeconds = Math.max(0, Math.floor(Number(ms || 0) / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+function compactReason(reason, maxLen = 80) {
+  if (!reason) return '';
+  const normalized = String(reason).replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLen) return normalized;
+  return `${normalized.slice(0, maxLen - 1)}…`;
+}
+
+function buildSystemLines() {
+  const keys = Object.keys(systems);
+  if (!keys.length) return ['- No monitored systems registered'];
+
+  return keys.map((k) => {
+    const s = systems[k] || {};
+    const status = s.status || 'unknown';
+    const icon = status === 'up' ? '🟢' : status === 'degraded' ? '🟠' : '🔴';
+    const name = s.name || k;
+    const reason = compactReason(s.reason);
+    return reason ? `${icon} **${name}** - ${reason}` : `${icon} **${name}**`;
+  });
+}
+
 function buildStatusEmbed() {
   const ov = overallStatus();
+  const keys = Object.keys(systems);
+  const upCount = keys.filter((k) => systems[k] && systems[k].status === 'up').length;
+  const degradedCount = keys.filter((k) => systems[k] && systems[k].status === 'degraded').length;
+  const downCount = keys.filter((k) => systems[k] && systems[k].status === 'down').length;
   const embed = new EmbedBuilder()
     .setTitle(`${statusEmoji(ov.state)} __${ov.text}__`)
     .setColor(ov.state === 'green' ? 0x57f287 : ov.state === 'orange' ? 0xfaa61a : 0xed4245)
     .setTimestamp(new Date());
 
-  const keys = Object.keys(systems);
-  if (!keys.length) {
-    embed.setDescription('- No monitored systems registered');
-    return embed;
-  }
-
-  for (const k of keys) {
-    const s = systems[k];
-    const icon = s.status === 'up' ? '🟢' : s.status === 'degraded' ? '🟠' : '🔴';
-    const name = s.name || k;
-    const line = s.reason ? `${icon} **${name}** — ${s.reason}` : `${icon} **${name}**`;
-    embed.addFields({ name: '\u200B', value: line });
-  }
+  const summaryLine = `Updated <t:${Math.floor(Date.now() / 1000)}:R> | Components ${keys.length} | Up ${upCount} | Degraded ${degradedCount} | Down ${downCount}`;
+  embed.setDescription(summaryLine);
+  embed.addFields({ name: 'Systems', value: buildSystemLines().join('\n').slice(0, 1024) });
 
   // Add shard / server / user summary if client available
   try {
@@ -84,8 +112,19 @@ function buildStatusEmbed() {
       } else if (process.env.SHARD_ID) {
         shardLabel = `Shard ${process.env.SHARD_ID}`;
       }
+      const wsPing = Number.isFinite(clientRef.ws?.ping) ? `${clientRef.ws.ping}ms` : 'n/a';
+      const memoryMb = Math.round((process.memoryUsage().rss / 1024 / 1024) * 10) / 10;
+      const runtime = [
+        `Uptime ${formatDuration(Date.now() - monitorStartedAt)}`,
+        `WS ${wsPing}`,
+        `RSS ${memoryMb}MB`,
+        `Node ${process.version}`
+      ].join(' | ');
       const summary = `${shardLabel ? shardLabel + ' | ' : ''}${serverCount.toLocaleString()} servers | ${userCount.toLocaleString()} users`;
-      embed.addFields({ name: 'Status', value: summary });
+      embed.addFields(
+        { name: 'Discord', value: summary },
+        { name: 'Runtime', value: runtime }
+      );
     }
   } catch (e) {
     logger.warn('Failed adding shard/server/user summary to status embed', { error: e && (e.stack || e) });
@@ -113,14 +152,12 @@ function buildStatusText() {
   const ov = overallStatus();
   const header = `${statusEmoji(ov.state)} ${ov.text}`;
   const keys = Object.keys(systems);
-  if (!keys.length) return `${header}\n- No monitored systems registered`;
-  const lines = keys.map(k => {
-    const s = systems[k];
-    const name = s.name || k;
-    const status = (s.status || 'unknown').toUpperCase();
-    return `- ${name}: ${status}${s.reason ? ` — ${s.reason}` : ''}`;
-  });
-  return `${header}\n${lines.join('\n')}`;
+  const upCount = keys.filter((k) => systems[k] && systems[k].status === 'up').length;
+  const degradedCount = keys.filter((k) => systems[k] && systems[k].status === 'degraded').length;
+  const downCount = keys.filter((k) => systems[k] && systems[k].status === 'down').length;
+  const summary = `Updated ${new Date().toISOString()} | Components ${keys.length} | Up ${upCount} | Degraded ${degradedCount} | Down ${downCount}`;
+  const lines = buildSystemLines().map((line) => line.replace(/\*\*/g, ''));
+  return `${header}\n${summary}\n${lines.join('\n')}`;
 }
 
 async function ensureChannelAndMessage() {
