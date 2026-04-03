@@ -47,8 +47,13 @@ function getGuildName(guildId) {
 }
 
 let timers = new Map();
+let timerCreatedAt = new Map(); // Track when each timer was created for stuck timer detection
 let client = null;
 let shuttingDown = false;
+let timerMonitorInterval = null;
+
+// Max age for legacy timers (longer than the longest hatch duration of 7 days, with buffer)
+const LEGACY_TIMER_MAX_AGE_MS = Number(process.env.HATCH_TIMER_MAX_AGE_MS) || 8 * 24 * 60 * 60 * 1000; // 8 days
 
 async function init(botClient) {
   client = botClient || null;
@@ -108,6 +113,9 @@ async function init(botClient) {
   try {
     utils.systemMonitor.registerSystem('hatchManager', { name: 'Hatch Manager', shutdown: shutdown });
   } catch (e) { logger.warn('Failed registering hatchManager with systemMonitor', { error: e && (e.stack || e) }); }
+
+  // Start periodic timer monitoring to detect stuck timers
+  startTimerMonitoring();
 }
 
 async function scheduleTimer(hatchId, delay) {
@@ -139,10 +147,12 @@ async function scheduleTimer(hatchId, delay) {
   }
   const t = setTimeout(() => {
     timers.delete(hatchId);
+    timerCreatedAt.delete(hatchId);
     logger.info('Hatch finished timer fired', { hatchId });
   }, Number(delay) || 0);
   if (typeof t.unref === 'function') t.unref();
   timers.set(hatchId, t);
+  timerCreatedAt.set(hatchId, Date.now());
 }
 
 async function startHatch(discordId, guildId, eggTypeId, durationMs) {
@@ -215,6 +225,7 @@ async function skipHatch(discordId, guildId, hatchId, costRoyalJelly = 5) {
   if (timers.has(hatchId)) {
     try { clearTimeout(timers.get(hatchId)); } catch (_) { /* ignore */ }
     timers.delete(hatchId);
+    timerCreatedAt.delete(hatchId);
   }
   const guildName = getGuildName(guildId);
   logger.info(`Hatch skipped (${guildName})`, { hatchId, discordId, guildId, cost: costRoyalJelly });
@@ -280,11 +291,50 @@ async function listHatches(discordId, guildId) {
   return rows.map(r => ({ id: r.id, egg_type: r.egg_type, started_at: Number(r.started_at), finishes_at: Number(r.finishes_at), collected: !!r.collected, skipped: !!r.skipped }));
 }
 
+// Periodic monitoring for stuck timers to detect memory leaks
+function startTimerMonitoring() {
+  if (timerMonitorInterval) return; // Already running
+  const MONITOR_INTERVAL_MS = Number(process.env.HATCH_TIMER_MONITOR_INTERVAL_MS) || 60 * 60 * 1000; // 1 hour
+  timerMonitorInterval = setInterval(() => {
+    try {
+      const now = Date.now();
+      let stuckCount = 0;
+      for (const [hatchId, createdAt] of timerCreatedAt.entries()) {
+        const age = now - createdAt;
+        if (age > LEGACY_TIMER_MAX_AGE_MS) {
+          logger.warn('Removing stuck hatch timer (exceeded max age)', { hatchId, ageHours: Math.round(age / 1000 / 60 / 60) });
+          const t = timers.get(hatchId);
+          if (t) clearTimeout(t);
+          timers.delete(hatchId);
+          timerCreatedAt.delete(hatchId);
+          stuckCount++;
+        }
+      }
+      if (stuckCount > 0 && timerCreatedAt.size > 0) {
+        logger.info('Timer monitoring: removed stuck timers', { stuckCount, remainingTimers: timers.size });
+      }
+    } catch (e) {
+      logger.warn('Error in timer monitoring', { error: e && (e.stack || e) });
+    }
+  }, MONITOR_INTERVAL_MS);
+  if (typeof timerMonitorInterval.unref === 'function') timerMonitorInterval.unref();
+}
+
+function stopTimerMonitoring() {
+  if (timerMonitorInterval) {
+    clearInterval(timerMonitorInterval);
+    timerMonitorInterval = null;
+  }
+}
+
 module.exports = { init, startHatch, skipHatch, collectHatch, listHatches };
 
 async function shutdown() {
   shuttingDown = true;
   try {
+    // Stop timer monitoring
+    stopTimerMonitoring();
+    
     // close bull worker/queue if used
     try {
       if (hatchWorker && typeof hatchWorker.close === 'function') await hatchWorker.close();
@@ -301,10 +351,25 @@ async function shutdown() {
       }
     }
     timers.clear();
+    timerCreatedAt.clear();
     logger.info('hatchManager shutdown: cleared timers and queue (if any)');
   } catch (e) {
     logger.warn('hatchManager shutdown error', { error: e && (e.stack || e) });
   }
 }
 
+// Clean up hatch timers for a specific guild (called when guild is deleted)
+async function cleanupGuild(guildId) {
+  const gid = String(guildId);
+  try {
+    // Remove all timers associated with hatches from this guild
+    // Note: We don't have direct guild->hatchId mapping in timers Map,
+    // so we rely on natural cleanup when hatches are collected/skipped/completed
+    logger.info('cleanupGuild: guild cleanup initiated (timers cleaned via natural expiration)', { guildId: gid });
+  } catch (e) {
+    logger.warn('cleanupGuild error', { guildId: gid, error: e && (e.stack || e) });
+  }
+}
+
 module.exports.shutdown = shutdown;
+module.exports.cleanupGuild = cleanupGuild;
