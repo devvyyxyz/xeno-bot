@@ -44,6 +44,7 @@ function getGuildName(guildId) {
 }
 
 let client = null;
+let initPhase = true; // CRITICAL: Prevents spawn initiation during startup
 // activeEggs: guildId -> Map(messageId -> { messageId, channelId, value, spawnedAt })
 let activeEggs = new Map();
 let timers = new Map();
@@ -67,7 +68,8 @@ const failureTracker = new Map();
 const guildSendMode = new Map();
 // warnCooldowns: key -> last log timestamp, to reduce repeated warning spam
 const warnCooldowns = new Map();
-const maxConcurrentSpawns = Math.max(1, Number(process.env.SPAWN_MAX_CONCURRENT) || 3);
+const configuredMaxConcurrentSpawns = Math.max(1, Number(process.env.SPAWN_MAX_CONCURRENT) || 3);
+let maxConcurrentSpawns = 1; // START at 1 during initialization, increase after init completes
 const maxSpawnQueueDepth = Number(process.env.SPAWN_QUEUE_MAX_DEPTH) || 100; // safety limit to prevent memory accumulation
 const spawnQueue = [];
 let activeSpawnWorkers = 0;
@@ -285,6 +287,12 @@ function stopPoller() {
 
 function enqueueSpawn(guildId, forcedEggTypeId, isForced = false) {
   if (shuttingDown) return Promise.reject(new Error('spawnManager is shutting down, cannot enqueue spawn'));
+  // CRITICAL FIX: Prevent spawn initiation during initialization phase
+  if (initPhase && !isForced) {
+    logger.debug('Ignoring spawn enqueue during init phase', { guildId });
+    pendingReschedule.add(guildId); // Will be scheduled after init completes
+    return Promise.resolve(false);
+  }
   // Prevent queue from growing unbounded during failure cascades
   if (spawnQueue.length >= maxSpawnQueueDepth) {
     logger.warn('Spawn queue depth limit reached; dropping new spawn request', {
@@ -632,6 +640,25 @@ async function init(botClient) {
         error: e && (e.stack || e),
       });
     }
+    
+    // CRITICAL FIX: End initialization phase and process deferred spawns
+    initPhase = false;
+    maxConcurrentSpawns = configuredMaxConcurrentSpawns;
+    logger.info('Init phase complete; resuming normal spawn operations', {
+      maxConcurrentSpawns,
+      pendingReschedules: pendingReschedule.size,
+    });
+    
+    // Process guilds that were deferred during init phase
+    if (pendingReschedule.size > 0) {
+      const guildIds = Array.from(pendingReschedule);
+      pendingReschedule.clear();
+      setImmediate(() => {
+        for (const gid of guildIds) {
+          scheduleNext(gid);
+        }
+      });
+    }
   } catch (err) {
     logger.error('Failed initializing spawn manager', { error: err.stack || err });
   }
@@ -832,15 +859,21 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     nextSpawnPersisted: nextSpawnAt.get(guildId),
   });
   
-  // Aggressive cache cleanup BEFORE spawn to free memory
+  // CRITICAL FIX: Clear Discord.js cache BEFORE any fetch to prevent cache explosion
+  // This must happen before we attempt to fetch channels or validate permission
   try {
     if (client && client.channels && client.channels.cache) {
       const initialSize = client.channels.cache.size;
-      client.channels.cache.clear();
       if (initialSize > 0) {
-        logger.debug('Cleared Discord.js channel cache before spawn', { initialSize });
+        client.channels.cache.clear();
+        logger.debug('Cleared Discord.js channel cache before spawn', { initialSize, guildId });
       }
     }
+  } catch (_) { /* ignore */ }
+  
+  // Force garbage collection before heavy operations to free up heap
+  try {
+    if (global.gc) global.gc();
   } catch (_) { /* ignore */ }
   // suppress near-duplicate spawns (e.g., timer firing while a force spawn also triggered)
   try {
@@ -926,7 +959,9 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     const guildMap = activeEggs.get(guildId);
     if (!isForced && guildMap && guildMap.size > 0) {
       logger.info(`Spawn event already active; skipping (${guildName})`, { guildId });
-      return scheduleNext(guildId);
+      // CRITICAL FIX: Don't call scheduleNext - it causes database writes that accumulate memory
+      // Just return false and let the poller handle rescheduling
+      return false;
     }
     const limit = (cfg && cfg.egg_limit) || 1;
     const channel = await client.channels.fetch(cfg.channel_id).catch(() => null);
@@ -1224,13 +1259,13 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       eggType: eggType.id,
     });
     
-    // Aggressive cache cleanup AFTER spawn message is sent to free memory
+    // CRITICAL FIX: Aggressive cache cleanup AFTER spawn message is sent to free memory
     try {
       if (client && client.channels && client.channels.cache) {
         const initialSize = client.channels.cache.size;
-        client.channels.cache.clear();
         if (initialSize > 0) {
-          logger.debug('Cleared Discord.js channel cache after spawn', { initialSize });
+          client.channels.cache.clear();
+          logger.debug('Cleared Discord.js channel cache after spawn', { initialSize, guildId });
         }
       }
       // Also clear message caches to prevent accumulation
@@ -1246,7 +1281,7 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       }
     } catch (_) { /* ignore */ }
     
-    // Force garbage collection to reduce memory fragmentation
+    // CRITICAL FIX: Force garbage collection to reduce memory fragmentation
     if (global.gc) {
       try {
         global.gc();
@@ -1328,7 +1363,7 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     scheduleNext(guildId);
     return false;
   } finally {
-    // Aggressive cache cleanup in finally block to ensure it always happens
+    // CRITICAL FIX: Aggressive cache cleanup in finally block to ensure it always happens
     try {
       if (client && client.channels && client.channels.cache) {
         const initialSize = client.channels.cache.size;
@@ -1337,6 +1372,11 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
           logger.debug('Cleared Discord.js channel cache in finally block', { initialSize, guildId });
         }
       }
+    } catch (_) { /* ignore */ }
+    
+    // Force GC one final time
+    try {
+      if (global.gc) global.gc();
     } catch (_) { /* ignore */ }
     
     inProgress.delete(guildId);
