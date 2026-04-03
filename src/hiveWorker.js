@@ -47,30 +47,26 @@ async function processHives() {
         // compute amount to award
         const amount = Math.floor((elapsedMs * rate) / msPerHour);
         if (amount > 0) {
-          // award amount
+          // award amount + update timestamp in atomic transaction
+          // ensures both succeed or both fail (prevents duplicate awards on crash)
+          const trx = await db.knex.transaction();
           try {
             await userModel.modifyCurrencyForGuild(ownerId, guildId, 'royal_jelly', Number(amount));
+            // advance last_collected by the amount awarded
+            const consumedMs = Math.floor((amount * msPerHour) / rate);
+            const newLast = lastCollected + consumedMs;
+            const newData = Object.assign({}, data, { last_collected_at: newLast });
+            await hiveModel.updateHiveById(hive.id, { data: newData }, { quiet: true });
             awardedHives.push({ hiveId: hive.id, ownerId, guildId, amount });
+            processed += 1;
+            await trx.commit();
           } catch (e) {
-            logger.warn('Failed awarding hive production', {
+            await trx.rollback();
+            logger.warn('Failed awarding and updating hive (transaction rolled back)', {
               hiveId: hive.id,
               ownerId,
               guildId,
               amount,
-              error: e && (e.stack || e),
-            });
-            continue;
-          }
-          // advance last_collected by the amount awarded
-          const consumedMs = Math.floor((amount * msPerHour) / rate);
-          const newLast = lastCollected + consumedMs;
-          const newData = Object.assign({}, data, { last_collected_at: newLast });
-          try {
-            await hiveModel.updateHiveById(hive.id, { data: newData }, { quiet: true });
-            processed += 1;
-          } catch (e) {
-            logger.warn('Failed updating hive last_collected', {
-              hiveId: hive.id,
               error: e && (e.stack || e),
             });
           }
