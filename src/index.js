@@ -713,6 +713,21 @@ try {
   logger.warn('hiveWorker module not available', { error: e && (e.stack || e) });
 }
 
+// Top.gg vote webhook + reminder service. Only the configured shard starts
+// the listener so sharded deployments do not collide on the HTTP port.
+try {
+  const topggVoteService = require('./services/topggVoteService');
+  client.once('clientReady', () => {
+    try {
+      topggVoteService.init(client);
+    } catch (e) {
+      logger.warn('Failed initializing topggVoteService', { error: e && (e.stack || e) });
+    }
+  });
+} catch (e) {
+  logger.warn('topggVoteService module not available', { error: e && (e.stack || e) });
+}
+
 // Guild join worker: offload join handling (webhook + welcome messages)
 try {
   const guildJoinWorker = require('./workers/guildJoinWorker');
@@ -795,6 +810,7 @@ process.on('unhandledRejection', (reason) => {
 async function gracefulShutdown(reason) {
   try {
     logger.info('Graceful shutdown starting', { reason });
+    let systemMonitorShutdownRan = false;
     try {
       const systemMonitor = utils.systemMonitor;
       if (systemMonitor) {
@@ -802,8 +818,10 @@ async function gracefulShutdown(reason) {
         try {
           if (typeof systemMonitor.markAllDown === 'function') {
             await systemMonitor.markAllDown(reason);
+            systemMonitorShutdownRan = true;
           } else if (typeof systemMonitor.markDown === 'function') {
             await systemMonitor.markDown('bot', reason);
+            systemMonitorShutdownRan = true;
           }
           // give Discord API a short moment to process edits
           await new Promise((res) => setTimeout(res, 500));
@@ -820,17 +838,25 @@ async function gracefulShutdown(reason) {
       });
     }
     // call optional shutdown hooks if modules expose them
-    try {
-      const spawnManager = require('./spawnManager');
-      if (typeof spawnManager.shutdown === 'function') await spawnManager.shutdown();
-    } catch (e) {
-      logger.warn('spawnManager.shutdown not available', { error: e && (e.stack || e) });
-    }
-    try {
-      const hatchManager = require('./hatchManager');
-      if (typeof hatchManager.shutdown === 'function') await hatchManager.shutdown();
-    } catch (e) {
-      logger.warn('hatchManager.shutdown not available', { error: e && (e.stack || e) });
+    if (!systemMonitorShutdownRan) {
+      try {
+        const spawnManager = require('./spawnManager');
+        if (typeof spawnManager.shutdown === 'function') await spawnManager.shutdown();
+      } catch (e) {
+        logger.warn('spawnManager.shutdown not available', { error: e && (e.stack || e) });
+      }
+      try {
+        const hatchManager = require('./hatchManager');
+        if (typeof hatchManager.shutdown === 'function') await hatchManager.shutdown();
+      } catch (e) {
+        logger.warn('hatchManager.shutdown not available', { error: e && (e.stack || e) });
+      }
+      try {
+        const topggVoteService = require('./services/topggVoteService');
+        if (typeof topggVoteService.shutdown === 'function') await topggVoteService.shutdown();
+      } catch (e) {
+        logger.warn('topggVoteService.shutdown not available', { error: e && (e.stack || e) });
+      }
     }
     // Attempt to gracefully close the Redis client if present to free sockets
     try {
@@ -880,3 +906,5 @@ async function gracefulShutdown(reason) {
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
+process.on('SIGQUIT', () => gracefulShutdown('SIGQUIT'));

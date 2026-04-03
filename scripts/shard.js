@@ -100,3 +100,25 @@ process.on('SIGTERM', async () => {
     process.exit(1);
   }
 });
+
+process.on('SIGHUP', async () => {
+  logger.info('ShardingManager received SIGHUP, shutting down gracefully');
+  try {
+    await manager.broadcastEval((client) => client.destroy());
+    process.exit(0);
+  } catch (e) {
+    logger.error('Error during graceful shutdown', { error: e && (e.stack || e) });
+    process.exit(1);
+  }
+});
+
+process.on('SIGQUIT', async () => {
+  logger.info('ShardingManager received SIGQUIT, shutting down gracefully');
+  try {
+    await manager.broadcastEval((client) => client.destroy());
+    process.exit(0);
+  } catch (e) {
+    logger.error('Error during graceful shutdown', { error: e && (e.stack || e) });
+    process.exit(1);
+  }
+});
