@@ -1,6 +1,7 @@
 const utils = require('../utils');
 const logger = utils.logger.get('messageCreate');
 const spawnManager = require('../spawnManager');
+const userModel = require('../models/user');
 const fallbackLogger = utils.fallbackLogger;
 
 module.exports = {
@@ -29,6 +30,17 @@ module.exports = {
         });
       }
     } catch (_) { /* ignore trace errors */ }
+    if (isEggAttempt && message.guild && message.author && message.author.id) {
+      try {
+        await userModel.findOrCreate(String(message.author.id));
+      } catch (err) {
+        logger.warn('Failed to initialize user on egg attempt', {
+          userId: message.author.id,
+          guildId: message.guild.id,
+          error: err && (err.stack || err),
+        });
+      }
+    }
     try {
       const handled = await spawnManager.handleMessage(message);
       if (handled) return;
