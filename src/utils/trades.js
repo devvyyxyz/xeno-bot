@@ -4,6 +4,7 @@ const hostModel = require('../models/host');
 const xenoModel = require('../models/xenomorph');
 const itemsService = require('../services/items');
 const logger = require('../utils').logger.get('utils:trades');
+const { parseJSON } = require('./format/jsonParse');
 
 function emptyOffer() {
   return { eggs: {}, items: {}, hosts: [], xenos: [] };
@@ -27,6 +28,66 @@ async function updateTrade(id, patch) {
 async function cancelTrade(id) {
   await updateTrade(id, { status: 'cancelled' });
   return getTradeById(id);
+}
+
+/**
+ * Transfer eggs from one user to another.
+ * @param {string} fromUserId - User ID to transfer from
+ * @param {string} toUserId - User ID to transfer to
+ * @param {string} guildId - Guild ID
+ * @param {object} eggMap - Object mapping egg IDs to quantities
+ */
+async function transferEggs(fromUserId, toUserId, guildId, eggMap = {}) {
+  for (const [eggId, qty] of Object.entries(eggMap)) {
+    const quantity = Number(qty);
+    if (quantity <= 0) continue;
+    await userModel.removeEggsForGuild(fromUserId, guildId, eggId, quantity);
+    await userModel.addEggsForGuild(toUserId, guildId, quantity, eggId);
+  }
+}
+
+/**
+ * Transfer items from one user to another.
+ * @param {string} fromUserId - User ID to transfer from
+ * @param {string} toUserId - User ID to transfer to
+ * @param {string} guildId - Guild ID
+ * @param {object} itemMap - Object mapping item IDs to quantities
+ */
+async function transferItems(fromUserId, toUserId, guildId, itemMap = {}) {
+  for (const [itemId, qty] of Object.entries(itemMap)) {
+    const quantity = Number(qty);
+    if (quantity <= 0) continue;
+    await itemsService.consumeItemForUser(fromUserId, guildId, { id: itemId }, quantity);
+    await userModel.addItemForGuild(toUserId, guildId, itemId, quantity);
+  }
+}
+
+/**
+ * Transfer hosts from one user to another.
+ * @param {string} fromUserId - User ID to transfer from (for logging)
+ * @param {string} toUserId - User ID to transfer to
+ * @param {array} hostIds - Array of host IDs to transfer
+ */
+async function transferHosts(fromUserId, toUserId, hostIds = []) {
+  for (const hid of hostIds) {
+    const hostId = Number(hid);
+    if (!hostId) continue;
+    await db.knex('hosts').where({ id: hostId }).update({ owner_id: toUserId });
+  }
+}
+
+/**
+ * Transfer xenomorphs from one user to another and detach from hives.
+ * @param {string} fromUserId - User ID to transfer from (for logging)
+ * @param {string} toUserId - User ID to transfer to
+ * @param {array} xenoIds - Array of xenomorph IDs to transfer
+ */
+async function transferXenos(fromUserId, toUserId, xenoIds = []) {
+  for (const xid of xenoIds) {
+    const xenoId = Number(xid);
+    if (!xenoId) continue;
+    await db.knex('xenomorphs').where({ id: xenoId }).update({ owner_id: toUserId, hive_id: null });
+  }
 }
 
 // Validate that the owner still controls offered assets and return a normalized offer summary
@@ -75,8 +136,8 @@ async function applyTrade(tradeRow) {
     const initiator = tradeRow.initiator_id;
     const recipient = tradeRow.recipient_id;
     const guildId = tradeRow.guild_id;
-    const a = JSON.parse(tradeRow.initiator_offer || '{}');
-    const b = JSON.parse(tradeRow.recipient_offer || '{}');
+    const a = parseJSON(tradeRow.initiator_offer, {}, 'initiator_offer');
+    const b = parseJSON(tradeRow.recipient_offer, {}, 'recipient_offer');
 
     // Re-validate ownership inside transaction (simple checks)
     const aProblems = await validateOfferOwnership(a, initiator, guildId);
@@ -86,38 +147,17 @@ async function applyTrade(tradeRow) {
       return { success: false, error: 'ownership_mismatch', details: { aProblems, bProblems } };
     }
 
-    // Remove eggs/items from initiator and add to recipient
-    for (const [eggId, qty] of Object.entries(a.eggs || {})) {
-      await userModel.removeEggsForGuild(initiator, guildId, eggId, Number(qty));
-      await userModel.addEggsForGuild(recipient, guildId, Number(qty), eggId);
-    }
-    for (const [itemId, qty] of Object.entries(a.items || {})) {
-      // consume from initiator
-      await itemsService.consumeItemForUser(initiator, guildId, { id: itemId }, Number(qty));
-      await userModel.addItemForGuild(recipient, guildId, itemId, Number(qty));
-    }
-    for (const hid of a.hosts || []) {
-      await db.knex('hosts').where({ id: Number(hid) }).update({ owner_id: recipient });
-    }
-    for (const xid of a.xenos || []) {
-      await db.knex('xenomorphs').where({ id: Number(xid) }).update({ owner_id: recipient, hive_id: null });
-    }
+    // Transfer initiator's offer to recipient
+    await transferEggs(initiator, recipient, guildId, a.eggs);
+    await transferItems(initiator, recipient, guildId, a.items);
+    await transferHosts(initiator, recipient, a.hosts);
+    await transferXenos(initiator, recipient, a.xenos);
 
-    // Remove eggs/items from recipient and add to initiator
-    for (const [eggId, qty] of Object.entries(b.eggs || {})) {
-      await userModel.removeEggsForGuild(recipient, guildId, eggId, Number(qty));
-      await userModel.addEggsForGuild(initiator, guildId, Number(qty), eggId);
-    }
-    for (const [itemId, qty] of Object.entries(b.items || {})) {
-      await itemsService.consumeItemForUser(recipient, guildId, { id: itemId }, Number(qty));
-      await userModel.addItemForGuild(initiator, guildId, itemId, Number(qty));
-    }
-    for (const hid of b.hosts || []) {
-      await db.knex('hosts').where({ id: Number(hid) }).update({ owner_id: initiator });
-    }
-    for (const xid of b.xenos || []) {
-      await db.knex('xenomorphs').where({ id: Number(xid) }).update({ owner_id: initiator, hive_id: null });
-    }
+    // Transfer recipient's offer to initiator
+    await transferEggs(recipient, initiator, guildId, b.eggs);
+    await transferItems(recipient, initiator, guildId, b.items);
+    await transferHosts(recipient, initiator, b.hosts);
+    await transferXenos(recipient, initiator, b.xenos);
 
     await db.knex('trades').where({ id: tradeRow.id }).update({ status: 'accepted', updated_at: db.knex.fn.now() });
     await trx.commit();
@@ -130,3 +170,4 @@ async function applyTrade(tradeRow) {
 }
 
 module.exports = { emptyOffer, createTrade, getTradeById, updateTrade, cancelTrade, validateOfferOwnership, applyTrade };
+

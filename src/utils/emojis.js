@@ -1,17 +1,14 @@
 // Lightweight emoji resolver with fallback and availability checks
 const fs = require('fs');
 const path = require('path');
+const { parseJSON } = require('./format/jsonParse');
 
 const EMOJI_PATH = path.join(__dirname, '../../config/emojis.json');
 const EMOJI_FALLBACK = '🔳';
 
 function loadEmojis() {
-  try {
-    const raw = fs.readFileSync(EMOJI_PATH, 'utf8');
-    return JSON.parse(raw);
-  } catch (err) {
-    return {};
-  }
+  const raw = fs.readFileSync(EMOJI_PATH, 'utf8');
+  return parseJSON(raw, {}, 'emojis.json');
 }
 
 // Return the raw config object for consumers

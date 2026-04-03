@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { getCommandConfig } = require('../../utils/commandsConfig');
 const safeReply = require('../../utils/safeReply');
+const { parseJSON } = require('../../utils/format/jsonParse');
 
 function chunkJoin(list, sep = ', ', max = 900) {
   const out = [];
@@ -22,13 +23,9 @@ function chunkJoin(list, sep = ', ', max = 900) {
 }
 
 function loadCredits() {
-  try {
-    const p = path.join(__dirname, '..', '..', '..', 'config', 'credits.json');
-    const raw = fs.readFileSync(p, 'utf8');
-    return JSON.parse(raw);
-  } catch (e) {
-    return null;
-  }
+  const p = path.join(__dirname, '..', '..', '..', 'config', 'credits.json');
+  const raw = fs.readFileSync(p, 'utf8');
+  return parseJSON(raw, null, 'credits.json');
 }
 
 const cfg = getCommandConfig('credits') || { name: 'credits', description: 'Show bot credits and contributors.' };

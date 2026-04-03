@@ -1,16 +1,13 @@
 const fs = require('fs');
 const path = require('path');
+const { parseJSON } = require('../utils/format/jsonParse');
 
 const FILE = path.join(__dirname, '../../data/profiles.json');
 
 function loadAll() {
-  try {
-    if (!fs.existsSync(FILE)) return {};
-    const s = fs.readFileSync(FILE, 'utf8');
-    return s ? JSON.parse(s) : {};
-  } catch (e) {
-    return {};
-  }
+  if (!fs.existsSync(FILE)) return {};
+  const s = fs.readFileSync(FILE, 'utf8');
+  return parseJSON(s, {}, 'profiles.json');
 }
 
 function saveAll(data) {
