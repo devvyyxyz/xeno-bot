@@ -7,16 +7,27 @@ module.exports = {
   name: 'messageCreate',
   async execute(message, client) {
     if (message.author.bot) return;
+    const content = typeof message.content === 'string' ? message.content : '';
+    const normalized = content.trim().toLowerCase();
+    const isEggAttempt = /\begg\b/i.test(normalized);
     try {
       const handled = await spawnManager.handleMessage(message);
       if (handled) return;
+      if (isEggAttempt) {
+        logger.info('Egg attempt was not handled by spawnManager', {
+          guildId: message.guild && message.guild.id,
+          channelId: message.channel && message.channel.id,
+          userId: message.author && message.author.id,
+          contentLength: content.length,
+        });
+      }
     } catch (err) {
       logger.error('Spawn manager message handling failed', { error: err.stack || err });
     }
     const prefix = client.config?.prefix || '!';
-    if (!message.content.startsWith(prefix)) return;
+    if (!content.startsWith(prefix)) return;
     logger.debug && logger.debug('Message received', { user: message.author.id, channel: message.channel.id });
-    const args = message.content.slice(prefix.length).trim().split(/\s+/);
+    const args = content.slice(prefix.length).trim().split(/\s+/);
     const commandName = args.shift().toLowerCase();
     const command = client.commands.get(commandName);
     if (!command) return;

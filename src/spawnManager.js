@@ -1266,6 +1266,13 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
 async function handleMessage(message) {
   if (!message.guild) return false;
   const gid = message.guild.id;
+  const rawContent = String(message.content || '').trim().toLowerCase();
+  // Accept common variants like "egg", egg!, !egg, /egg.
+  const normalizedContent = rawContent.replace(/^["'`!/.\s]+|["'`!?.\s]+$/g, '');
+  const hasEggKeyword = /\begg\b/i.test(normalizedContent);
+  const contentUnavailable = rawContent.length === 0;
+  const isEggAttempt = hasEggKeyword || contentUnavailable || !!(message.reference && message.reference.messageId);
+
   let guildMapKey = gid;
   let guildMap = activeEggs.get(gid);
   if (!guildMap) {
@@ -1277,12 +1284,19 @@ async function handleMessage(message) {
       }
     }
   }
-  if (!guildMap || guildMap.size === 0) return false;
+  if (!guildMap || guildMap.size === 0) {
+    if (isEggAttempt) {
+      logger.info('[SPAWN] Egg attempt ignored: no active guild eggs', {
+        guildId: gid,
+        userId: message.author && message.author.id,
+        channelId: message.channel && message.channel.id,
+        hasEggKeyword,
+        contentUnavailable,
+      });
+    }
+    return false;
+  }
   if (message.author.bot) return false;
-  const rawContent = String(message.content || '').trim().toLowerCase();
-  // Accept common variants like "egg", egg!, !egg, /egg.
-  const normalizedContent = rawContent.replace(/^["'`!/.\s]+|["'`!?.\s]+$/g, '');
-  const hasEggKeyword = /\begg\b/i.test(normalizedContent);
 
   // check for active egg event in this channel
   let eggsInChannel = [...guildMap.values()].filter((e) => String(e.channelId) === String(message.channel.id));
@@ -1331,12 +1345,30 @@ async function handleMessage(message) {
     } catch (_) { /* ignore DB fallback errors */ }
   }
 
-  if (eggsInChannel.length === 0) return false;
+  if (eggsInChannel.length === 0) {
+    if (isEggAttempt) {
+      logger.info('[SPAWN] Egg attempt ignored: no channel/db match', {
+        guildId: gid,
+        userId: message.author && message.author.id,
+        channelId: message.channel && message.channel.id,
+        activeGuildEggs: guildMap.size,
+      });
+    }
+    return false;
+  }
 
   // If message content is unavailable (missing Message Content intent in some contexts),
   // allow the first non-bot message in the active egg channel to catch.
-  const contentUnavailable = rawContent.length === 0;
-  if (!hasEggKeyword && !contentUnavailable) return false;
+  if (!hasEggKeyword && !contentUnavailable) {
+    if (isEggAttempt) {
+      logger.info('[SPAWN] Egg attempt ignored: keyword/content gate failed', {
+        guildId: gid,
+        userId: message.author && message.author.id,
+        channelId: message.channel && message.channel.id,
+      });
+    }
+    return false;
+  }
 
   // Only the first user to type 'egg' claims all eggs
   const eggEvent = eggsInChannel[0];
@@ -1357,11 +1389,13 @@ async function handleMessage(message) {
     });
   } catch (_) { /* ignore */ }
   
+  let catchTimeMs = 0;
+  let result = 0;
   try {
     // Calculate catch time
-    const catchTimeMs = Date.now() - eggEvent.spawnedAt;
+    catchTimeMs = Date.now() - eggEvent.spawnedAt;
     // Track per egg type and stats
-    const result = await userModel.addEggsForGuild(
+    result = await userModel.addEggsForGuild(
       String(message.author.id),
       gid,
       eggEvent.numEggs,
@@ -1372,7 +1406,38 @@ async function handleMessage(message) {
     // Consume the active egg only after the reward update succeeds.
     // This prevents a failed DB write from silently deleting the spawn.
     activeEggs.delete(guildMapKey);
+    logger.info('[SPAWN] Egg award committed', {
+      guildId: gid,
+      userId: message.author.id,
+      messageId: eggEvent.messageId,
+      numEggs: eggEvent.numEggs,
+      eggType: eggEvent.eggType.id,
+      catchTimeMs,
+      result,
+    });
+  } catch (err) {
+    logger.error('Failed awarding egg', {
+      guildId: gid,
+      user: message.author.id,
+      messageId: eggEvent && eggEvent.messageId,
+      error: err.stack || err,
+    });
+    try {
+      await message.channel.send(
+        `${emojis.facehugger || ''} Error awarding egg to ${message.author}.`
+      );
+    } catch (replyErr) {
+      logger.warn('Failed sending award error response', {
+        guildId: gid,
+        user: message.author.id,
+        error: replyErr && (replyErr.stack || replyErr),
+      });
+    }
+    // Keep egg active when award fails so users can retry.
+    return false;
+  }
 
+  try {
     const catchTime = Duration.fromMillis(catchTimeMs)
       .shiftTo('years', 'months', 'days', 'hours', 'minutes', 'seconds')
       .toHuman({ maximumFractionDigits: 2, showZeros: false });
@@ -1387,15 +1452,13 @@ async function handleMessage(message) {
       eggType: eggEvent.eggType.id,
       catchTimeMs,
     });
-  } catch (err) {
-    logger.error('Failed awarding egg', {
+  } catch (sendErr) {
+    logger.warn('Egg awarded but failed to send catch response', {
       guildId: gid,
       user: message.author.id,
-      error: err.stack || err,
+      messageId: eggEvent && eggEvent.messageId,
+      error: sendErr && (sendErr.stack || sendErr),
     });
-    await message.channel.send(
-      `${emojis.facehugger || ''} Error awarding egg to ${message.author}.`
-    );
   }
 
   // remove persisted active spawn row for this message
