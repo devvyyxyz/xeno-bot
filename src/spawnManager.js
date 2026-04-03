@@ -80,6 +80,9 @@ let spawnCleanupInterval = null;
 // Shard-local guild set and in-flight enqueue tracking
 let shardGuildSet = new Set();
 let enqueuedSet = new Set();
+let directMessageListenerAttached = false;
+let messageCreateEventsSeen = 0;
+let lastMessageCreateSeenAt = 0;
 const SPAWN_POLL_MS = Number(process.env.SPAWN_SCHED_POLL_MS) || 5000;
 const SPAWN_POLL_DB_LIMIT = Number(process.env.SPAWN_SCHED_DB_LIMIT) || 200;
 const SPAWN_CLEANUP_MS = Number(process.env.SPAWN_CLEANUP_MS) || 10 * 60 * 1000;
@@ -331,6 +334,21 @@ function processSpawnQueue() {
 
 async function init(botClient) {
   client = botClient;
+  if (!directMessageListenerAttached && client && typeof client.on === 'function') {
+    client.on('messageCreate', async (message) => {
+      try {
+        messageCreateEventsSeen += 1;
+        lastMessageCreateSeenAt = Date.now();
+        await handleMessage(message);
+      } catch (e) {
+        logger.warn('Direct spawn messageCreate listener failed', {
+          error: e && (e.stack || e),
+        });
+      }
+    });
+    directMessageListenerAttached = true;
+    logger.info('Attached direct spawn messageCreate listener');
+  }
   // start schedules for guilds that belong to this shard
   try {
     try {
@@ -1081,6 +1099,32 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
       uncaughtEggTimeout.delete(guildId);
     }, UNCAUGHT_EGG_TIMEOUT_MS);
     uncaughtEggTimeout.set(guildId, timeoutId);
+
+    // Diagnostic: if egg remains active and no messageCreate events were seen, catching may be blocked.
+    try {
+      const checkMs = Number(process.env.SPAWN_MESSAGE_EVENT_CHECK_MS) || 20000;
+      const warnTimer = setTimeout(() => {
+        try {
+          const stillActive = activeEggs.get(guildId);
+          const noRecentMessageEvents = !lastMessageCreateSeenAt || (Date.now() - lastMessageCreateSeenAt > checkMs);
+          if (stillActive && stillActive.size > 0 && noRecentMessageEvents) {
+            warnWithCooldown(
+              `msg-events-missing:${guildId}`,
+              'Active egg still present but no messageCreate events observed; text catches may be blocked',
+              {
+                guildId,
+                channelId: channel.id,
+                messageId: sent.id,
+                messageCreateEventsSeen,
+                hint: 'Enable Message Content intent and verify bot can read messages in this channel',
+              },
+              2 * 60 * 1000
+            );
+          }
+        } catch (_) { /* ignore */ }
+      }, checkMs);
+      if (typeof warnTimer.unref === 'function') warnTimer.unref();
+    } catch (_) { /* ignore */ }
     // persist active spawn so it survives restarts
     try {
       const knex = db.knex;
