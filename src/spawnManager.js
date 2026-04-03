@@ -287,7 +287,52 @@ function spawnCleanupTick() {
       if (shardGuildSet && shardGuildSet.size > 0 && !shardGuildSet.has(String(gid))) enqueuedSet.delete(gid);
     }
     
-    // Log memory and state periodically
+    // Recovery: detect and fix stuck guilds (no scheduled spawn, no active eggs, not in progress)
+    if (shardGuildSet && shardGuildSet.size > 0) {
+      const stuckGuilds = [];
+      for (const guildId of shardGuildSet) {
+        const hasScheduledSpawn = nextSpawnAt.has(String(guildId)) || nextSpawnAt.has(guildId);
+        const hasActiveEgg = activeEggs.has(String(guildId)) || activeEggs.has(guildId);
+        const isInProgress = inProgress.has(String(guildId)) || inProgress.has(guildId);
+        const isEnqueued = enqueuedSet.has(String(guildId)) || enqueuedSet.has(guildId);
+        const lastSpawn = lastSpawnAt.get(String(guildId)) || lastSpawnAt.get(guildId) || 0;
+        const timeSinceLastSpawn = now - lastSpawn;
+        
+        // Guild is stuck if: no scheduled spawn, no active eggs, not in progress, and hasn't recently spawned
+        const isStuck = !hasScheduledSpawn && !hasActiveEgg && !isInProgress && !isEnqueued && timeSinceLastSpawn > 60000; // 60s minimum
+        
+        if (isStuck) {
+          stuckGuilds.push(guildId);
+        }
+      }
+      
+      // Schedule recovery for stuck guilds
+      if (stuckGuilds.length > 0) {
+        logger.warn('[SPAWN RECOVERY] Found stuck guilds with no scheduled spawns', {
+          count: stuckGuilds.length,
+          guildIds: stuckGuilds.slice(0, 10), // Log first 10 to avoid spam
+        });
+        
+        for (const guildId of stuckGuilds) {
+          try {
+            // Schedule spawn for stuck guild immediately
+            const scheduledAt = now + 2000; // spawn in 2 seconds
+            nextSpawnAt.set(String(guildId), scheduledAt);
+            logger.info('[SPAWN RECOVERY] Scheduled recovery spawn for stuck guild', {
+              guildId: String(guildId),
+              scheduledAt,
+              in_ms: 2000,
+            });
+          } catch (e) {
+            logger.warn('[SPAWN RECOVERY] Failed to schedule recovery spawn', {
+              guildId: String(guildId),
+              error: e && (e.stack || e),
+            });
+          }
+        }
+      }
+    }
+    
     try {
       const mu = process.memoryUsage();
       const totalActiveEggs = Array.from(activeEggs.values()).reduce((sum, map) => sum + map.size, 0);
@@ -1900,6 +1945,41 @@ async function forceSpawn(guildId, forcedEggTypeId) {
 }
 
 module.exports.forceSpawn = forceSpawn;
+
+// Debug helper: get spawn state for a specific guild
+function getGuildSpawnState(guildId) {
+  const guildIdStr = String(guildId);
+  const hasScheduledSpawn = nextSpawnAt.has(guildIdStr) || nextSpawnAt.has(guildId);
+  const scheduledAt = nextSpawnAt.get(guildIdStr) || nextSpawnAt.get(guildId);
+  const hasActiveEgg = activeEggs.has(guildIdStr) || activeEggs.has(guildId);
+  const activeEggMap = activeEggs.get(guildIdStr) || activeEggs.get(guildId);
+  const isInProgress = inProgress.has(guildIdStr) || inProgress.has(guildId);
+  const isEnqueued = enqueuedSet.has(guildIdStr) || enqueuedSet.has(guildId);
+  const lastSpawn = lastSpawnAt.get(guildIdStr) || lastSpawnAt.get(guildId);
+  const failureInfo = failureTracker.get(guildIdStr) || failureTracker.get(guildId);
+  
+  return {
+    guildId: guildIdStr,
+    hasScheduledSpawn,
+    scheduledAt: scheduledAt || null,
+    scheduledInMs: scheduledAt ? Math.max(0, scheduledAt - Date.now()) : null,
+    hasActiveEgg,
+    activeEggCount: activeEggMap ? activeEggMap.size : 0,
+    activeEggs: activeEggMap ? Array.from(activeEggMap.entries()).map(([mid, egg]) => ({
+      messageId: mid,
+      channelId: egg.channelId,
+      spawnedAt: egg.spawnedAt,
+      numEggs: egg.numEggs,
+      eggType: egg.eggType && egg.eggType.id,
+    })) : [],
+    isInProgress,
+    isEnqueued,
+    lastSpawnMs: lastSpawn ? Date.now() - lastSpawn : null,
+    failures: failureInfo ? { count: failureInfo.count, lastFailTime: failureInfo.lastFailTime } : null,
+  };
+}
+
+module.exports.getGuildSpawnState = getGuildSpawnState;
 
 // Shutdown helper: clear any pending timers used for scheduling
 async function shutdown() {
