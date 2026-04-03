@@ -1273,6 +1273,21 @@ async function handleMessage(message) {
   const contentUnavailable = rawContent.length === 0;
   const isEggAttempt = hasEggKeyword || contentUnavailable || !!(message.reference && message.reference.messageId);
 
+  if (isEggAttempt) {
+    try {
+      logger.info('[SPAWN] handleMessage entry', {
+        guildId: gid,
+        channelId: message.channel && message.channel.id,
+        userId: message.author && message.author.id,
+        rawLength: rawContent.length,
+        normalizedContent,
+        hasEggKeyword,
+        contentUnavailable,
+        activeGuilds: activeEggs.size,
+      });
+    } catch (_) { /* ignore */ }
+  }
+
   let guildMapKey = gid;
   let guildMap = activeEggs.get(gid);
   if (!guildMap) {

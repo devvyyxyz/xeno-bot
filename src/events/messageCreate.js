@@ -11,6 +11,25 @@ module.exports = {
     const normalized = content.trim().toLowerCase();
     const isEggAttempt = /\begg\b/i.test(normalized);
     try {
+      const gid = message.guild && message.guild.id ? String(message.guild.id) : null;
+      let activeGuildEggs = 0;
+      if (gid && spawnManager && spawnManager.activeEggs) {
+        const map = spawnManager.activeEggs.get(gid);
+        activeGuildEggs = map && map.size ? map.size : 0;
+      }
+      if (isEggAttempt || activeGuildEggs > 0) {
+        logger.info('messageCreate trace', {
+          guildId: gid,
+          channelId: message.channel && message.channel.id,
+          userId: message.author && message.author.id,
+          contentLength: content.length,
+          normalizedPreview: normalized.slice(0, 32),
+          isEggAttempt,
+          activeGuildEggs,
+        });
+      }
+    } catch (_) { /* ignore trace errors */ }
+    try {
       const handled = await spawnManager.handleMessage(message);
       if (handled) return;
       if (isEggAttempt) {
