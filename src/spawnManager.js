@@ -1269,10 +1269,30 @@ async function handleMessage(message) {
   const guildMap = activeEggs.get(gid);
   if (!guildMap || guildMap.size === 0) return false;
   if (message.author.bot) return false;
-  if (message.content.trim().toLowerCase() !== 'egg') return false;
+  const rawContent = String(message.content || '').trim().toLowerCase();
+  // Accept common variants like "egg", egg!, egg.
+  const normalizedContent = rawContent.replace(/^["'`\s]+|["'`!?.\s]+$/g, '');
+  if (normalizedContent !== 'egg') return false;
 
   // check for a single active egg event in this channel
-  const eggsInChannel = [...guildMap.values()].filter((e) => e.channelId === message.channel.id);
+  let eggsInChannel = [...guildMap.values()].filter((e) => String(e.channelId) === String(message.channel.id));
+
+  // If user replied directly to a spawn message, match by referenced message id.
+  if (eggsInChannel.length === 0 && message.reference && message.reference.messageId) {
+    const byReply = guildMap.get(String(message.reference.messageId));
+    if (byReply) eggsInChannel = [byReply];
+  }
+
+  // Safe fallback: if exactly one active egg exists in the guild, allow catch.
+  if (eggsInChannel.length === 0 && guildMap.size === 1) {
+    eggsInChannel = [Array.from(guildMap.values())[0]];
+    logger.debug('Egg catch fallback matched single active guild egg', {
+      guildId: gid,
+      messageChannelId: message.channel.id,
+      spawnChannelId: eggsInChannel[0] && eggsInChannel[0].channelId,
+    });
+  }
+
   if (eggsInChannel.length === 0) return false;
 
   // Only the first user to type 'egg' claims all eggs
