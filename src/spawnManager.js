@@ -1284,7 +1284,7 @@ async function handleMessage(message) {
   const normalizedContent = rawContent.replace(/^["'`!/.\s]+|["'`!?.\s]+$/g, '');
   const hasEggKeyword = /\begg\b/i.test(normalizedContent);
 
-  // check for a single active egg event in this channel
+  // check for active egg event in this channel
   let eggsInChannel = [...guildMap.values()].filter((e) => String(e.channelId) === String(message.channel.id));
 
   // If user replied directly to a spawn message, match by referenced message id.
@@ -1293,14 +1293,42 @@ async function handleMessage(message) {
     if (byReply) eggsInChannel = [byReply];
   }
 
-  // Safe fallback: if exactly one active egg exists in the guild, allow catch.
-  if (eggsInChannel.length === 0 && guildMap.size === 1) {
-    eggsInChannel = [Array.from(guildMap.values())[0]];
+  // Safe fallback: if active egg exists but channel didn't match, use newest guild egg.
+  if (eggsInChannel.length === 0 && guildMap.size > 0) {
+    const newest = Array.from(guildMap.values()).sort((a, b) => Number(b.spawnedAt || 0) - Number(a.spawnedAt || 0))[0];
+    if (newest) eggsInChannel = [newest];
     logger.debug('Egg catch fallback matched single active guild egg', {
       guildId: gid,
       messageChannelId: message.channel.id,
-      spawnChannelId: eggsInChannel[0] && eggsInChannel[0].channelId,
+      spawnChannelId: newest && newest.channelId,
+      activeInGuild: guildMap.size,
     });
+  }
+
+  // Last-resort fallback: if no in-memory egg matched but DB still has one, reconstruct minimally.
+  if (eggsInChannel.length === 0) {
+    try {
+      const knex = db.knex;
+      const row = await knex('active_spawns')
+        .where({ guild_id: String(gid) })
+        .orderBy('spawned_at', 'desc')
+        .first();
+      if (row) {
+        const dbEggType = eggTypes.find((t) => t.id === row.egg_type) || { id: row.egg_type, name: row.egg_type, emoji: '' };
+        eggsInChannel = [{
+          messageId: row.message_id,
+          channelId: row.channel_id,
+          spawnedAt: Number(row.spawned_at) || Date.now(),
+          numEggs: Number(row.num_eggs) || 1,
+          eggType: { id: dbEggType.id, name: dbEggType.name, emoji: dbEggType.emoji || '' },
+        }];
+        logger.debug('Egg catch fallback reconstructed active egg from DB', {
+          guildId: gid,
+          messageId: row.message_id,
+          channelId: row.channel_id,
+        });
+      }
+    } catch (_) { /* ignore DB fallback errors */ }
   }
 
   if (eggsInChannel.length === 0) return false;
