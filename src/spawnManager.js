@@ -1280,9 +1280,9 @@ async function handleMessage(message) {
   if (!guildMap || guildMap.size === 0) return false;
   if (message.author.bot) return false;
   const rawContent = String(message.content || '').trim().toLowerCase();
-  // Accept common variants like "egg", egg!, egg.
-  const normalizedContent = rawContent.replace(/^["'`\s]+|["'`!?.\s]+$/g, '');
-  if (normalizedContent !== 'egg') return false;
+  // Accept common variants like "egg", egg!, !egg, /egg.
+  const normalizedContent = rawContent.replace(/^["'`!/.\s]+|["'`!?.\s]+$/g, '');
+  const hasEggKeyword = /\begg\b/i.test(normalizedContent);
 
   // check for a single active egg event in this channel
   let eggsInChannel = [...guildMap.values()].filter((e) => String(e.channelId) === String(message.channel.id));
@@ -1304,6 +1304,11 @@ async function handleMessage(message) {
   }
 
   if (eggsInChannel.length === 0) return false;
+
+  // If message content is unavailable (missing Message Content intent in some contexts),
+  // allow the first non-bot message in the active egg channel to catch.
+  const contentUnavailable = rawContent.length === 0;
+  if (!hasEggKeyword && !contentUnavailable) return false;
 
   // Only the first user to type 'egg' claims all eggs
   const eggEvent = eggsInChannel[0];
