@@ -1266,7 +1266,17 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
 async function handleMessage(message) {
   if (!message.guild) return false;
   const gid = message.guild.id;
-  const guildMap = activeEggs.get(gid);
+  let guildMapKey = gid;
+  let guildMap = activeEggs.get(gid);
+  if (!guildMap) {
+    for (const [k, v] of activeEggs.entries()) {
+      if (String(k) === String(gid)) {
+        guildMapKey = k;
+        guildMap = v;
+        break;
+      }
+    }
+  }
   if (!guildMap || guildMap.size === 0) return false;
   if (message.author.bot) return false;
   const rawContent = String(message.content || '').trim().toLowerCase();
@@ -1328,7 +1338,7 @@ async function handleMessage(message) {
 
     // Consume the active egg only after the reward update succeeds.
     // This prevents a failed DB write from silently deleting the spawn.
-    activeEggs.delete(gid);
+    activeEggs.delete(guildMapKey);
 
     const catchTime = Duration.fromMillis(catchTimeMs)
       .shiftTo('years', 'months', 'days', 'hours', 'minutes', 'seconds')
@@ -1359,7 +1369,7 @@ async function handleMessage(message) {
   try {
     const knex = db.knex;
     if (eggEvent && eggEvent.messageId)
-      await knex('active_spawns').where({ guild_id: gid, message_id: eggEvent.messageId }).del();
+      await knex('active_spawns').where({ guild_id: String(gid), message_id: eggEvent.messageId }).del();
   } catch (e) {
     try {
       logger.warn('Failed removing active_spawns row after catch', {
@@ -1447,14 +1457,15 @@ async function handleMessage(message) {
   }
 
   // If no more active eggs, schedule the next spawn (apply pending reschedule if present)
-  if (!activeEggs.has(gid)) {
+  if (!activeEggs.has(guildMapKey) && !activeEggs.has(gid)) {
     if (pendingReschedule.has(gid)) {
       pendingReschedule.delete(gid);
     }
     // Clear the uncaught egg timeout since eggs were caught
-    if (uncaughtEggTimeout.has(gid)) {
-      clearTimeout(uncaughtEggTimeout.get(gid));
-      uncaughtEggTimeout.delete(gid);
+    const timeoutKey = uncaughtEggTimeout.has(gid) ? gid : String(guildMapKey);
+    if (uncaughtEggTimeout.has(timeoutKey)) {
+      clearTimeout(uncaughtEggTimeout.get(timeoutKey));
+      uncaughtEggTimeout.delete(timeoutKey);
     }
     // Always schedule the next spawn after an event completes
     try {
