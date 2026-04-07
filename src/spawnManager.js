@@ -1647,16 +1647,17 @@ async function handleMessage(message) {
     }
   }
   if (!guildMap || guildMap.size === 0) {
-    if (isEggAttempt) {
-      logger.info('[SPAWN] Egg attempt ignored: no active guild eggs', {
-        guildId: gid,
-        userId: message.author && message.author.id,
-        channelId: message.channel && message.channel.id,
-        hasEggKeyword,
-        contentUnavailable,
-      });
+    if (!isEggAttempt) {
+      return false;
     }
-    return false;
+    logger.info('[SPAWN] Egg attempt continuing with DB fallback: no active guild eggs in memory', {
+      guildId: gid,
+      userId: message.author && message.author.id,
+      channelId: message.channel && message.channel.id,
+      hasEggKeyword,
+      contentUnavailable,
+    });
+    guildMap = new Map();
   }
   if (message.author.bot) return false;
 
