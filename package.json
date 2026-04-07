@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@discordjs/builders": "^2.0.0-dev.1771286636-ccce987fa",
-    "@discordjs/rest": "^2.6.0",
+    "@discordjs/rest": "^2.6.1",
     "@sentry/node": "^7.16.0",
     "bullmq": "^5.71.0",
     "cors": "^2.8.5",
