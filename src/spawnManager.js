@@ -112,6 +112,20 @@ function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function normalizeGuildId(guildId) {
+  return String(guildId);
+}
+
+function getGuildEggMap(guildId) {
+  const gid = normalizeGuildId(guildId);
+  let guildMap = activeEggs.get(gid);
+  if (guildMap) return guildMap;
+  for (const [k, v] of activeEggs.entries()) {
+    if (String(k) === gid) return v;
+  }
+  return null;
+}
+
 function warnWithCooldown(key, message, meta = {}, cooldownMs = 15 * 60 * 1000) {
   const now = Date.now();
   const last = warnCooldowns.get(key) || 0;
@@ -888,6 +902,7 @@ async function init(botClient) {
 }
 
 function scheduleNext(guildId) {
+  guildId = normalizeGuildId(guildId);
   if (shuttingDown) {
     try { logger && logger.info && logger.info('Skipping scheduleNext: system is shutting down', { guildId }); } catch (_) { /* ignore */ }
     return;
@@ -895,7 +910,7 @@ function scheduleNext(guildId) {
   // Wrap async IIFE with error handler to prevent unhandled rejections
   (async () => {
     // Checkpoint 1: Check active eggs
-    const activeMap = activeEggs.get(guildId);
+    const activeMap = getGuildEggMap(guildId);
     if (activeMap && activeMap.size > 0) {
       logger.info('Active eggs present; delaying schedule until cleared', {
         guildId,
@@ -1018,8 +1033,9 @@ function scheduleNext(guildId) {
 }
 
 function requestReschedule(guildId) {
+  guildId = normalizeGuildId(guildId);
   // If eggs are active, mark for reschedule after they're cleared; otherwise schedule immediately
-  const activeMap = activeEggs.get(guildId);
+  const activeMap = getGuildEggMap(guildId);
   if (activeMap && activeMap.size > 0) {
     const wasPending = pendingReschedule.has(guildId);
     pendingReschedule.add(guildId);
@@ -1036,8 +1052,9 @@ function requestReschedule(guildId) {
 }
 
 function getNextSpawnForGuild(guildId) {
+  guildId = normalizeGuildId(guildId);
   // If an active egg event exists, return null to indicate spawn is active now
-  const activeMap = activeEggs.get(guildId);
+  const activeMap = getGuildEggMap(guildId);
   if (activeMap && activeMap.size > 0)
     return {
       active: true,
@@ -1070,6 +1087,7 @@ function pickEggType() {
 }
 
 async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
+  guildId = normalizeGuildId(guildId);
   const guildName = getGuildName(guildId);
   // prevent concurrent spawns for the same guild
   if (inProgress.has(guildId)) {
@@ -1182,7 +1200,7 @@ async function doSpawn(guildId, forcedEggTypeId, isForced = false) {
     }
 
     // Only one spawn event at a time, but spawn up to egg_limit eggs in this event
-    const guildMap = activeEggs.get(guildId);
+    const guildMap = getGuildEggMap(guildId);
     if (!isForced && guildMap && guildMap.size > 0) {
       logger.info(`Spawn event already active; skipping (${guildName})`, { guildId });
       // CRITICAL FIX: Don't call scheduleNext - it causes database writes that accumulate memory
@@ -1651,18 +1669,6 @@ async function handleMessage(message) {
     if (byReply) eggsInChannel = [byReply];
   }
 
-  // Safe fallback: if active egg exists but channel didn't match, use newest guild egg.
-  if (eggsInChannel.length === 0 && guildMap.size > 0) {
-    const newest = Array.from(guildMap.values()).sort((a, b) => Number(b.spawnedAt || 0) - Number(a.spawnedAt || 0))[0];
-    if (newest) eggsInChannel = [newest];
-    logger.debug('Egg catch fallback matched single active guild egg', {
-      guildId: gid,
-      messageChannelId: message.channel.id,
-      spawnChannelId: newest && newest.channelId,
-      activeInGuild: guildMap.size,
-    });
-  }
-
   // Last-resort fallback: if no in-memory egg matched but DB still has one, reconstruct minimally.
   if (eggsInChannel.length === 0) {
     try {
@@ -1671,7 +1677,13 @@ async function handleMessage(message) {
         .where({ guild_id: String(gid) })
         .orderBy('spawned_at', 'desc')
         .first();
-      if (row) {
+      const rowChannelMatches = row && String(row.channel_id) === String(message.channel.id);
+      const rowReplyMatches =
+        row &&
+        message.reference &&
+        message.reference.messageId &&
+        String(row.message_id) === String(message.reference.messageId);
+      if (row && (rowChannelMatches || rowReplyMatches)) {
         const dbEggType = eggTypes.find((t) => t.id === row.egg_type) || { id: row.egg_type, name: row.egg_type, emoji: '' };
         eggsInChannel = [{
           messageId: row.message_id,
@@ -1684,6 +1696,13 @@ async function handleMessage(message) {
           guildId: gid,
           messageId: row.message_id,
           channelId: row.channel_id,
+        });
+      } else if (row) {
+        logger.debug('Ignored DB egg fallback due to channel mismatch', {
+          guildId: gid,
+          messageChannelId: message.channel && message.channel.id,
+          spawnChannelId: row.channel_id,
+          rowMessageId: row.message_id,
         });
       }
     } catch (_) { /* ignore DB fallback errors */ }
